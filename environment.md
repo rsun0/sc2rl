@@ -35,3 +35,50 @@ For each marine, our agent will choose one of 3 actions:
 * Attack closest (attack the roach closest to this marine)
 * Attack weakest (attack the roach with the lowest health)
 The agent will order one marine at a time, cycling through the army of marines. There will be an adjustable number of frames skipped between each order.
+
+## Environment Handler 
+Every frame, the agent will pass its observations to the environment handler. The environment handler will behave differently depending on the number of frames skipped between actions. The environment handler will have two important variables:
+  * frame_skip         # The number of frames between every action
+  * frame_no           # This variable always has the following value: frame_no = total_frames % frame_skip
+
+The environment handler will have a step function. This function will have three primary functionalities.
+  * if frame_no is 0, the environment handler will select a unit and decide on an action. S, A, R, S', D is returned.
+  * if frame_no is 1, the selected unit will be assigned an action by our policy and send the action to the environment.
+  * if frame_no is any other value, step performs no actions on the environment.
+
+At every iteration of step, frame_no will be incremented, and then set equal to frame_no % frame_skip. All interaction between the agent and the environment will pass through this environment handler. This step function handles the multi-frame action sequences needed in the pysc2 environment. 
+
+## Main Class Structure:
+1. Imports
+2. Constants
+	-input space: W x H x D
+	-auxiliary_input_size
+	-action space
+	-player
+	-game constants
+3. Player Class
+4. main():
+	Agent = Agent()
+	Agent.train()
+	Agent.test()
+
+
+Class Agent():
+	action_handler
+	replay_mem = deque(limit=MAX_REPLAY_SIZE)
+	games[]
+
+	def train():
+		action_handler.training = True
+		for game in num_games:
+			Game = run_game()
+			replay_mem.append(Game.mem)
+			gradient_step()
+
+	def run_game():
+		action_handler.new_game()
+		done = False
+		while !done:
+			s, a, r, s’, done = action_handler.get_env()
+			memory.append( (s, a, r, s, done) )
+			action_handler.exec(jobs)
