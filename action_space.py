@@ -25,7 +25,10 @@ class Actuator:
     def __init__(self):
         self.state = _ActuatorState.NOT_SELECTED
 
-    def compute_action(self, action, selected, own_unit_density, enemy_unit_density, enemy_hit_points):
+    def reset(self):
+        self.state = _ActuatorState.NOT_SELECTED
+
+    def compute_action(self, action, selected, friendly_unit_density, enemy_unit_density, enemy_hit_points):
         '''
         Gets the raw action to fulfill the actuator's current state.
 
@@ -40,7 +43,7 @@ class Actuator:
         if self.state == _ActuatorState.NOT_SELECTED:
             if action == Action.SELECT:
                 self.state = _ActuatorState.SELECTED
-                return self._compute_select(own_unit_density)
+                return self._compute_select(friendly_unit_density)
             raise Exception('Actuator cannot order a unit without selection or twice in a row')
         else:
             self.state = _ActuatorState.NOT_SELECTED
@@ -52,19 +55,19 @@ class Actuator:
                 return self._compute_attack_weakest(selected, enemy_hit_points)
             raise Exception('Actuator cannot select twice in a row')
 
-    def _compute_select(self, own_unit_density):
-        possible_y, possible_x = own_unit_density.nonzero()
-        possible_points = zip(possible_x, possible_y)
+    def _compute_select(self, friendly_unit_density):
+        possible_y, possible_x = friendly_unit_density.nonzero()
+        possible_points = list(zip(possible_x, possible_y))
         point = random.choice(possible_points)
         return actions.FunctionCall(actions.FUNCTIONS.select_point.id, [_SINGLE_SELECT, point])
 
     def _compute_retreat(self, selected, enemy_unit_density):
         enemy_com = ndimage.measurements.center_of_mass(enemy_unit_density)
         unit_position = selected.nonzero()[0][0], selected.nonzero()[1][0]
-        direction_vector = -(enemy_com[1] - unit_position[1]), -(enemy_com[0] - unit_position[0])
+        direction_vector = np.array([-(enemy_com[1] - unit_position[1]), -(enemy_com[0] - unit_position[0])])
 
-        max_movement_x = self._compute_movement_multiple(direction_vector[0], unit_position, enemy_unit_density.shape[1])
-        max_movement_y = self._compute_movement_multiple(direction_vector[1], unit_position, enemy_unit_density.shape[0])
+        max_movement_x = self._compute_movement_multiple(direction_vector[0], unit_position[1], enemy_unit_density.shape[1])
+        max_movement_y = self._compute_movement_multiple(direction_vector[1], unit_position[0], enemy_unit_density.shape[0])
         max_movement = min(max_movement_x, max_movement_y)
         
         retreat_target = max_movement * direction_vector
