@@ -79,7 +79,7 @@ class state_modifier():
         array = np.stack([friendly_selected, friendly_hitpoints, hostile_hitpoints, friendly_density, hostile_density], axis=0)
         
         x, y = friendly_selected.nonzero()
-        marine_hitpoints = friendly_hitpoints[y][x]
+        marine_hitpoints = friendly_hitpoints[y,x]
         
         army_count = obs.observation["player"][_ARMY_COUNT]
         
