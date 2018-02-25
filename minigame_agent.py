@@ -10,6 +10,10 @@ from pysc2.agents import base_agent
 from pysc2.lib import actions
 from pysc2.lib import features
 
+from modified_state_space import state_modifier.modified_state_space
+
+LAST_TIMESTEP = environment.StepType.LAST # MEANS ITS DONE
+
 _NO_OP = actions.FUNCTIONS.no_op.id
 _ATTACK = 1 #TODO
 _RETREAT = 2 #TODO
@@ -104,39 +108,33 @@ ACTIONS = [_NO_OP, _ATTACK, _RETREAT]
 
 INPUT_DIMENSION = 100 #TODO 
 
-class SmartAgent(base_agent.BaseAgent):
-    def __init__(self, n_episodes=10000, n_win_ticks=195, max_env_steps=None, gamma=1.0, epsilon=1.0, epsilon_min=0.01, epsilon_log_decay=0.995, alpha=0.01, alpha_decay=0.01, batch_size=64, monitor=False, quiet=False):
-        self.memory = deque(maxlen=100000)
-        self.env = gym.make('CartPole-v0')
-        if monitor:
-            self.env = gym.wrappers.Monitor(self.env, '../data/cartpole-1', force=True)
+class DefeatRoachesAgent(base_agent.BaseAgent):
+    def __init__(self):
+        self.memory = deque(maxlen=10000)
+        self.games_elapsed = 0
 
-        self.gamma = gamma
-        self.epsilon = epsilon
-        self.epsilon_min = epsilon_min
-        self.epsilon_decay = epsilon_log_decay
-        self.alpha = alpha
-        self.alpha_decay = alpha_decay
-        self.n_episodes = n_episodes
-        self.n_win_ticks = n_win_ticks
-        self.batch_size = batch_size
-        self.quiet = quiet
+        self.gamma = 1.0
+        self.epsilon = 1.0
+        self.epsilon_min = 0.01
+        self.epsilon_decay = 0.995
+        self.alpha = 0.01
+        self.alpha_decay = 0.01
+        self.batch_size = 64
+
+        self.frame = 0
+        self.FRAMES_PER_ACTION = 10
+
+        self.state = None
+        self.action = None
+        self.reward = 0
 
         # initialize model
-        
+        self.model = self.initialize_model()
+        self.model.compile(loss='mse', optimizer=Adam(lr=self.alpha, decay=self.alpha_decay) )
 
+        super(SmartAgent, self).__init__()
 
-        # self.model = Sequential()
-        # self.model.add( Convolution2D(32, 3, 3, activation='relu', input_shape=(128,128,3)) ) # input layer
-        # self.model.add(MaxPooling2D(pool_size=(2,2)))
-        # self.model.add(Dropout(0.25))
-        # self.model.add(Flatten())
-        # self.model.add(Dense(128, activation='relu'))
-        # self.model.add(Dropout(0.5))
-        # self.model.add(Dense(len(ACTIONS), activation='softmax')) # output layer (actions space)
-
-        # Store layers weight & bias
-        
+    def initialize_model(self):
         square_input, scalar_input = get_input_space()
         target = get_action_space()
         
@@ -159,13 +157,8 @@ class SmartAgent(base_agent.BaseAgent):
             'out': tf.Variable(tf.random_normal([num_classes])),
             'scalar': tf.Variable(tf.random_normal([num_classes])) #TODO
         }
-
-        self.model = conv_net(square_input, scalar_input, weights, biases, dropout)
-
-
-        self.model.compile(loss='mse', optimizer=Adam(lr=self.alpha, decay=self.alpha_decay) )
-
-        super(SmartAgent, self).__init__()
+        
+        return conv_net(square_input, scalar_input, weights, biases, dropout)
 
     def remember(self, state, action, reward, next_state, done):
         '''
@@ -191,13 +184,6 @@ class SmartAgent(base_agent.BaseAgent):
         '''
 
         return max(self.epsilon_min, min(self.epsilon, 1.0 - math.log10( (t+1) * self.epsilon_decay ) ) )
-
-    def preprocess_state(self, state):
-        '''
-        Change state into INPUT SPACE FOR DQN
-        '''
-        # TODO
-        return np.reshape(state, [1,4])
 
     def replay(self, batch_size):
         x_batch, y_batch = [], []
@@ -225,12 +211,68 @@ class SmartAgent(base_agent.BaseAgent):
         
     #     return [x + x_distance, y + y_distance]
     
-    def step(self, obs):
-        super(SmartAgent, self).step(obs)
+    # def step(self, obs):
+    #     super(SmartAgent, self).step(obs)
         
-        player_y, player_x = (obs.observation['minimap'][_PLAYER_RELATIVE] == _PLAYER_SELF).nonzero()
-        self.base_top_left = 1 if player_y.any() and player_y.mean() <= 31 else 0
+    #     player_y, player_x = (obs.observation['minimap'][_PLAYER_RELATIVE] == _PLAYER_SELF).nonzero()
+    #     self.base_top_left = 1 if player_y.any() and player_y.mean() <= 31 else 0
         
-        return actions.FunctionCall(_NO_OP, [])
+    #     return actions.FunctionCall(_NO_OP, [])
 
-    
+    def handle_step(self, next_state, reward, done):
+        if done:
+            self.compute_loss()
+            return ACTION_NO_OP
+
+        if frame == 0: # selects the random unit
+            return actuator.select_random_unit()
+
+        elif frame == 1: # actually selects the action
+            chosen_action = self.choose_action(state, self.epsilon)
+
+
+            return chosen_action, previous_reward, previous_action
+        else: # skips frame
+            frame = (frame + 1) % self.FRAMES_PER_ACTION
+            return ACTION_NO_OP
+
+    def step(self, observation):
+        next_state, reward, done = self.extract_from_observation(observation)
+        action = self.handle_step(next_state, reward, done)
+        if action not in ALLOWED_ACTIONS:
+           return action
+
+        # calculate reward, etc..
+        prev_reward = self.reward
+        prev_state = self.state
+        prev_action = self.action
+
+        # select OUR ACTIONS... retreat, attack closest, attack weakest       
+       
+
+    def extract_done_from_observation(self, observation):
+        return observation.step_type == LAST_TIMESTEP
+
+    def extract_reward_from_observation(self, observation):
+        '''
+            Returns the reward by taking the delta in score
+        '''
+        curr_score = observation.observation['score_cumulative'][0]
+        return curr_score - self.score
+
+    def extract_state_from_observation(self, observation):
+        return modified_state_space(observation)
+
+    def extract_from_observation(self, observation):
+        done = extract_done_from_observation(self, observation)
+        reward = extract_reward_from_observation(self, observation)
+        state = extract_state_from_observation(observation)
+
+        return state, reward, done
+
+    def preprocess_state(self, state):
+        '''
+        Change state into INPUT SPACE FOR DQN
+        '''
+        # TODO
+        return np.reshape(state, [1,4])
