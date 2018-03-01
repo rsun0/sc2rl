@@ -62,16 +62,15 @@ class Actuator:
         return actions.FunctionCall(actions.FUNCTIONS.select_point.id, [_SINGLE_SELECT, point])
 
     def _compute_retreat(self, selected, enemy_unit_density):
-        enemy_com = ndimage.measurements.center_of_mass(enemy_unit_density)
-        unit_position = selected.nonzero()[0][0], selected.nonzero()[1][0]
-        direction_vector = np.array([-(enemy_com[1] - unit_position[1]), -(enemy_com[0] - unit_position[0])])
+        enemy_com = np.flip(np.array(ndimage.measurements.center_of_mass(enemy_unit_density)), 0)
+        unit_position = np.array((selected.nonzero()[1][0], selected.nonzero()[0][0]))
+        direction_vector = -(enemy_com - unit_position)
 
-        max_movement_x = self._compute_movement_multiple(direction_vector[0], unit_position[1], enemy_unit_density.shape[1])
-        max_movement_y = self._compute_movement_multiple(direction_vector[1], unit_position[0], enemy_unit_density.shape[0])
+        max_movement_x = self._compute_movement_multiple(direction_vector[0], unit_position[0], enemy_unit_density.shape[1])
+        max_movement_y = self._compute_movement_multiple(direction_vector[1], unit_position[1], enemy_unit_density.shape[0])
         max_movement = min(max_movement_x, max_movement_y)
         
-        retreat_target = max_movement * direction_vector
-        retreat_target = round(retreat_target[0]), round(retreat_target[1])
+        retreat_target = np.round(max_movement * direction_vector + unit_position)
         return actions.FunctionCall(actions.FUNCTIONS.Move_screen.id, [_NOT_QUEUED, retreat_target])
 
     @staticmethod
