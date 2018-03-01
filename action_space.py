@@ -39,12 +39,15 @@ class Actuator:
         '''
         if action == Action.NO_OP:
             return actions.FunctionCall(actions.FUNCTIONS.no_op.id, [])
+
+        if np.all(selected == 0):
+            self.state = _ActuatorState.NOT_SELECTED
         
         if self.state == _ActuatorState.NOT_SELECTED:
             if action == Action.SELECT:
                 self.state = _ActuatorState.SELECTED
                 return self._compute_select(friendly_unit_density)
-            raise Exception('Actuator cannot order a unit without selection or twice in a row')
+            raise Exception('Actuator cannot order a unit without selection or twice in a row (unit may have died)')
         else:
             self.state = _ActuatorState.NOT_SELECTED
             if action == Action.RETREAT:
@@ -52,12 +55,14 @@ class Actuator:
             elif action == Action.ATTACK_CLOSEST:
                 return self._compute_attack_closest(selected, enemy_unit_density)
             elif action == Action.ATTACK_WEAKEST:
-                return self._compute_attack_weakest(selected, enemy_hit_points)
+                return self._compute_attack_weakest(enemy_unit_density, enemy_hit_points)
             raise Exception('Actuator cannot select twice in a row')
 
     def _compute_select(self, friendly_unit_density):
         possible_y, possible_x = friendly_unit_density.nonzero()
         possible_points = list(zip(possible_x, possible_y))
+        if not possible_points:
+            raise Exception('Actuator cannot select when no units exist')
         point = random.choice(possible_points)
         return actions.FunctionCall(actions.FUNCTIONS.select_point.id, [_SINGLE_SELECT, point])
 
@@ -86,5 +91,7 @@ class Actuator:
     def _compute_attack_closest(self, selected, enemy_unit_density):
         pass
 
-    def _compute_attack_weakest(self, selected, enemy_hit_points):
-        pass
+    def _compute_attack_weakest(self, enemy_unit_density, enemy_hit_points):
+        enemy_hit_points[enemy_unit_density == 0] = np.iinfo(enemy_hit_points.dtype).max
+        weakest_enemy = np.flip(np.array(np.unravel_index(np.argmin(enemy_hit_points), enemy_hit_points.shape)), axis=0)
+        return actions.FunctionCall(actions.FUNCTIONS.Attack_screen.id, [_NOT_QUEUED, weakest_enemy])
