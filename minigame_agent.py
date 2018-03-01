@@ -9,10 +9,14 @@ import tensorflow as tf
 from pysc2.agents import base_agent
 from pysc2.lib import actions
 from pysc2.lib import features
+from pysc2.env import environment
 
-from modified_state_space import state_modifier.modified_state_space
+from modified_state_space import modified_state_space
 
+FIRST_TIMESTEP = environment.StepType.FIRST
 LAST_TIMESTEP = environment.StepType.LAST # MEANS ITS DONE
+WINDOW_WIDTH = 84
+
 
 _NO_OP = actions.FUNCTIONS.no_op.id
 _ATTACK = 1 #TODO
@@ -22,16 +26,21 @@ _RETREAT = 2 #TODO
 # _SELECT_ARMY = actions.FUNCTIONS.select_army.id
 # _ATTACK_MINIMAP = actions.FUNCTIONS.Attack_minimap.id
 
+ACTIONS = [0, 1, 2]
+INPUT_SPACE = [(5, WINDOW_WIDTH, WINDOW_WIDTH), (1, 2)]
+
 _PLAYER_RELATIVE = features.SCREEN_FEATURES.player_relative.index
 _UNIT_TYPE = features.SCREEN_FEATURES.unit_type.index
 _PLAYER_ID = features.SCREEN_FEATURES.player_id.index
 _PLAYER_SELF = 1
+
 
 # Training Parameters
 learning_rate = 0.001
 num_steps = 200
 batch_size = 128
 display_step = 10
+
 
 # Create some wrappers for simplicity
 def conv2d(x, W, b, strides=1):
@@ -46,8 +55,8 @@ def maxpool2d(x, k=2):
     return tf.nn.max_pool(x, ksize=[1, k, k, 1], strides=[1, k, k, 1],
                           padding='SAME')
 
-SQUARE_INPUT = tf.placeholder(tf.float32, [ , , 3] ) # SQUARE INPUTS
-SCALAR_INPUT = tf.placeholder(tf.float, [, ] )
+SQUARE_INPUT = tf.placeholder(tf.float32, [ WINDOW_WIDTH, WINDOW_WIDTH, 3] ) # SQUARE INPUTS
+SCALAR_INPUT = tf.placeholder(tf.float32, [1, 2] )
 
 network_action = tf.placeholder(tf.float32, [None, len(ACTIONS)] ) # target
 keep_prob = tf.placeholder(tf.float32) # dropout (keep probability)
@@ -108,7 +117,7 @@ ACTIONS = [_NO_OP, _ATTACK, _RETREAT]
 
 INPUT_DIMENSION = 100 #TODO 
 
-class DefeatRoachesAgent(base_agent.BaseAgent):
+class DefeatRoaches(base_agent.BaseAgent):
     def __init__(self):
         self.memory = deque(maxlen=10000)
         self.games_elapsed = 0
@@ -124,6 +133,10 @@ class DefeatRoachesAgent(base_agent.BaseAgent):
         self.frame = 0
         self.FRAMES_PER_ACTION = 10
 
+        self.prev_state = None
+        self.prev_action = None
+        self.prev_reward = 0
+
         self.state = None
         self.action = None
         self.reward = 0
@@ -136,7 +149,8 @@ class DefeatRoachesAgent(base_agent.BaseAgent):
 
     def initialize_model(self):
         square_input, scalar_input = get_input_space()
-        target = get_action_space()
+        #target = get_action_space()
+        num_classes = len(ACTIONS)
         
         self.weights = {
             # 5x5 conv, 1 input, 32 outputs
@@ -199,11 +213,13 @@ class DefeatRoachesAgent(base_agent.BaseAgent):
             x_batch.append( state[0] )
             y_batch.append( y_target[0] )
 
+        return x_batch, y_batch
+        """   Commented out by Michael. This function will now return x_batch, y_batch.
         # put batch in for training
         self.model.fit( np.array(x_batch), np.array(y_batch), batch_size=len(x_batch), verbose=0)
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay # decay
-
+        """
 
     # def transformLocation(self, x, x_distance, y, y_distance):
     #     if not self.base_top_left:
@@ -219,7 +235,7 @@ class DefeatRoachesAgent(base_agent.BaseAgent):
         
     #     return actions.FunctionCall(_NO_OP, [])
 
-    def handle_step(self, next_state, reward, done):
+    def handle_step(self, curr_state, reward, done):
         if done:
             self.compute_loss()
             return ACTION_NO_OP
@@ -228,7 +244,7 @@ class DefeatRoachesAgent(base_agent.BaseAgent):
             return actuator.select_random_unit()
 
         elif frame == 1: # actually selects the action
-            chosen_action = self.choose_action(state, self.epsilon)
+            chosen_action = self.choose_action(curr_state, self.epsilon)
 
 
             return chosen_action, previous_reward, previous_action
@@ -237,18 +253,44 @@ class DefeatRoachesAgent(base_agent.BaseAgent):
             return ACTION_NO_OP
 
     def step(self, observation):
-        next_state, reward, done = self.extract_from_observation(observation)
-        action = self.handle_step(next_state, reward, done)
+        curr_state, reward, done = self.extract_from_observation(observation)
+        action = self.handle_step(curr_state, reward, done)
+        
+        self.state = curr_state
+        self.action = action
+        self.reward = self.extract_reward_from_observation(observation)
+        self.done = extract_done_from_observation(observation)
+        
+        if (self.done):
+            self.reward += self.reward_from_end_state(observation)
+            self.remember(self.prev_state, self.prev_action, self.reward, self.state, self.done)
+            self.train_model(iters=100)
+            print(self.memory)
+        
+        elif (not self.extract_start_from_observation(observation)):
+            self.remember(self.prev_state, self.prev_action, self.reward, self.state, self.done)
+        
+        
         if action not in ALLOWED_ACTIONS:
            return action
 
         # calculate reward, etc..
-        prev_reward = self.reward
-        prev_state = self.state
-        prev_action = self.action
+        self.prev_reward = self.reward
+        self.prev_state = self.state
+        self.prev_action = self.action
 
         # select OUR ACTIONS... retreat, attack closest, attack weakest       
        
+    def reward_from_end_state(self, observation):
+    
+        """
+        EDIT SO THAT 100 IS RETURNED IF PLAYER WON, -100 IF PLAYER LOST
+        """
+    
+        return 0
+       
+    def extract_start_from_observation(self, observation):
+        return observation.step_type == FIRST_TIMESTEP
 
     def extract_done_from_observation(self, observation):
         return observation.step_type == LAST_TIMESTEP
@@ -257,6 +299,8 @@ class DefeatRoachesAgent(base_agent.BaseAgent):
         '''
             Returns the reward by taking the delta in score
         '''
+        if (self.extract_start_from_observation(observation)):
+            return 0
         curr_score = observation.observation['score_cumulative'][0]
         return curr_score - self.score
 
@@ -276,3 +320,29 @@ class DefeatRoachesAgent(base_agent.BaseAgent):
         '''
         # TODO
         return np.reshape(state, [1,4])
+        
+    def train_model(iters=100):
+        for i in range(iters):
+            batch = self.replay(self.batch_size)
+            """
+            
+            COMMENCE TRAINING STEP HERE
+            
+            """
+    
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
