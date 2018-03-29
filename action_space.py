@@ -2,8 +2,9 @@ from pysc2.lib import actions
 from pysc2.lib import features
 from enum import Enum
 from enum import auto
-from scipy import ndimage
 import numpy as np
+from scipy import ndimage
+from scipy.spatial import distance
 import random
 
 _SINGLE_SELECT = [0]
@@ -68,7 +69,7 @@ class Actuator:
 
     def _compute_retreat(self, selected, enemy_unit_density):
         enemy_com = np.flip(np.array(ndimage.measurements.center_of_mass(enemy_unit_density)), 0)
-        unit_position = np.array((selected.nonzero()[1][0], selected.nonzero()[0][0]))
+        unit_position = np.flip(np.array(ndimage.measurements.center_of_mass(selected)), 0)
         direction_vector = -(enemy_com - unit_position)
 
         max_movement_x = self._compute_movement_multiple(direction_vector[0], unit_position[0], enemy_unit_density.shape[1])
@@ -89,7 +90,11 @@ class Actuator:
         return max_movement
 
     def _compute_attack_closest(self, selected, enemy_unit_density):
-        pass
+        unit_position = np.expand_dims(np.array(ndimage.measurements.center_of_mass(selected)), axis=0)
+        enemy_positions = np.transpose(enemy_unit_density.nonzero())
+        distances = distance.cdist(unit_position, enemy_positions)
+        closest = np.flip(enemy_positions[np.argmin(distances)], 0)
+        return actions.FunctionCall(actions.FUNCTIONS.Attack_screen.id, [_NOT_QUEUED, closest])
 
     def _compute_attack_weakest(self, enemy_unit_density, enemy_hit_points):
         enemy_hit_points[enemy_unit_density == 0] = np.iinfo(enemy_hit_points.dtype).max

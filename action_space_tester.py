@@ -31,4 +31,4 @@ class Agent(base_agent.BaseAgent):
             return self.actuator.compute_action(Action.SELECT, selected, friendly_unit_density, enemy_unit_density, enemy_hit_points)
         else:
             self.state = 0
-            return self.actuator.compute_action(Action.ATTACK_WEAKEST, selected, friendly_unit_density, enemy_unit_density, enemy_hit_points)
+            return self.actuator.compute_action(Action.ATTACK_CLOSEST, selected, friendly_unit_density, enemy_unit_density, enemy_hit_points)
