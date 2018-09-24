@@ -18,7 +18,8 @@ class terran_agent(base_agent.BaseAgent):
             self.handle_action(obs)
         else:
             self.handle_select(obs)
-        
+            
+        self.iteration += 1
         return actions.FUNCTIONS.no_op()
         
     # Implement this     
@@ -33,7 +34,19 @@ class terran_agent(base_agent.BaseAgent):
         if (len(marines) > 0):
             marine = random.choice(marines)
             return actions.FUNCTIONS.select_point("select_all_type", (larva.x,
-                                                                      larva.y)
+                                                                      larva.y))
+                                                                      
+                                                                      
+    def unit_type_is_selected(self, obs, unit_type):
+        if (len(obs.observation.single_select) > 0 and
+          obs.observation.single_select[0].unit_type == unit_type):
+            return True
+    
+        if (len(obs.observation.multi_select) > 0 and
+          obs.observation.multi_select[0].unit_type == unit_type):
+            return True
+    
+        return False
 
 
 
