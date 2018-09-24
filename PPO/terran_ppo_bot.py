@@ -13,14 +13,34 @@ class terran_agent(base_agent.BaseAgent):
         
     def step(self, obs):
         super(terran_agent, self).step(obs)
-        print(self.iteration)
-        self.iteration += 1
+        
+        if self.unit_type_is_selected(obs, units.Terran.Marine):
+            self.handle_action(obs)
+        else:
+            self.handle_select(obs)
+        
         return actions.FUNCTIONS.no_op()
+        
+    # Implement this     
+    def handle_action(self, 
+                        obs):
+        return actions.FUNCTIONS.no_op()
+        
+    # Selects all marines
+    def handle_select(self, 
+                        obs):
+        marines = self.get_units_by_type(obs, units.Terran.Marine)
+        if (len(marines) > 0):
+            marine = random.choice(marines)
+            return actions.FUNCTIONS.select_point("select_all_type", (larva.x,
+                                                                      larva.y)
 
-STEPS = 25000
-STEP_MUL=8
 
 
+
+
+
+STEP_MUL=1
 
 def main(unused_argv):
     agent = terran_agent()
