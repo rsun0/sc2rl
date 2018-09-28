@@ -36,7 +36,6 @@ class terran_agent(base_agent.BaseAgent):
             return actions.FUNCTIONS.select_point("select_all_type", (larva.x,
                                                                       larva.y))
                                                                       
-                                                                      
     def unit_type_is_selected(self, obs, unit_type):
         if (len(obs.observation.single_select) > 0 and
           obs.observation.single_select[0].unit_type == unit_type):
@@ -47,11 +46,6 @@ class terran_agent(base_agent.BaseAgent):
             return True
     
         return False
-
-
-
-
-
 
 STEP_MUL=1
 
