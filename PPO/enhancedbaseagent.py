@@ -1,6 +1,6 @@
 
 """
-Written by Michael McGuire to provide an enhanced base agent with simple repetitive functions.
+Written by Michael McGuire to provide an enhanced base agent with simple repetitive functions. (09 / 29 / 2018)
 """
 
 import pysc2
@@ -15,10 +15,8 @@ class EnhancedBaseAgent(base_agent.BaseAgent):
     def __init__(self):
         super(EnhancedBaseAgent, self).__init__()
     
-    """
-    def step(self, obs):
-        super(EnhancedBaseAgent, self).step(obs)
-    """
+    
+    
     """
         Returns True if obs shows that there is a unit of type unit_type currently selected
     """
@@ -34,6 +32,8 @@ class EnhancedBaseAgent(base_agent.BaseAgent):
     
         return False
         
+        
+        
     """
         Selects all units of type unit_type 
     """
@@ -44,11 +44,21 @@ class EnhancedBaseAgent(base_agent.BaseAgent):
             u = random.choice(my_units)
             return actions.FUNCTIONS.select_point("select_all_type", (u.x, u.y))
 
+
+
+    """
+        Returns list of units of type unit_type in the feature_units layer of obs
+    """
     def get_units_by_type(self, obs, unit_type):
         return [unit for unit in obs.observation.feature_units if unit.unit_type == unit_type]
 
 
 
+
+"""
+    Runs 'agent' on map 'mapname' for 'iterations' iterations.
+    Returns the data from all of the games run.
+"""
 def run_game_with_agent(agent, mapname, iterations):
     game_data = []
     with sc2_env.SC2Env(
