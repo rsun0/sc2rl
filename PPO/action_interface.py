@@ -33,9 +33,9 @@ class Actuator:
         if np.all(selected == 0):
             self.units_selected = False
 
-        if not self.unit_selected:
+        if not self.units_selected:
             if action == Action.SELECT:
-                self.unit_selected = True
+                self.units_selected = True
                 return actions.FUNCTIONS.select_army('select')
             raise Exception('Actuator cannot order units without selection (unit may have died)')
         
@@ -52,8 +52,8 @@ class Actuator:
         enemy_com = np.flip(np.array(ndimage.measurements.center_of_mass(enemy_unit_density)), 0)
         direction_vector = -(enemy_com - friendly_com)
 
-        max_movement_x = Actuator._compute_movement_multiple(direction_vector[0], friendly_com[0], friendly_unit_density.shape[1])
-        max_movement_y = Actuator._compute_movement_multiple(direction_vector[1], friendly_com[1], friendly_unit_density.shape[0])
+        max_movement_x = Actuator._compute_movement_multiplier(direction_vector[0], friendly_com[0], friendly_unit_density.shape[1])
+        max_movement_y = Actuator._compute_movement_multiplier(direction_vector[1], friendly_com[1], friendly_unit_density.shape[0])
         max_movement = min(max_movement_x, max_movement_y)
         
         retreat_target = np.round(max_movement * direction_vector + friendly_com)
