@@ -48,7 +48,9 @@ class EnhancedBaseAgent(base_agent.BaseAgent):
         return [unit for unit in obs.observation.feature_units if unit.unit_type == unit_type]
 
 
-
+"""
+Runs a given agent on the map mapname. Runs the agent on the mapname for i in iterations.
+"""
 def run_game_with_agent(agent, mapname, iterations):
     game_data = []
     with sc2_env.SC2Env(
