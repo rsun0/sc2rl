@@ -19,10 +19,9 @@ class Agent(base_agent.BaseAgent):
         features, _ = state_modifier.modified_state_space(obs)
         selected = features[0]
         friendly_unit_density = features[2]
-        enemy_unit_density = features[4]
         if np.all(friendly_unit_density == 0):
-            return self.actuator.compute_action(Action.NO_OP, selected, friendly_unit_density, enemy_unit_density)
+            return self.actuator.compute_action(Action.NO_OP, features)
         if not self.actuator.units_selected or np.all(selected == 0):
-            return self.actuator.compute_action(Action.SELECT, selected, friendly_unit_density, enemy_unit_density)
+            return self.actuator.compute_action(Action.SELECT, features)
         else:
-            return self.actuator.compute_action(Action.ATTACK, selected, friendly_unit_density, enemy_unit_density)
+            return self.actuator.compute_action(Action.ATTACK, features)

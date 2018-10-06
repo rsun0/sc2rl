@@ -17,18 +17,20 @@ class Actuator:
     def reset(self):
         self.units_selected = False
 
-    def compute_action(self, action, selected, friendly_unit_density, enemy_unit_density):
+    def compute_action(self, action, custom_obs):
         '''
         Computes the raw action corresponding to the chosen abstract action
 
         :param action: The chosen abstract action (NO_OP, SELECT, RETREAT, or ATTACK)
-        :param selected: 
-        :param friendly_unit_density: The abstract feature representing friendly unit locations
-        :param enemy_unit_density: The abstract feature representing enemy unit locations
+        :param custom_obs: Custom observations as given by modified state space
         :returns: The raw action to return to environment
         '''
         if action == Action.NO_OP:
             return actions.FUNCTIONS.no_op()
+
+        selected = custom_obs[0]
+        friendly_unit_density = custom_obs[2]
+        enemy_unit_density = custom_obs[4]
 
         if np.all(selected == 0):
             self.units_selected = False
