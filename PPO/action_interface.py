@@ -36,17 +36,17 @@ class Actuator:
             self.units_selected = False
 
         if not self.units_selected:
-            if action == Action.SELECT:
-                self.units_selected = True
-                return actions.FUNCTIONS.select_army('select')
-            raise Exception('Actuator cannot order units without selection (unit may have died)')
+            assert action == Action.SELECT, 'Actuator cannot order units without selection (unit may have died)'
+
+            self.units_selected = True
+            return actions.FUNCTIONS.select_army('select')
         
         else:
             if action == Action.RETREAT:
                 return self._compute_retreat(friendly_unit_density, enemy_unit_density)
             elif action == Action.ATTACK:
                 return self._compute_attack(enemy_unit_density)
-            raise Exception('Actuator cannot select with preexisting selection')
+            assert False, 'Actuator cannot select with preexisting selection'
 
     @staticmethod
     def _compute_retreat(friendly_unit_density, enemy_unit_density):
