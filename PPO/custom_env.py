@@ -3,6 +3,7 @@ from pysc2.lib import features
 from modified_state_space import state_modifier
 from action_interface import Action, Actuator
 from numpy import all as np_all
+import numpy as np
 
 class DefeatRoachesEnvironment:
 
@@ -24,6 +25,9 @@ class DefeatRoachesEnvironment:
         )
         self.actuator = Actuator()
         self.last_obs = None
+        self.action_space = 2
+        FACTOR = 8 # TODO
+        self.observation_space = 84*84*FACTOR # 
 
     def reset(self):
         '''
