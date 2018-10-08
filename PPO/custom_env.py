@@ -39,7 +39,7 @@ class DefeatRoachesEnvironment:
         assert not raw_obs.last(), 'Environment reset immediately led to terminal state'
         custom_obs, _ = state_modifier.modified_state_space(raw_obs)
         self.last_obs = custom_obs
-        return custom_obs[1:] # exclude selected
+        return custom_obs[1:], 0, False, None # exclude selected
 
     def step(self, action):
         '''
@@ -71,7 +71,7 @@ class DefeatRoachesEnvironment:
             raw_obs = self.env.reset()[0] # get obs for 1st agent
         else:
             raw_action = self.actuator.compute_action(start_action, self.last_obs)
-            raw_obs = self.env.step([raw_action])
+            raw_obs = self.env.step([raw_action])[0]
         
         if raw_obs.last():
             return raw_obs
@@ -84,7 +84,6 @@ class DefeatRoachesEnvironment:
         selected = custom_obs[0]
         if not self.actuator.units_selected or np_all(selected == 0):
             raw_action = self.actuator.compute_action(Action.SELECT, custom_obs)
-            raw_obs = self.env.step([raw_action])
+            raw_obs = self.env.step([raw_action])[0]
         assert self.actuator.units_selected, 'Units not selected after select action'
-        
         return raw_obs
