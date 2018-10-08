@@ -43,10 +43,16 @@ class DefeatRoachesEnvironment:
         :param action: Action.ATTACK or Action.RETREAT
         :returns: Observations, reward, terminal, None
         '''
-        assert self.last_obs is not None, 'Environment must be reset after init or terminal'
-        assert action == Action.ATTACK or action == Action.RETREAT, 'Agent action must be attack or retreat'
         
-        raw_obs = self._run_to_next(action)
+        assert self.last_obs is not None, 'Environment must be reset after init or terminal'
+        #assert action == Action.ATTACK or action == Action.RETREAT, 'Agent action must be attack or retreat'
+        if (action == 0):
+            step_act = Action.RETREAT
+        if (action == 1):
+            step_act = Action.ATTACK
+        
+        
+        raw_obs = self._run_to_next(step_act)
         custom_obs, _ = state_modifier.modified_state_space(raw_obs)
         self.last_obs = custom_obs if not raw_obs.last() else None
         return custom_obs[1:], raw_obs.reward, raw_obs.last(), None
