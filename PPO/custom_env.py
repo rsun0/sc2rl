@@ -13,7 +13,7 @@ class DefeatRoachesEnvironment:
         :param render: Whether to render the game
         :param step_multiplier: Step multiplier for pysc2 environment
         '''
-        self.env = sc2_env.SC2Env(
+        self._env = sc2_env.SC2Env(
             map_name='DefeatRoaches',
             agent_interface_format=features.AgentInterfaceFormat(
                 feature_dimensions=features.Dimensions(screen=84, minimap=64),
@@ -23,8 +23,11 @@ class DefeatRoachesEnvironment:
             visualize=render,
             game_steps_per_episode=None
         )
-        self.actuator = Actuator()
-        self.last_obs = None
+        self._actuator = Actuator()
+        self._prev_frame = None
+        self._curr_frame = None
+        self._terminal = True
+
         self.action_space = 2
         FACTOR = 8 # TODO
         self.observation_space = 84*84*FACTOR # 
@@ -34,12 +37,13 @@ class DefeatRoachesEnvironment:
         Resets the environment for a new episode
         :returns: Observations, reward, terminal, None for start state
         '''
-        self.actuator.reset()
+        self._actuator.reset()
+        self._terminal = False
 
         raw_obs = self._run_to_next()
-        custom_obs, _ = state_modifier.modified_state_space(raw_obs)
-        self.last_obs = custom_obs if not raw_obs.last() else None
-        return custom_obs[1:], raw_obs.reward, raw_obs.last(), None # exclude selected
+        self._terminal = raw_obs.last()
+        agent_obs = self._combine_frames()
+        return agent_obs, raw_obs.reward, raw_obs.last(), None # exclude selected
 
     def step(self, action):
         '''
@@ -48,7 +52,7 @@ class DefeatRoachesEnvironment:
         :returns: Observations, reward, terminal, None
         '''
         
-        assert self.last_obs is not None, 'Environment must be reset after init or terminal'
+        assert not self._terminal, 'Environment must be reset after init or terminal'
         #assert action == Action.ATTACK or action == Action.RETREAT, 'Agent action must be attack or retreat'
         if (action == 0):
             step_act = Action.RETREAT
@@ -56,9 +60,9 @@ class DefeatRoachesEnvironment:
             step_act = Action.ATTACK
         
         raw_obs = self._run_to_next(step_act)
-        custom_obs, _ = state_modifier.modified_state_space(raw_obs)
-        self.last_obs = custom_obs if not raw_obs.last() else None
-        return custom_obs[1:], raw_obs.reward, raw_obs.last(), None # exclude selected
+        self._terminal = raw_obs.last()
+        agent_obs = self._combine_frames()
+        return agent_obs, raw_obs.reward, raw_obs.last(), None # exclude selected
 
     def _run_to_next(self, start_action=None):
         '''
@@ -67,22 +71,43 @@ class DefeatRoachesEnvironment:
         :returns: Final raw observations
         '''
         if start_action is None:
-            raw_obs = self.env.reset()[0] # get obs for 1st agent
+            raw_obs = self._reset_env()
         else:
-            raw_action = self.actuator.compute_action(start_action, self.last_obs)
-            raw_obs = self.env.step([raw_action])[0]
+            last_obs = state_modifier.modified_state_space(self._curr_frame)
+            raw_action = self._actuator.compute_action(start_action, last_obs)
+            raw_obs = self._step_env(raw_action)
         
         if raw_obs.last():
             return raw_obs
         
-        custom_obs, _ = state_modifier.modified_state_space(raw_obs)
+        custom_obs = state_modifier.modified_state_space(raw_obs)
 
         friendly_unit_density = custom_obs[2]
         assert not np_all(friendly_unit_density == 0), 'All marines dead but not terminal state'
 
         selected = custom_obs[0]
-        if not self.actuator.units_selected or np_all(selected == 0):
-            raw_action = self.actuator.compute_action(Action.SELECT, custom_obs)
-            raw_obs = self.env.step([raw_action])[0]
-        assert self.actuator.units_selected, 'Units not selected after select action'
+        if not self._actuator.units_selected or np_all(selected == 0):
+            raw_action = self._actuator.compute_action(Action.SELECT, custom_obs)
+            raw_obs = self._step_env(raw_action)
+        assert self._actuator.units_selected, 'Units not selected after select action'
         return raw_obs
+
+    def _combine_frames(self):
+        '''
+        Combines the previous and current frame for observations
+        '''
+        assert self._prev_frame is not None and self._curr_frame is not None, 'Returning to agent after less than 2 frames should be impossible'
+
+        custom_prev = state_modifier.modified_state_space(self._prev_frame)[1:]
+        custom_curr = state_modifier.modified_state_space(self._curr_frame)[1:]
+        return np.append(custom_prev, custom_curr, axis=0)
+
+    def _reset_env(self):
+        self._prev_frame = self._curr_frame
+        self._curr_frame = self._env.reset()[0] # get obs for 1st agent
+        return self._curr_frame
+
+    def _step_env(self, raw_action):
+        self._prev_frame = self._curr_frame
+        self._curr_frame = self._env.step([raw_action])[0] # get obs for 1st agent
+        return self._curr_frame

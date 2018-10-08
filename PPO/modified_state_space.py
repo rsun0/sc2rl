@@ -85,9 +85,10 @@ class state_modifier():
         # ------------------------------------- #        
         
         ### Computes the number of marines that are still alive
-        army_count = len(obs.observation.feature_units)
+        # army_count = len(obs.observation.feature_units)
         
-        return (array, army_count)
+        # return (array, army_count)
+        return array
         
         
         
