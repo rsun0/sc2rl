@@ -14,8 +14,8 @@ import numpy as np
 class Network(object):
     def __init__(self, env, scope, num_layers, num_units, obs_plc, act_plc, trainable=True):
         self.env = env
-        self.observation_size = # should be (N x N x 2) (layers for health and unit pos), can be squashed into (N^2 x 2)
-        self.action_size = # should be 2
+        self.observation_size = obs_plc # TODO:
+        self.action_size = env.action_space
         self.trainable = trainable
 
         self.scope = scope
@@ -27,6 +27,7 @@ class Network(object):
         self.act_op = self.action_sample()
 
     def _build_network(self, num_layers, num_units):
+        # TODO: switch to CONV NETS
         with tf.variable_scope(self.scope):
             x = self.obs_place
             for i in range(num_layers):
@@ -74,9 +75,9 @@ class PPOAgent(object):
         self.adv_place = tf.placeholder(shape=[None], dtype=tf.float32)
         self.return_place = tf.placeholder(shape=[None], dtype=tf.float32)
 
-        self.obs_place = tf.placeholder(shape=[None, env.observation_space.shape[0]],
+        self.obs_place = tf.placeholder(shape=[None, env.observation_space,
                                         name="ob", dtype=tf.float32)
-        self.acts_place = tf.placeholder(shape=[None, env.action_space.shape[0]],
+        self.acts_place = tf.placeholder(shape=[None, env.action_space,
                                          name="ac", dtype=tf.float32)
 
         ## build network
@@ -123,7 +124,7 @@ class PPOAgent(object):
 
     def traj_generator(self):
         t = 0
-        action = # TODO env.action_space.sample()
+        action = int(env.action_space * random.random()) # this is replacement of env.action_space.sample()
         done = True
         ob = env.reset()
 
@@ -159,7 +160,7 @@ class PPOAgent(object):
             actions[i] = action[0]
             prevactions[i] = prevaction
 
-            ob, reward, done, _ = env.step(action[0]) # TODO: REPLACE
+            ob, reward, done, _ = env.step(action[0]) # TODO: select argmax from action? or is action[0] always?
             rewards[i] = reward
 
             cur_ep_return += reward
@@ -178,6 +179,7 @@ class PPOAgent(object):
         action, value = tf.get_default_session().run([self.net.act_op, self.net.v], feed_dict={
             self.net.obs_place: ob[None]
         })
+        # TODO: Check if action is an array
         return action, value
 
     def run(self):
@@ -256,7 +258,7 @@ class PPOAgent(object):
 
 
 if __name__ == "__main__":
-    env = # TODO
+    env = DefeatRoachesEnvironment(render=True, step_multiplier=1)
     sess = tf.InteractiveSession()
     ppo = PPOAgent(env)
     tf.get_default_session().run(tf.global_variables_initializer())
