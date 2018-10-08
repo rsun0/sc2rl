@@ -7,7 +7,7 @@ import numpy as np
 
 class DefeatRoachesEnvironment:
 
-    def __init__(self, render=False, step_multiplier=1):
+    def __init__(self, render=False, step_multiplier=None):
         '''
         Initializes internal pysc2 environment
         :param render: Whether to render the game
@@ -21,7 +21,7 @@ class DefeatRoachesEnvironment:
             ),
             step_mul=step_multiplier,
             visualize=render,
-            game_steps_per_episode=0
+            game_steps_per_episode=None
         )
         self.actuator = Actuator()
         self.last_obs = None
