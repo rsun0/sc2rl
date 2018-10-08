@@ -32,19 +32,19 @@ class DefeatRoachesEnvironment:
     def reset(self):
         '''
         Resets the environment for a new episode
-        :returns: The start state
+        :returns: Observations, reward, terminal, None for start state
         '''
         self.actuator.reset()
+
         raw_obs = self._run_to_next()
-        assert not raw_obs.last(), 'Environment reset immediately led to terminal state'
         custom_obs, _ = state_modifier.modified_state_space(raw_obs)
-        self.last_obs = custom_obs
-        return custom_obs[1:], 0, False, None # exclude selected
+        self.last_obs = custom_obs if not raw_obs.last() else None
+        return custom_obs[1:], raw_obs.reward, raw_obs.last(), None # exclude selected
 
     def step(self, action):
         '''
         Runs the environment until the next agent action is required
-        :param action: Action.ATTACK or Action.RETREAT
+        :param action: 0 for Action.RETREAT or 1 for Action.ATTACK
         :returns: Observations, reward, terminal, None
         '''
         
@@ -55,11 +55,10 @@ class DefeatRoachesEnvironment:
         if (action == 1):
             step_act = Action.ATTACK
         
-        
         raw_obs = self._run_to_next(step_act)
         custom_obs, _ = state_modifier.modified_state_space(raw_obs)
         self.last_obs = custom_obs if not raw_obs.last() else None
-        return custom_obs[1:], raw_obs.reward, raw_obs.last(), None
+        return custom_obs[1:], raw_obs.reward, raw_obs.last(), None # exclude selected
 
     def _run_to_next(self, start_action=None):
         '''
