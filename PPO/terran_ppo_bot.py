@@ -7,6 +7,7 @@ import random
 import enhancedbaseagent
 from enhancedbaseagent import EnhancedBaseAgent
 from modified_state_space import state_modifier
+import numpy as np
 
 class terran_agent(EnhancedBaseAgent):
 
@@ -23,7 +24,6 @@ class terran_agent(EnhancedBaseAgent):
     def step(self, obs):
     
         simp_obs = state_modifier.modified_state_space(obs)
-    
     
         self.iteration += 1
         super(terran_agent, self).step(obs)

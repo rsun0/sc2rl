@@ -61,15 +61,16 @@ class EnhancedBaseAgent(base_agent.BaseAgent):
 """
 def run_game_with_agent(agent, mapname, iterations):
     game_data = []
-    with sc2_env.SC2Env(
+    env = sc2_env.SC2Env(
         map_name=mapname,
         agent_interface_format=features.AgentInterfaceFormat(
             feature_dimensions=features.Dimensions(screen=84, minimap=64),
             use_feature_units=True),
         step_mul=1,
         visualize=True,
-        game_steps_per_episode=0) as env:
-                
+        game_steps_per_episode=0)
+        
+    for i in range(1):
         agent.setup(env.observation_spec(), env.action_spec())
         for i in range(iterations):
             print("Playing game {}".format(i+1))

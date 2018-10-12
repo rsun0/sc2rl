@@ -11,6 +11,7 @@
 import tensorflow as tf
 import numpy as np
 from custom_env import DefeatRoachesEnvironment
+import random
 
 class Network(object):
     def __init__(self, env, scope, num_layers, num_units, obs_plc, act_plc, trainable=True):
@@ -24,7 +25,7 @@ class Network(object):
         self.obs_place = obs_plc
         self.acts_place = act_plc
 
-        self.p, self.v, self.logstd = self._build_network(num_layers=num_layers, num_units=num_units)
+        self.p , self.v, self.logstd = self._build_network(num_layers=num_layers, num_units=num_units)
         self.act_op = self.action_sample()
 
     def _build_network(self, num_layers, num_units):
@@ -34,7 +35,7 @@ class Network(object):
             for i in range(num_layers):
                 x = tf.layers.dense(x, units=num_units, activation=tf.nn.tanh, name="p_fc"+str(i),
                                     trainable=self.trainable)
-            action = tf.layers.dense(x, units=self.action_size, activation=tf.tanh,
+            action = tf.layers.dense(x, units=self.action_size, activation=tf.nn.softmax,
                                      name="p_fc"+str(num_layers), trainable=self.trainable)
 
             x = self.obs_place
@@ -50,7 +51,7 @@ class Network(object):
         return action, value, logstd
 
     def action_sample(self):
-        return self.p + tf.exp(self.logstd) * tf.random_normal(tf.shape(self.p))
+        return self.p # + tf.exp(self.logstd) * tf.random_normal(tf.shape(self.p))
 
     def get_variables(self):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.scope)
@@ -76,9 +77,9 @@ class PPOAgent(object):
         self.adv_place = tf.placeholder(shape=[None], dtype=tf.float32)
         self.return_place = tf.placeholder(shape=[None], dtype=tf.float32)
 
-        self.obs_place = tf.placeholder(shape=(env.observation_space),
+        self.obs_place = tf.placeholder(shape=(None,env.observation_space),
                                         name="ob", dtype=tf.float32)
-        self.acts_place = tf.placeholder(shape=(env.action_space),
+        self.acts_place = tf.placeholder(shape=(None,2),
                                          name="ac", dtype=tf.float32)
 
         ## build network
@@ -104,6 +105,7 @@ class PPOAgent(object):
 
     @staticmethod
     def logp(net):
+        print(net.acts_place, net.p, net.logstd)
         logp = -(0.5 * tf.reduce_sum(tf.square((net.acts_place - net.p) / tf.exp(net.logstd)), axis=-1) \
             + 0.5 * np.log(2.0 * np.pi) * tf.to_float(tf.shape(net.p)[-1]) \
             + tf.reduce_sum(net.logstd, axis=-1))
@@ -127,8 +129,9 @@ class PPOAgent(object):
         t = 0
         action = int(env.action_space * random.random()) # this is replacement of env.action_space.sample()
         done = True
-        ob = env.reset()
-
+        ob, reward, done, _ = env.reset()
+        ob = self.normalize(ob)
+        ob = ob.flatten()
         cur_ep_return = 0
         cur_ep_length = 0
         ep_returns = []
@@ -138,13 +141,13 @@ class PPOAgent(object):
         rewards = np.zeros(self.step_size, 'float32')
         values = np.zeros(self.step_size, 'float32')
         dones = np.zeros(self.step_size, 'int32')
-        actions = np.array([action for _ in range(self.step_size)])
+        actions = np.array([np.zeros((2,)) for _ in range(self.step_size)])
         prevactions = actions.copy()
 
         while True:
             prevaction = action
-            action, value = self.act(ob)
-            #print(value)
+            action_vals, value = self.act(ob)
+            action = self.select_action(action_vals)
             if t > 0 and t % self.step_size == 0:
                 yield {"ob": obs, "reward":rewards, "value": values,
                        "done": dones, "action": actions, "prevaction": prevactions,
@@ -158,10 +161,14 @@ class PPOAgent(object):
             obs[i] = ob
             values[i] = value
             dones[i] = done
-            actions[i] = action[0]
-            prevactions[i] = prevaction
+            actions[i] = np.zeros((2,))
+            actions[i][action] = 1
+            prevactions[i] = np.zeros((2,))
+            prevactions[i][prevaction] = 1
 
-            ob, reward, done, _ = env.step(action[0]) # TODO: select argmax from action? or is action[0] always?
+            ob, reward, done, _ = env.step(action) # TODO: select argmax from action? or is action[0] always?
+            ob = self.normalize(ob)
+            ob = ob.flatten()
             rewards[i] = reward
 
             cur_ep_return += reward
@@ -173,15 +180,38 @@ class PPOAgent(object):
                 ep_lengths.append(cur_ep_length)
                 cur_ep_return = 0
                 cur_ep_length = 0
-                ob = env.reset()
+                ob, reward, done, _ = env.reset()
+                ob = self.normalize(ob)
+                ob = ob.flatten()
             t += 1
 
     def act(self, ob):
-        action, value = tf.get_default_session().run([self.net.act_op, self.net.v], feed_dict={
+        ob=ob.flatten()
+        actions, value = tf.get_default_session().run([self.net.act_op, self.net.v], feed_dict={
             self.net.obs_place: ob[None]
         })
-        # TODO: Check if action is an array
-        return action, value
+        #action = self.select_action(actions)
+        return actions, value
+        
+    def normalize(self, ob):
+        return ((ob.T - np.mean(ob, axis=(1,2))) / (np.max(ob, axis=(1,2)) - np.min(ob, axis=(1,2)))).T
+        
+    """
+    Returns some element i in range(len(action_probs)), each with action_probs[i] probability.
+    """
+    def select_action(self, action_probs):
+        action_probs = action_probs.reshape((self.env.action_space))
+        num = random.random()
+        running_sum = 0.0
+        for i in range(len(action_probs)):
+            
+            running_sum += action_probs[i]
+            if num < running_sum:
+                return i
+            
+        return len(action_probs)-1
+        
+        
 
     def run(self):
         traj_gen = self.traj_generator()
@@ -220,6 +250,8 @@ class PPOAgent(object):
                 self.save_model("./model/ppo_defeat_banelings")
 
     def update(self):
+        print("--- update called ---")
+        
         ent = self.entropy(self.net)
         ratio = tf.exp(self.logp(self.net) - tf.stop_gradient(self.logp(self.old_net)))
         surr1 = ratio * self.adv_place
@@ -259,7 +291,7 @@ class PPOAgent(object):
 
 
 if __name__ == "__main__":
-    env = DefeatRoachesEnvironment(render=True, step_multiplier=1)
+    env = DefeatRoachesEnvironment(render=True, step_multiplier=6)
     sess = tf.InteractiveSession()
     ppo = PPOAgent(env)
     tf.get_default_session().run(tf.global_variables_initializer())

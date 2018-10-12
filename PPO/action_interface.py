@@ -1,14 +1,13 @@
 from pysc2.lib import actions
 from enum import Enum
-from enum import auto
 import numpy as np
 from scipy import ndimage
 
 class Action(Enum):
-    NO_OP = auto()
-    SELECT = auto()
-    RETREAT = auto()
-    ATTACK = auto()
+    NO_OP = 1
+    SELECT = 2
+    RETREAT = 3
+    ATTACK = 4
 
 class Actuator:
     def __init__(self):
