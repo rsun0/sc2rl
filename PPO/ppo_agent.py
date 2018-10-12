@@ -194,8 +194,8 @@ class PPOAgent(object):
         return actions, value
         
     def normalize(self, ob):
-        return ((ob.T - np.mean(ob, axis=(1,2))) / (np.max(ob, axis=(1,2)) - np.min(ob, axis=(1,2)))).T
-        
+        #return ((ob.T - np.mean(ob, axis=(1,2))) / (1 + np.max(ob, axis=(1,2)) - np.min(ob, axis=(1,2)))).T
+        return ob
     """
     Returns some element i in range(len(action_probs)), each with action_probs[i] probability.
     """
@@ -245,8 +245,8 @@ class PPOAgent(object):
                     pol_loss += step_losses[2]/len
                 print("vf_loss: {:.5f}, pol_loss: {:.5f}, entorpy: {:.5f}".format(vf_loss, pol_loss, entropy))
 
-            # Save model every 1000 iterations
-            if iteration % 1000 == 0:
+            # Save model every 100 iterations
+            if iteration % 100 == 0:
                 self.save_model("./model/ppo_defeat_banelings")
 
     def update(self):
@@ -291,7 +291,7 @@ class PPOAgent(object):
 
 
 if __name__ == "__main__":
-    env = DefeatRoachesEnvironment(render=True, step_multiplier=6)
+    env = DefeatRoachesEnvironment(render=False, step_multiplier=6)
     sess = tf.InteractiveSession()
     ppo = PPOAgent(env)
     tf.get_default_session().run(tf.global_variables_initializer())
