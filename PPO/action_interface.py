@@ -1,14 +1,13 @@
 from pysc2.lib import actions
 from enum import Enum
-from enum import auto
 import numpy as np
 from scipy import ndimage
 
 class Action(Enum):
-    NO_OP = auto()
-    SELECT = auto()
-    RETREAT = auto()
-    ATTACK = auto()
+    NO_OP = 1
+    SELECT = 2
+    RETREAT = 3
+    ATTACK = 4
 
 class Actuator:
     def __init__(self):
@@ -17,34 +16,36 @@ class Actuator:
     def reset(self):
         self.units_selected = False
 
-    def compute_action(self, action, selected, friendly_unit_density, enemy_unit_density):
+    def compute_action(self, action, custom_obs):
         '''
         Computes the raw action corresponding to the chosen abstract action
 
         :param action: The chosen abstract action (NO_OP, SELECT, RETREAT, or ATTACK)
-        :param selected: 
-        :param friendly_unit_density: The abstract feature representing friendly unit locations
-        :param enemy_unit_density: The abstract feature representing enemy unit locations
+        :param custom_obs: Custom observations as given by modified state space
         :returns: The raw action to return to environment
         '''
         if action == Action.NO_OP:
             return actions.FUNCTIONS.no_op()
 
+        selected = custom_obs[0]
+        friendly_unit_density = custom_obs[2]
+        enemy_unit_density = custom_obs[4]
+
         if np.all(selected == 0):
             self.units_selected = False
 
         if not self.units_selected:
-            if action == Action.SELECT:
-                self.units_selected = True
-                return actions.FUNCTIONS.select_army('select')
-            raise Exception('Actuator cannot order units without selection (unit may have died)')
+            assert action == Action.SELECT, 'Actuator cannot order units without selection (unit may have died)'
+
+            self.units_selected = True
+            return actions.FUNCTIONS.select_army('select')
         
         else:
             if action == Action.RETREAT:
                 return self._compute_retreat(friendly_unit_density, enemy_unit_density)
             elif action == Action.ATTACK:
                 return self._compute_attack(enemy_unit_density)
-            raise Exception('Actuator cannot select with preexisting selection')
+            assert False, 'Actuator cannot select with preexisting selection'
 
     @staticmethod
     def _compute_retreat(friendly_unit_density, enemy_unit_density):

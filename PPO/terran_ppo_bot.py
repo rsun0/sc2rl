@@ -7,8 +7,12 @@ import random
 import enhancedbaseagent
 from enhancedbaseagent import EnhancedBaseAgent
 from modified_state_space import state_modifier
+<<<<<<< HEAD
 from action_interface import Action, Actuator
 from ppo_agent import PPOAgent
+=======
+import numpy as np
+>>>>>>> 50eda19452d03e2520e35a9c714c6e0efadc1a30
 
 class terran_agent(EnhancedBaseAgent):
 
@@ -25,6 +29,13 @@ class terran_agent(EnhancedBaseAgent):
     
         
     def step(self, obs):
+<<<<<<< HEAD
+=======
+    
+        simp_obs = state_modifier.modified_state_space(obs)
+    
+        self.iteration += 1
+>>>>>>> 50eda19452d03e2520e35a9c714c6e0efadc1a30
         super(terran_agent, self).step(obs)
         self.iteration += 1
         ###################################################

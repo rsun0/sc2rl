@@ -46,7 +46,7 @@ class state_modifier():
     """
         inputs : TimeStep variable for each frame's observation
 
-        outputs : a 2-tuple. The first element is a stacked 3d numpy tensor stacked as follows:
+        outputs : a stacked 3d numpy tensor stacked as
         
             Current position of marines
             Hit points of all marines
@@ -54,7 +54,6 @@ class state_modifier():
             Hit points of all roaches
             Unit density of all roaches
             
-        The second element is the player's army count.
 
     """
     def modified_state_space(obs):
@@ -85,9 +84,10 @@ class state_modifier():
         # ------------------------------------- #        
         
         ### Computes the number of marines that are still alive
-        army_count = len(obs.observation.feature_units)
+        # army_count = len(obs.observation.feature_units)
         
-        return (array, army_count)
+        # return (array, army_count)
+        return array
         
         
         
