@@ -67,6 +67,8 @@ def run_game_with_agent(agent, mapname, iterations):
         game_steps_per_episode=0) as env:
                 
         agent.setup(env.observation_spec(), env.action_spec())
+        
+        
         for i in range(iterations):
             print("Playing game {}".format(i+1))
             timesteps = env.reset()
