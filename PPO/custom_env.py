@@ -1,20 +1,26 @@
 from pysc2.env import sc2_env
 from pysc2.lib import features
-from modified_state_space import state_modifier
 from action_interface import Action, Actuator
 from numpy import all as np_all
 import numpy as np
 
-class DefeatRoachesEnvironment:
+class MinigameEnvironment:
 
-    def __init__(self, render=False, step_multiplier=None):
+    def __init__(self, state_modifier_func, map_name_="DefeatRoaches", render=False, step_multiplier=None):
         '''
         Initializes internal pysc2 environment
         :param render: Whether to render the game
         :param step_multiplier: Step multiplier for pysc2 environment
         '''
+        import sys
+        from absl import flags
+        FLAGS = flags.FLAGS
+        FLAGS(sys.argv)
+        self.map = map_name_
+        self.state_modifier_func = state_modifier_func
+
         self._env = sc2_env.SC2Env(
-            map_name='DefeatRoaches',
+            map_name=map_name_,
             agent_interface_format=features.AgentInterfaceFormat(
                 feature_dimensions=features.Dimensions(screen=84, minimap=64),
                 use_feature_units=True
@@ -73,14 +79,14 @@ class DefeatRoachesEnvironment:
         if start_action is None:
             raw_obs = self._reset_env()
         else:
-            last_obs = state_modifier.modified_state_space(self._curr_frame)
+            last_obs = self.state_modifier_func(self._curr_frame)
             raw_action = self._actuator.compute_action(start_action, last_obs)
             raw_obs = self._step_env(raw_action)
         
         if raw_obs.last():
             return raw_obs
         
-        custom_obs = state_modifier.modified_state_space(raw_obs)
+        custom_obs = self.state_modifier_func(raw_obs)
 
         friendly_unit_density = custom_obs[2]
         assert not np_all(friendly_unit_density == 0), 'All marines dead but not terminal state'
@@ -98,8 +104,8 @@ class DefeatRoachesEnvironment:
         '''
         assert self._prev_frame is not None and self._curr_frame is not None, 'Returning to agent after less than 2 frames should be impossible'
 
-        custom_prev = state_modifier.modified_state_space(self._prev_frame)[1:]
-        custom_curr = state_modifier.modified_state_space(self._curr_frame)[1:]
+        custom_prev = self.state_modifier_func(self._prev_frame)[1:]
+        custom_curr = self.state_modifier_func(self._curr_frame)[1:]
         return np.append(custom_prev, custom_curr, axis=0)
 
     def _reset_env(self):
