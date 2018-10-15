@@ -10,7 +10,8 @@
 
 import tensorflow as tf
 import numpy as np
-from custom_env import DefeatRoachesEnvironment
+from custom_env import MinigameEnvironment
+from modified_state_space import state_modifier
 import random
 
 class Network(object):
@@ -85,15 +86,15 @@ class PPOAgent(object):
         ## build network
         self.net = Network(env=self.env,
                            scope="pi",
-                           num_layers=2,
-                           num_units=128,
+                           num_layers=4,
+                           num_units=512,
                            obs_plc=self.obs_place,
                            act_plc=self.acts_place)
 
         self.old_net = Network(env=self.env,
                                scope="old_pi",
-                               num_layers=2,
-                               num_units=128,
+                               num_layers=4,
+                               num_units=512,
                                obs_plc=self.obs_place,
                                act_plc=self.acts_place,
                                trainable=False)
@@ -247,7 +248,7 @@ class PPOAgent(object):
 
             # Save model every 100 iterations
             if iteration % 100 == 0:
-                self.save_model("./model/ppo_defeat_banelings")
+                self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
 
     def update(self):
         print("--- update called ---")
@@ -291,7 +292,14 @@ class PPOAgent(object):
 
 
 if __name__ == "__main__":
+<<<<<<< HEAD
     env = DefeatRoachesEnvironment(render=True, step_multiplier=6)
+=======
+    env = MinigameEnvironment(state_modifier.modified_state_space, 
+                                map_name_="DefeatRoaches", 
+                                render=False, 
+                                step_multiplier=6)
+>>>>>>> fcea7ebd3bf829669420775c949f9980d6e06052
     sess = tf.InteractiveSession()
     ppo = PPOAgent(env)
     tf.get_default_session().run(tf.global_variables_initializer())

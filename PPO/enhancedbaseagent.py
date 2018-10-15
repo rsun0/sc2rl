@@ -52,12 +52,8 @@ class EnhancedBaseAgent(base_agent.BaseAgent):
     def get_units_by_type(self, obs, unit_type):
         return [unit for unit in obs.observation.feature_units if unit.unit_type == unit_type]
 
-
-
-
 """
-    Runs 'agent' on map 'mapname' for 'iterations' iterations.
-    Returns the data from all of the games run.
+Runs a given agent on the map mapname. Runs the agent on the mapname for i in iterations.
 """
 def run_game_with_agent(agent, mapname, iterations):
     game_data = []
@@ -72,6 +68,8 @@ def run_game_with_agent(agent, mapname, iterations):
         
     for i in range(1):
         agent.setup(env.observation_spec(), env.action_spec())
+        
+        
         for i in range(iterations):
             print("Playing game {}".format(i+1))
             timesteps = env.reset()

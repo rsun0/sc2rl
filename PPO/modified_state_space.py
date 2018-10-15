@@ -15,7 +15,7 @@ from __future__ import print_function
 
 from pysc2.agents import base_agent
 from pysc2.lib import actions
-from pysc2.lib import features
+from pysc2.lib import features, units
 from pysc2.env import environment
 
 import numpy as np
@@ -38,6 +38,13 @@ _SELECT_ALL = [0]
 _FIRST_TIMESTEP = environment.StepType.FIRST
 _LAST_TIMESTEP = environment.StepType.LAST
 
+def zero_one_norm(array):
+    arr_max = np.max(array)
+    arr_min = np.min(array)
+    denom = arr_max - arr_min
+    if (denom == 0):
+        return array
+    return (array - arr_min) / denom
 
 class state_modifier():        
     
@@ -78,19 +85,56 @@ class state_modifier():
         friendly_density = np.multiply(unit_density, player_friendly)
         hostile_density = np.multiply(unit_density, player_hostile) 
         
+        
+        # Normalize friendly_hitpoints and hostile_hitpoints to between 0 and 1
+        friendly_hitpoints = zero_one_norm(friendly_hitpoints)
+        hostile_hitpoints = zero_one_norm(hostile_hitpoints)
+        
+        
         ### Stacks the previous arrays in the order given in the documentation. This will be the primary input to the neural network.
+        
         array = np.stack([friendly_selected, friendly_hitpoints, friendly_density, hostile_hitpoints, hostile_density], axis=0)
         
-        # ------------------------------------- #        
-        
-        ### Computes the number of marines that are still alive
-        # army_count = len(obs.observation.feature_units)
-        
-        # return (array, army_count)
         return array
         
         
+    """
+        inputs : TimeStep variable for each frame's observation
+
+        outputs : a stacked 3d numpy tensor stacked as
         
+            Current positions of marines
+            Current positions of zerglings
+            Current positions of banelings
+            Hitpoints of all units
+            Density of all units            
+
+    """
+    def ZerglingsAndBanelingsSpace(obs):
+        
+        scr = obs.observation.feature_screen
+   
+        ### Computes array of locations of selected marines
+        friendly_selected = np.array(scr.selected)
+    
+        ### Computes arrays of locations of marines and enemy units
+        player_relative = np.array(scr.player_relative)
+        marines = (player_relative == _PLAYER_FRIENDLY).astype(int)
+        player_hostile = (player_relative == _PLAYER_HOSTILE).astype(int)
+        
+        marines = (scr.unit_type ==  units.Terran.Marine).astype(int)
+        zerglings = (scr.unit_type == units.Zerg.Zergling).astype(int)
+        banelings = (scr.unit_type == units.Zerg.Baneling).astype(int)
+        hitpoints = np.array(scr.unit_hit_points).astype(int)
+        unit_density = np.array(scr.unit_density).astype(int)
+        
+        # Normalize hitpoints
+        hitpoints = zero_one_norm(hitpoints)
+        
+        ### Stacks the previous arrays in the order given in the documentation. This will be the primary input to the neural network.
+        array = np.stack([np.array(marines), np.array(zerglings), np.array(banelings), hitpoints, unit_density], axis=0)
+        
+        return array
 
        
 
