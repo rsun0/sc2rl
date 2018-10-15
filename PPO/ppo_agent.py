@@ -13,6 +13,7 @@ import numpy as np
 from custom_env import MinigameEnvironment
 from modified_state_space import state_modifier
 import random
+from time import sleep
 
 class Network(object):
     def __init__(self, env, scope, num_layers, num_units, obs_plc, act_plc, trainable=True):
@@ -20,7 +21,7 @@ class Network(object):
         self.observation_size = obs_plc # TODO:
         self.action_size = env.action_space
         self.trainable = trainable
-
+        self.activation = tf.nn.relu
         self.scope = scope
 
         self.obs_place = obs_plc
@@ -28,20 +29,70 @@ class Network(object):
 
         self.p , self.v, self.logstd = self._build_network(num_layers=num_layers, num_units=num_units)
         self.act_op = self.action_sample()
+        
 
     def _build_network(self, num_layers, num_units):
         # TODO: switch to CONV NETS
         with tf.variable_scope(self.scope):
             x = self.obs_place
+            
+            # Initializes convolutional layers
+            
+            print(x.shape)
+            x = tf.layers.conv2d(x,
+                filters=1,
+                kernel_size=[8, 8],
+                padding="same",
+                strides=(4, 4),
+                activation=self.activation)
+                
+            sleep(3)
+                
+            print(x.shape)
+            x = tf.layers.conv2d(x,
+                filters=1,
+                kernel_size=[4, 4],
+                padding="same",
+                strides=2,
+                activation=self.activation)
+                
+            sleep(3)
+                
+            print(x.shape)
+            x = tf.contrib.layers.flatten(x)
+            
+            print(x.shape)
+            # Initializes fully connected layers
             for i in range(num_layers):
-                x = tf.layers.dense(x, units=num_units, activation=tf.nn.tanh, name="p_fc"+str(i),
+                x = tf.layers.dense(x, units=num_units, activation=self.activation, name="p_fc"+str(i),
                                     trainable=self.trainable)
-            action = tf.layers.dense(x, units=self.action_size, activation=tf.nn.softmax,
+            action = tf.layers.dense(x, units=self.action_size, activation=self.activation,
                                      name="p_fc"+str(num_layers), trainable=self.trainable)
 
+            sleep(3)
+
             x = self.obs_place
+            
+            x = tf.layers.conv2d(x,
+                filters=1,
+                kernel_size=[8,8],
+                padding="same",
+                strides=(4, 4),
+                activation=self.activation)
+                
+            x = tf.layers.conv2d(x,
+                filters=1,
+                kernel_size=[4,4],
+                padding="same",
+                strides=(2, 2),
+                activation=self.activation)
+                
+            x = tf.contrib.layers.flatten(x)
+            
+            
+            
             for i in range(num_layers):
-                x = tf.layers.dense(x, units=num_units, activation=tf.nn.tanh, name="v_fc"+str(i),
+                x = tf.layers.dense(x, units=num_units, activation=self.activation, name="v_fc"+str(i),
                                     trainable=self.trainable)
             value = tf.layers.dense(x, units=1, activation=None, name="v_fc"+str(num_layers),
                                     trainable=self.trainable)
@@ -62,9 +113,11 @@ class Network(object):
 
 
 class PPOAgent(object):
-    def __init__(self, env):
+    def __init__(self, env, session=None, input_shape=(84, 84, 8)):
         self.env = env
 
+        self.input_shape = input_shape
+        self.session=session
         ## hyperparameters - TODO: TUNE
         self.learning_rate = 1e-4
         self.epochs = 10
@@ -72,13 +125,13 @@ class PPOAgent(object):
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
-        self.batch_size = 64
+        self.batch_size = 32
 
         ## placeholders
         self.adv_place = tf.placeholder(shape=[None], dtype=tf.float32)
         self.return_place = tf.placeholder(shape=[None], dtype=tf.float32)
 
-        self.obs_place = tf.placeholder(shape=(None,env.observation_space),
+        self.obs_place = tf.placeholder(shape=([None] + env.observation_space),
                                         name="ob", dtype=tf.float32)
         self.acts_place = tf.placeholder(shape=(None,2),
                                          name="ac", dtype=tf.float32)
@@ -86,15 +139,15 @@ class PPOAgent(object):
         ## build network
         self.net = Network(env=self.env,
                            scope="pi",
-                           num_layers=4,
-                           num_units=512,
+                           num_layers=2,
+                           num_units=128,
                            obs_plc=self.obs_place,
                            act_plc=self.acts_place)
 
         self.old_net = Network(env=self.env,
                                scope="old_pi",
-                               num_layers=4,
-                               num_units=512,
+                               num_layers=2,
+                               num_units=128,
                                obs_plc=self.obs_place,
                                act_plc=self.acts_place,
                                trainable=False)
@@ -131,8 +184,8 @@ class PPOAgent(object):
         action = int(env.action_space * random.random()) # this is replacement of env.action_space.sample()
         done = True
         ob, reward, done, _ = env.reset()
+        ob = ob.reshape(self.input_shape)
         ob = self.normalize(ob)
-        ob = ob.flatten()
         cur_ep_return = 0
         cur_ep_length = 0
         ep_returns = []
@@ -168,8 +221,8 @@ class PPOAgent(object):
             prevactions[i][prevaction] = 1
 
             ob, reward, done, _ = env.step(action) # TODO: select argmax from action? or is action[0] always?
+            ob = ob.reshape(self.input_shape)
             ob = self.normalize(ob)
-            ob = ob.flatten()
             rewards[i] = reward
 
             cur_ep_return += reward
@@ -182,13 +235,12 @@ class PPOAgent(object):
                 cur_ep_return = 0
                 cur_ep_length = 0
                 ob, reward, done, _ = env.reset()
+                ob = ob.reshape(self.input_shape)
                 ob = self.normalize(ob)
-                ob = ob.flatten()
             t += 1
 
     def act(self, ob):
-        ob=ob.flatten()
-        actions, value = tf.get_default_session().run([self.net.act_op, self.net.v], feed_dict={
+        actions, value = self.session.run([self.net.act_op, self.net.v], feed_dict={
             self.net.obs_place: ob[None]
         })
         #action = self.select_action(actions)
@@ -224,7 +276,7 @@ class PPOAgent(object):
             traj = traj_gen.__next__()
             self.add_vtarg_and_adv(traj)
 
-            tf.get_default_session().run(self.assign_op)
+            self.session.run(self.assign_op)
 
             # normalize adv.
             traj["advantage"] = (traj["advantage"]-np.mean(traj["advantage"]))/np.std(traj["advantage"])
@@ -236,7 +288,7 @@ class PPOAgent(object):
                 entropy = 0
                 for i in range(len):
                     cur = i*self.batch_size
-                    *step_losses, _ = tf.get_default_session().run([self.ent, self.vf_loss, self.pol_loss, self.update_op],feed_dict = {self.obs_place: traj["ob"][cur:cur+self.batch_size],
+                    *step_losses, _ = self.session.run([self.ent, self.vf_loss, self.pol_loss, self.update_op],feed_dict = {self.obs_place: traj["ob"][cur:cur+self.batch_size],
                                                        self.acts_place: traj["action"][cur:cur+self.batch_size],
                                                        self.adv_place: traj["advantage"][cur:cur+self.batch_size],
                                                        self.return_place: traj["return"][cur:cur+self.batch_size]})
@@ -283,11 +335,11 @@ class PPOAgent(object):
         traj["return"] = traj["advantage"] + traj["value"]
 
     def save_model(self, model_path):
-        self.saver.save(tf.get_default_session(), model_path)
+        self.saver.save(self.session, model_path)
         print("model saved")
 
     def restore_model(self, model_path):
-        self.saver.restore(tf.get_default_session(), model_path)
+        self.saver.restore(self.session, model_path)
         print("model restored")
 
 
@@ -299,11 +351,20 @@ if __name__ == "__main__":
                                 map_name_="DefeatRoaches", 
                                 render=False, 
                                 step_multiplier=6)
+<<<<<<< HEAD
 >>>>>>> fcea7ebd3bf829669420775c949f9980d6e06052
     sess = tf.InteractiveSession()
     ppo = PPOAgent(env)
     tf.get_default_session().run(tf.global_variables_initializer())
     ppo.restore_model("./model/ppo_defeat_banelings")
+=======
+    config=tf.ConfigProto()
+    config.gpu_options.allow_growth=True
+    sess = tf.Session(config=config)
+    ppo = PPOAgent(env, session=sess)
+    sess.run(tf.global_variables_initializer())
+    #ppo.restore_model("./model/ppo_defeat_banelings")
+>>>>>>> 66e8f8df986512505265ad487be16c69bb258600
     ppo.run()
 
     env.close()
