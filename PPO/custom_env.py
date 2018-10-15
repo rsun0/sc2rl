@@ -36,7 +36,7 @@ class MinigameEnvironment:
 
         self.action_space = 2
         FACTOR = 8 # TODO
-        self.observation_space = 84*84*FACTOR # 
+        self.observation_space = [84, 84, FACTOR] # 
 
     def reset(self):
         '''
