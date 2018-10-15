@@ -243,7 +243,7 @@ class PPOAgent(object):
                     entropy += step_losses[0]/len
                     vf_loss += step_losses[1]/len
                     pol_loss += step_losses[2]/len
-                print("vf_loss: {:.5f}, pol_loss: {:.5f}, entorpy: {:.5f}".format(vf_loss, pol_loss, entropy))
+                print("vf_loss: {:.5f}, pol_loss: {:.5f}, entropy: {:.5f}".format(vf_loss, pol_loss, entropy))
 
             # Save model every 100 iterations
             if iteration % 100 == 0:
@@ -291,11 +291,11 @@ class PPOAgent(object):
 
 
 if __name__ == "__main__":
-    env = DefeatRoachesEnvironment(render=False, step_multiplier=6)
+    env = DefeatRoachesEnvironment(render=True, step_multiplier=6)
     sess = tf.InteractiveSession()
     ppo = PPOAgent(env)
     tf.get_default_session().run(tf.global_variables_initializer())
-    #ppo.restore_model("./model/ppo_defeat_banelings")
+    ppo.restore_model("./model/ppo_defeat_banelings")
     ppo.run()
 
     env.close()
