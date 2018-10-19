@@ -38,9 +38,8 @@ class Network(object):
             
             # Initializes convolutional layers
             
-            print(x.shape)
             x = tf.layers.conv2d(x,
-                filters=1,
+                filters=32,
                 kernel_size=[8, 8],
                 padding="same",
                 strides=(4, 4),
@@ -48,9 +47,8 @@ class Network(object):
                 
             sleep(3)
                 
-            print(x.shape)
             x = tf.layers.conv2d(x,
-                filters=1,
+                filters=64,
                 kernel_size=[4, 4],
                 padding="same",
                 strides=2,
@@ -58,10 +56,8 @@ class Network(object):
                 
             sleep(3)
                 
-            print(x.shape)
             x = tf.contrib.layers.flatten(x)
             
-            print(x.shape)
             # Initializes fully connected layers
             for i in range(num_layers):
                 x = tf.layers.dense(x, units=num_units, activation=self.activation, name="p_fc"+str(i),
@@ -74,14 +70,14 @@ class Network(object):
             x = self.obs_place
             
             x = tf.layers.conv2d(x,
-                filters=1,
+                filters=32,
                 kernel_size=[8,8],
                 padding="same",
                 strides=(4, 4),
                 activation=self.activation)
                 
             x = tf.layers.conv2d(x,
-                filters=1,
+                filters=64,
                 kernel_size=[4,4],
                 padding="same",
                 strides=(2, 2),
@@ -125,7 +121,7 @@ class PPOAgent(object):
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
-        self.batch_size = 32
+        self.batch_size = 64
 
         ## placeholders
         self.adv_place = tf.placeholder(shape=[None], dtype=tf.float32)
@@ -344,27 +340,26 @@ class PPOAgent(object):
 
 
 if __name__ == "__main__":
-<<<<<<< HEAD
-    env = DefeatRoachesEnvironment(render=True, step_multiplier=6)
-=======
     env = MinigameEnvironment(state_modifier.modified_state_space, 
                                 map_name_="DefeatRoaches", 
                                 render=False, 
                                 step_multiplier=6)
-<<<<<<< HEAD
->>>>>>> fcea7ebd3bf829669420775c949f9980d6e06052
+    """
+    <<<<<<< HEAD
+    >>>>>>> fcea7ebd3bf829669420775c949f9980d6e06052
     sess = tf.InteractiveSession()
     ppo = PPOAgent(env)
     tf.get_default_session().run(tf.global_variables_initializer())
     ppo.restore_model("./model/ppo_defeat_banelings")
-=======
+    =======
+    """
     config=tf.ConfigProto()
     config.gpu_options.allow_growth=True
     sess = tf.Session(config=config)
     ppo = PPOAgent(env, session=sess)
     sess.run(tf.global_variables_initializer())
-    #ppo.restore_model("./model/ppo_defeat_banelings")
->>>>>>> 66e8f8df986512505265ad487be16c69bb258600
+    ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
+    #>>>>>>> 66e8f8df986512505265ad487be16c69bb258600
     ppo.run()
 
     env.close()
