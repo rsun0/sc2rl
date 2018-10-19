@@ -109,10 +109,10 @@ class Network(object):
 
 
 class PPOAgent(object):
-    def __init__(self, env, session=None, input_shape=(84, 84, 8)):
+    def __init__(self, env, session=None):
         self.env = env
 
-        self.input_shape = input_shape
+        self.input_shape = self.env.observation_space
         self.session=session
         ## hyperparameters - TODO: TUNE
         self.learning_rate = 1e-4
@@ -129,7 +129,7 @@ class PPOAgent(object):
 
         self.obs_place = tf.placeholder(shape=([None] + env.observation_space),
                                         name="ob", dtype=tf.float32)
-        self.acts_place = tf.placeholder(shape=(None,2),
+        self.acts_place = tf.placeholder(shape=(None,self.env.action_space),
                                          name="ac", dtype=tf.float32)
 
         ## build network
@@ -191,7 +191,7 @@ class PPOAgent(object):
         rewards = np.zeros(self.step_size, 'float32')
         values = np.zeros(self.step_size, 'float32')
         dones = np.zeros(self.step_size, 'int32')
-        actions = np.array([np.zeros((2,)) for _ in range(self.step_size)])
+        actions = np.array([np.zeros((self.env.action_space,)) for _ in range(self.step_size)])
         prevactions = actions.copy()
 
         while True:
@@ -211,9 +211,9 @@ class PPOAgent(object):
             obs[i] = ob
             values[i] = value
             dones[i] = done
-            actions[i] = np.zeros((2,))
+            actions[i] = np.zeros((self.env.action_space,))
             actions[i][action] = 1
-            prevactions[i] = np.zeros((2,))
+            prevactions[i] = np.zeros((self.env.action_space,))
             prevactions[i][prevaction] = 1
 
             ob, reward, done, _ = env.step(action) # TODO: select argmax from action? or is action[0] always?
@@ -342,8 +342,8 @@ class PPOAgent(object):
 if __name__ == "__main__":
     env = MinigameEnvironment(state_modifier.modified_state_space, 
                                 map_name_="DefeatRoaches", 
-                                render=False, 
-                                step_multiplier=6)
+                                render=True, 
+                                step_multiplier=3)
     """
     <<<<<<< HEAD
     >>>>>>> fcea7ebd3bf829669420775c949f9980d6e06052
@@ -358,7 +358,7 @@ if __name__ == "__main__":
     sess = tf.Session(config=config)
     ppo = PPOAgent(env, session=sess)
     sess.run(tf.global_variables_initializer())
-    ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
+    #ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
     #>>>>>>> 66e8f8df986512505265ad487be16c69bb258600
     ppo.run()
 

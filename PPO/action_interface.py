@@ -34,6 +34,9 @@ class Actuator:
     def reset(self):
         self.units_selected = False
         self.location = None
+        
+    def action_space(self):
+        return 10
 
     def compute_action(self, action, custom_obs):
         '''
@@ -48,6 +51,7 @@ class Actuator:
 
         selected = custom_obs[0]
         friendly_unit_density = custom_obs[2]
+        enemy_unit_hitpoints = custom_obs[3]
         enemy_unit_density = custom_obs[4]
         
         if np.all(selected == 0):
@@ -110,7 +114,7 @@ class Actuator:
                                             enemy_unit_density)
             elif action == Action.ATTACK_WEAKEST:
                 return self._compute_attack_nearest(location,
-                                            enemy_unit_density)
+                                            enemy_unit_hitpoints)
                                             
     @staticmethod
     def _compute_retreat(friendly_unit_density, enemy_unit_density):
