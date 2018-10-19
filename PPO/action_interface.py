@@ -4,17 +4,36 @@ import numpy as np
 from scipy import ndimage
 
 class Action(Enum):
+    """
     NO_OP = 1
     SELECT = 2
     RETREAT = 3
     ATTACK = 4
-
+    """
+    NO_OP = 1
+    SELECT = 2
+    
+    LEFT = 3
+    UP_LEFT = 4
+    UP = 5
+    UP_RIGHT = 6
+    RIGHT = 7
+    DOWN_RIGHT = 8
+    DOWN = 9
+    DOWN_LEFT = 10
+    ATTACK_NEAREST = 11
+    ATTACK_WEAKEST = 12
+    
 class Actuator:
     def __init__(self):
         self.units_selected = False
+        self.move_multiplier = 5
+        self.location = None
+        
 
     def reset(self):
         self.units_selected = False
+        self.location = None
 
     def compute_action(self, action, custom_obs):
         '''
@@ -41,12 +60,54 @@ class Actuator:
             return actions.FUNCTIONS.select_army('select')
         
         else:
+            """
             if action == Action.RETREAT:
                 return self._compute_retreat(friendly_unit_density, enemy_unit_density)
             elif action == Action.ATTACK:
                 return self._compute_attack(enemy_unit_density)
             assert False, 'Actuator cannot select with preexisting selection'
-
+            """
+            if action == Action.LEFT:
+                return self._compute_move(friendly_unit_density,
+                                            enemy_unit_density,
+                                            -1,
+                                            0)
+            elif action == Action.UP_LEFT:
+                return self._compute_move(friendly_unit_density,
+                                            enemy_unit_density,
+                                            -1,
+                                            1)
+            elif action == Action.UP:
+                return self._compute_move(friendly_unit_density,
+                                            enemy_unit_density,
+                                            0,
+                                            1)
+            elif action == Action.UP_RIGHT:
+                return self._compute_move(friendly_unit_density,
+                                            enemy_unit_density,
+                                            1,
+                                            1)
+            elif action == Action.RIGHT:
+                return self._compute_move(friendly_unit_density,
+                                            enemy_unit_density,
+                                            1,
+                                            0)
+            elif action == Action.DOWN_RIGHT:
+                return self._compute_move(friendly_unit_density,
+                                            enemy_unit_density,
+                                            1,
+                                            -1)
+            elif action == Action.DOWN:
+                return self._compute_move(friendly_unit_density,
+                                            enemy_unit_density,
+                                            0,
+                                            -1)
+            elif action == Action.DOWN_LEFT:
+                return self._compute_move(friendly_unit_density,
+                                            enemy_unit_density,
+                                            -1,
+                                            -1)
+                                            
     @staticmethod
     def _compute_retreat(friendly_unit_density, enemy_unit_density):
         friendly_com = np.flip(np.array(ndimage.measurements.center_of_mass(friendly_unit_density)), 0)
@@ -73,3 +134,34 @@ class Actuator:
     def _compute_attack(enemy_unit_density):
         enemy_com = np.flip(np.array(ndimage.measurements.center_of_mass(enemy_unit_density)), 0)
         return actions.FUNCTIONS.Attack_screen('now', enemy_com)
+        
+    @staticmethod
+    def _compute_attack_nearest(location, enemy_unit_density):
+        enemy_indices = np.array(enemy_unit_density.nonzero())
+        target_index = np.argmin( la.norm( location - enemy_indices, 2, axis=0))
+        target_loc = enemy_indices[target_index]
+        return action.FUNCTIONS.Attack_screen('now', target_loc)
+        
+    @staticmethod
+    def _compute_attack_weakest(location, enemy_unit_hitpoints):
+        target_loc = np.array(np.where(enemy_unit_hitpoints==np.min(enemy_unit_hitpoints[np.nonzero(enemy_unit_hitpoints)])))[:,0]
+        return actions.FUNCTIONS.Attack_screen('now', target_loc)
+        
+        
+    @staticmethod
+    def _compute_move(friendly_unit_density, enemy_unit_density, dx, dy):
+
+        friendly_com = np.flip(np.array(ndimage.measurements.center_of_mass(friendly_unit_density)), 0)
+        direction_vector = self.move_multiplier * np.array([dy, dx])
+        
+        move_target = _screen_normalize(friendly_com + direction_vector)
+        return actions.FUNCTIONS.Move_screen('now', move_target)
+        
+    @staticmethod
+    def _screen_normalize(coords):
+        for i in range(len(coords)):
+            if coords[i] < 0:
+                coords[i] = 0
+            if coords[i] > screen_size - 1:
+                coords[i] = screen_size - 1;
+        
