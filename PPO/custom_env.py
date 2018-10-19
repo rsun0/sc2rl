@@ -105,10 +105,9 @@ class MinigameEnvironment:
         assert self._prev_frame is not None and self._curr_frame is not None, 'Returning to agent after less than 2 frames should be impossible'
 
         custom_prev = self.state_modifier_func(self._prev_frame)[1:]
-        all_curr = self.state_modifier_func(self._curr_frame)
-        custom_curr = all_curr[1:]
+        custom_curr = self.state_modifier_func(self._curr_frame)
+        custom_curr = custom_curr[np.r_[1:len(custom_curr),0]] # move selected frame to end
         custom_frames = np.append(custom_prev, custom_curr, axis=0)
-        custom_frames = np.append(custom_frames, np.expand_dims(all_curr[0], axis=0), axis=0)
         return custom_frames
 
     def _reset_env(self):
