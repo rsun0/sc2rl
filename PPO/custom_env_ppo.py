@@ -1,8 +1,9 @@
-from custom_env import DefeatRoachesEnvironment
+from custom_env import MinigameEnvironment
+from modified_state_space import state_modifier
 import random
 
 def random_agent():
-    env = DefeatRoachesEnvironment(render=True,step_multiplier=4)
+    env = MinigameEnvironment(render=True,step_multiplier=4,state_modifier_func=state_modifier.modified_state_space)
     state, reward, done, _ = env.reset()
     print(state.shape)
     for i in range(10): 
