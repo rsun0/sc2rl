@@ -49,7 +49,7 @@ class Actuator:
         selected = custom_obs[0]
         friendly_unit_density = custom_obs[2]
         enemy_unit_density = custom_obs[4]
-
+        
         if np.all(selected == 0):
             self.units_selected = False
 
@@ -60,6 +60,12 @@ class Actuator:
             return actions.FUNCTIONS.select_army('select')
         
         else:
+            location = [0, 0]
+            try:
+                location = np.array(np.where(selected==np.min(selected[np.nonzero(selected)])))[:,0]
+            except:
+                print("Location invalid")
+                return actions.FUNCTIONS.no_op()
             """
             if action == Action.RETREAT:
                 return self._compute_retreat(friendly_unit_density, enemy_unit_density)
@@ -68,45 +74,43 @@ class Actuator:
             assert False, 'Actuator cannot select with preexisting selection'
             """
             if action == Action.LEFT:
-                return self._compute_move(friendly_unit_density,
-                                            enemy_unit_density,
+                return self._compute_move(location,
                                             -1,
                                             0)
             elif action == Action.UP_LEFT:
-                return self._compute_move(friendly_unit_density,
-                                            enemy_unit_density,
+                return self._compute_move(location,
                                             -1,
                                             1)
             elif action == Action.UP:
-                return self._compute_move(friendly_unit_density,
-                                            enemy_unit_density,
+                return self._compute_move(location,
                                             0,
                                             1)
             elif action == Action.UP_RIGHT:
-                return self._compute_move(friendly_unit_density,
-                                            enemy_unit_density,
+                return self._compute_move(location,
                                             1,
                                             1)
             elif action == Action.RIGHT:
-                return self._compute_move(friendly_unit_density,
-                                            enemy_unit_density,
+                return self._compute_move(location,
                                             1,
                                             0)
             elif action == Action.DOWN_RIGHT:
-                return self._compute_move(friendly_unit_density,
-                                            enemy_unit_density,
+                return self._compute_move(location,
                                             1,
                                             -1)
             elif action == Action.DOWN:
-                return self._compute_move(friendly_unit_density,
-                                            enemy_unit_density,
+                return self._compute_move(location,
                                             0,
                                             -1)
             elif action == Action.DOWN_LEFT:
-                return self._compute_move(friendly_unit_density,
-                                            enemy_unit_density,
+                return self._compute_move(location,
                                             -1,
                                             -1)
+            elif action == Action.ATTACK_NEAREST:
+                return self._compute_attack_nearest(location,
+                                            enemy_unit_density)
+            elif action == Action.ATTACK_WEAKEST:
+                return self._compute_attack_nearest(location,
+                                            enemy_unit_density)
                                             
     @staticmethod
     def _compute_retreat(friendly_unit_density, enemy_unit_density):
@@ -149,12 +153,11 @@ class Actuator:
         
         
     @staticmethod
-    def _compute_move(friendly_unit_density, enemy_unit_density, dx, dy):
-
-        friendly_com = np.flip(np.array(ndimage.measurements.center_of_mass(friendly_unit_density)), 0)
+    def _compute_move(location, dx, dy):
+        
         direction_vector = self.move_multiplier * np.array([dy, dx])
         
-        move_target = _screen_normalize(friendly_com + direction_vector)
+        move_target = _screen_normalize(location + direction_vector)
         return actions.FUNCTIONS.Move_screen('now', move_target)
         
     @staticmethod
