@@ -2,12 +2,14 @@ from pysc2.lib import actions
 from enum import Enum
 import numpy as np
 from scipy import ndimage
+from scipy.spatial import distance
 
 class Action(Enum):
     NO_OP = 1
     SELECT = 2
     RETREAT = 3
-    ATTACK = 4
+    ATTACK_CLOSEST = 5
+    ATTACK_WEAKEST = 6
 
 class Actuator:
     def __init__(self):
@@ -29,6 +31,7 @@ class Actuator:
 
         selected = custom_obs[0]
         friendly_unit_density = custom_obs[2]
+        enemy_hit_points = custom_obs[3]
         enemy_unit_density = custom_obs[4]
 
         if np.all(selected == 0):
@@ -42,24 +45,28 @@ class Actuator:
         
         else:
             if action == Action.RETREAT:
-                self.units_selected = False
+                # self.units_selected = False
                 return self._compute_retreat(selected, enemy_unit_density)
-            elif action == Action.ATTACK:
-                self.units_selected = False
-                return self._compute_attack(enemy_unit_density)
+            # elif action == Action.ATTACK:
+            #     self.units_selected = False
+            #     return self._compute_attack(enemy_unit_density)
+            elif action == Action.ATTACK_CLOSEST:
+                return self._compute_attack_closest(selected, enemy_unit_density)
+            elif action == Action.ATTACK_WEAKEST:
+                return self._compute_attack_weakest(selected, enemy_unit_density, enemy_hit_points)
             assert False, 'Actuator cannot select with preexisting selection'
 
     @staticmethod
     def _compute_retreat(selected, enemy_unit_density):
-        unit_position = np.flip(np.array(ndimage.measurements.center_of_mass(selected)), 0)
+        friendly_com = np.flip(np.array(ndimage.measurements.center_of_mass(selected)), 0)
         enemy_com = np.flip(np.array(ndimage.measurements.center_of_mass(enemy_unit_density)), 0)
-        direction_vector = -(enemy_com - unit_position)
+        direction_vector = -(enemy_com - friendly_com)
 
-        max_movement_x = Actuator._compute_movement_multiplier(direction_vector[0], unit_position[0], selected.shape[1])
-        max_movement_y = Actuator._compute_movement_multiplier(direction_vector[1], unit_position[1], selected.shape[0])
+        max_movement_x = Actuator._compute_movement_multiplier(direction_vector[0], friendly_com[0], selected.shape[1])
+        max_movement_y = Actuator._compute_movement_multiplier(direction_vector[1], friendly_com[1], selected.shape[0])
         max_movement = min(max_movement_x, max_movement_y)
         
-        retreat_target = np.round(max_movement * direction_vector + unit_position)
+        retreat_target = np.round(max_movement * direction_vector + friendly_com)
         return actions.FUNCTIONS.Move_screen('now', retreat_target)
 
     @staticmethod
@@ -71,16 +78,31 @@ class Actuator:
         else:
             return (screen_size - 1 - position) / direction
 
-    @staticmethod
-    def _compute_attack(enemy_unit_density):
-        enemy_com = np.flip(np.array(ndimage.measurements.center_of_mass(enemy_unit_density)), 0)
-        return actions.FUNCTIONS.Attack_screen('now', enemy_com)
+    # @staticmethod
+    # def _compute_attack(enemy_unit_density):
+    #     enemy_com = np.flip(np.array(ndimage.measurements.center_of_mass(enemy_unit_density)), 0)
+    #     return actions.FUNCTIONS.Attack_screen('now', enemy_com)
 
     @staticmethod
     def _compute_select(friendly_unit_density):
-        possible_y, possible_x = np.nonzero(friendly_unit_density)
-        if len(possible_x) == 0:
-            raise Exception('Actuator cannot select when no units exist')
-        c = np.random.choice(len(possible_x))
-        selection = [possible_x[c], possible_y[c]]
-        return actions.FUNCTIONS.select_point('select', selection)
+        return actions.FUNCTIONS.select_army('select')
+        # possible_y, possible_x = np.nonzero(friendly_unit_density)
+        # if len(possible_x) == 0:
+        #     raise Exception('Actuator cannot select when no units exist')
+        # c = np.random.choice(len(possible_x))
+        # selection = [possible_x[c], possible_y[c]]
+        # return actions.FUNCTIONS.select_point('select', selection)
+
+    @staticmethod
+    def _compute_attack_closest(selected, enemy_unit_density):
+        friendly_com = np.expand_dims(np.array(ndimage.measurements.center_of_mass(selected)), axis=0)
+        enemy_positions = np.transpose(enemy_unit_density.nonzero())
+        distances = distance.cdist(friendly_com, enemy_positions)
+        closest = np.flip(enemy_positions[np.argmin(distances)], 0)
+        return actions.FUNCTIONS.Attack_screen('now', closest)
+
+    @staticmethod
+    def _compute_attack_weakest(selected, enemy_unit_density, enemy_hit_points):
+        enemy_hit_points[enemy_unit_density == 0] = np.finfo(enemy_hit_points.dtype).max
+        weakest = np.flip(np.array(np.unravel_index(np.argmin(enemy_hit_points), enemy_hit_points.shape)), axis=0)
+        return actions.FUNCTIONS.Attack_screen('now', weakest)
