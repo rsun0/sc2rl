@@ -38,50 +38,42 @@ class Network(object):
             
             # Initializes convolutional layers
             
-            print(x.shape)
             x = tf.layers.conv2d(x,
-                filters=1,
+                filters=32,
                 kernel_size=[8, 8],
                 padding="same",
                 strides=(4, 4),
                 activation=self.activation)
                 
-            sleep(3)
-                
-            print(x.shape)
             x = tf.layers.conv2d(x,
-                filters=1,
+                filters=64,
                 kernel_size=[4, 4],
                 padding="same",
                 strides=2,
                 activation=self.activation)
                 
-            sleep(3)
                 
-            print(x.shape)
             x = tf.contrib.layers.flatten(x)
             
-            print(x.shape)
             # Initializes fully connected layers
             for i in range(num_layers):
                 x = tf.layers.dense(x, units=num_units, activation=self.activation, name="p_fc"+str(i),
                                     trainable=self.trainable)
-            action = tf.layers.dense(x, units=self.action_size, activation=self.activation,
+            action = tf.layers.dense(x, units=self.action_size, activation=tf.nn.softmax,
                                      name="p_fc"+str(num_layers), trainable=self.trainable)
 
-            sleep(3)
 
             x = self.obs_place
             
             x = tf.layers.conv2d(x,
-                filters=1,
+                filters=32,
                 kernel_size=[8,8],
                 padding="same",
                 strides=(4, 4),
                 activation=self.activation)
                 
             x = tf.layers.conv2d(x,
-                filters=1,
+                filters=64,
                 kernel_size=[4,4],
                 padding="same",
                 strides=(2, 2),
@@ -113,10 +105,10 @@ class Network(object):
 
 
 class PPOAgent(object):
-    def __init__(self, env, session=None, input_shape=(84, 84, 8)):
+    def __init__(self, env, session=None):
         self.env = env
 
-        self.input_shape = input_shape
+        self.input_shape = self.env.observation_space
         self.session=session
         ## hyperparameters - TODO: TUNE
         self.learning_rate = 1e-4
@@ -243,7 +235,6 @@ class PPOAgent(object):
         actions, value = self.session.run([self.net.act_op, self.net.v], feed_dict={
             self.net.obs_place: ob[None]
         })
-        #action = self.select_action(actions)
         return actions, value
         
     def normalize(self, ob):
@@ -261,6 +252,7 @@ class PPOAgent(object):
             running_sum += action_probs[i]
             if num < running_sum:
                 return i
+            
             
         return len(action_probs)-1
         
@@ -347,13 +339,13 @@ if __name__ == "__main__":
     env = MinigameEnvironment(state_modifier.modified_state_space, 
                                 map_name_="DefeatRoaches", 
                                 render=False, 
-                                step_multiplier=6)
+                                step_multiplier=2)
     config=tf.ConfigProto()
     config.gpu_options.allow_growth=True
     sess = tf.Session(config=config)
     ppo = PPOAgent(env, session=sess)
     sess.run(tf.global_variables_initializer())
-    #ppo.restore_model("./model/ppo_defeat_banelings")
+    ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
     ppo.run()
 
     env.close()
