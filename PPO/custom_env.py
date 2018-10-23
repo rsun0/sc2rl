@@ -1,7 +1,6 @@
 from pysc2.env import sc2_env
 from pysc2.lib import features
 from action_interface import Action, Actuator
-from numpy import all as np_all
 import numpy as np
 
 class MinigameEnvironment:
@@ -34,8 +33,8 @@ class MinigameEnvironment:
         self._curr_frame = None
         self._terminal = True
 
-        self.action_space = 2
-        FACTOR = 8 # TODO
+        self.action_space = 3
+        FACTOR = 9 # TODO
         self.observation_space = [84, 84, FACTOR] # 
 
     def reset(self):
@@ -46,10 +45,10 @@ class MinigameEnvironment:
         self._actuator.reset()
         self._terminal = False
 
-        raw_obs = self._run_to_next()
-        self._terminal = raw_obs.last()
+        self._run_to_next()
+        self._terminal = self._curr_frame.last()
         agent_obs = self._combine_frames()
-        return agent_obs, raw_obs.reward, raw_obs.last(), None # exclude selected
+        return agent_obs, self._curr_frame.reward, self._curr_frame.last(), None # exclude selected
 
     def step(self, action):
         '''
@@ -59,16 +58,18 @@ class MinigameEnvironment:
         '''
         
         assert not self._terminal, 'Environment must be reset after init or terminal'
-        #assert action == Action.ATTACK or action == Action.RETREAT, 'Agent action must be attack or retreat'
-        if (action == 0):
+        assert action in range(3), 'Agent action must be 0 or 1 or 2'
+        if action == 0:
             step_act = Action.RETREAT
-        if (action == 1):
-            step_act = Action.ATTACK
+        elif action == 1:
+            step_act = Action.ATTACK_CLOSEST
+        elif action == 2:
+            step_act = Action.ATTACK_WEAKEST
         
-        raw_obs = self._run_to_next(step_act)
-        self._terminal = raw_obs.last()
+        self._run_to_next(step_act)
+        self._terminal = self._curr_frame.last()
         agent_obs = self._combine_frames()
-        return agent_obs, raw_obs.reward, raw_obs.last(), None # exclude selected
+        return agent_obs, self._curr_frame.reward, self._curr_frame.last(), None # exclude selected
 
     def _run_to_next(self, start_action=None):
         '''
@@ -77,26 +78,29 @@ class MinigameEnvironment:
         :returns: Final raw observations
         '''
         if start_action is None:
-            raw_obs = self._reset_env()
+            self._reset_env()
         else:
             last_obs = self.state_modifier_func(self._curr_frame)
             raw_action = self._actuator.compute_action(start_action, last_obs)
-            raw_obs = self._step_env(raw_action)
+            self._step_env(raw_action)
         
-        if raw_obs.last():
-            return raw_obs
+        if self._curr_frame.last():
+            return
         
-        custom_obs = self.state_modifier_func(raw_obs)
+        custom_obs = self.state_modifier_func(self._curr_frame)
 
         friendly_unit_density = custom_obs[2]
-        assert not np_all(friendly_unit_density == 0), 'All marines dead but not terminal state'
+        assert not np.all(friendly_unit_density == 0), 'All marines dead but not terminal state'
 
         selected = custom_obs[0]
-        if not self._actuator.units_selected or np_all(selected == 0):
+        while not self._actuator.units_selected or np.all(selected == 0):
             raw_action = self._actuator.compute_action(Action.SELECT, custom_obs)
-            raw_obs = self._step_env(raw_action)
-        assert self._actuator.units_selected, 'Units not selected after select action'
-        return raw_obs
+            self._step_env(raw_action)
+            if self._curr_frame.last():
+                return
+            custom_obs = self.state_modifier_func(self._curr_frame)
+            selected = custom_obs[0]
+        assert self._actuator.units_selected and np.any(selected > 0), 'Units not selected after select action'
 
     def _combine_frames(self):
         '''
@@ -105,18 +109,15 @@ class MinigameEnvironment:
         assert self._prev_frame is not None and self._curr_frame is not None, 'Returning to agent after less than 2 frames should be impossible'
 
         custom_prev = self.state_modifier_func(self._prev_frame)[1:]
-        all_curr = self.state_modifier_func(self._curr_frame)
-        custom_curr = all_curr[1:]
+        custom_curr = self.state_modifier_func(self._curr_frame)
+        custom_curr = custom_curr[np.r_[1:len(custom_curr),0]] # move selected frame to end
         custom_frames = np.append(custom_prev, custom_curr, axis=0)
-        custom_frames = np.append(custom_frames, np.expand_dims(all_curr[0], axis=0), axis=0)
         return custom_frames
 
     def _reset_env(self):
         self._prev_frame = self._curr_frame
         self._curr_frame = self._env.reset()[0] # get obs for 1st agent
-        return self._curr_frame
 
     def _step_env(self, raw_action):
         self._prev_frame = self._curr_frame
         self._curr_frame = self._env.step([raw_action])[0] # get obs for 1st agent
-        return self._curr_frame

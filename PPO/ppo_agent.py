@@ -38,35 +38,28 @@ class Network(object):
             
             # Initializes convolutional layers
             
-            print(x.shape)
             x = tf.layers.conv2d(x,
-                filters=1,
+                filters=32,
                 kernel_size=[8, 8],
                 padding="same",
                 strides=(4, 4),
                 activation=self.activation)
                 
-            sleep(3)
                 
-            print(x.shape)
             x = tf.layers.conv2d(x,
-                filters=1,
+                filters=64,
                 kernel_size=[4, 4],
                 padding="same",
                 strides=2,
                 activation=self.activation)
                 
-            sleep(3)
-                
-            print(x.shape)
             x = tf.contrib.layers.flatten(x)
             
-            print(x.shape)
             # Initializes fully connected layers
             for i in range(num_layers):
                 x = tf.layers.dense(x, units=num_units, activation=self.activation, name="p_fc"+str(i),
                                     trainable=self.trainable)
-            action = tf.layers.dense(x, units=self.action_size, activation=self.activation,
+            action = tf.layers.dense(x, units=self.action_size, activation=tf.nn.softmax,
                                      name="p_fc"+str(num_layers), trainable=self.trainable)
 
             sleep(3)
@@ -74,14 +67,14 @@ class Network(object):
             x = self.obs_place
             
             x = tf.layers.conv2d(x,
-                filters=1,
+                filters=32,
                 kernel_size=[8,8],
                 padding="same",
                 strides=(4, 4),
                 activation=self.activation)
                 
             x = tf.layers.conv2d(x,
-                filters=1,
+                filters=64,
                 kernel_size=[4,4],
                 padding="same",
                 strides=(2, 2),
@@ -116,7 +109,7 @@ class PPOAgent(object):
     def __init__(self, env, session=None, input_shape=(84, 84, 8)):
         self.env = env
 
-        self.input_shape = input_shape
+        self.input_shape = self.env.observation_space
         self.session=session
         ## hyperparameters - TODO: TUNE
         self.learning_rate = 1e-4
@@ -133,7 +126,7 @@ class PPOAgent(object):
 
         self.obs_place = tf.placeholder(shape=([None] + env.observation_space),
                                         name="ob", dtype=tf.float32)
-        self.acts_place = tf.placeholder(shape=(None,2),
+        self.acts_place = tf.placeholder(shape=(None,self.env.action_space),
                                          name="ac", dtype=tf.float32)
 
         ## build network
@@ -195,7 +188,7 @@ class PPOAgent(object):
         rewards = np.zeros(self.step_size, 'float32')
         values = np.zeros(self.step_size, 'float32')
         dones = np.zeros(self.step_size, 'int32')
-        actions = np.array([np.zeros((2,)) for _ in range(self.step_size)])
+        actions = np.array([np.zeros((self.env.action_space,)) for _ in range(self.step_size)])
         prevactions = actions.copy()
 
         while True:
@@ -215,9 +208,9 @@ class PPOAgent(object):
             obs[i] = ob
             values[i] = value
             dones[i] = done
-            actions[i] = np.zeros((2,))
+            actions[i] = np.zeros((self.env.action_space,))
             actions[i][action] = 1
-            prevactions[i] = np.zeros((2,))
+            prevactions[i] = np.zeros((self.env.action_space,))
             prevactions[i][prevaction] = 1
 
             ob, reward, done, _ = env.step(action) # TODO: select argmax from action? or is action[0] always?
@@ -300,6 +293,7 @@ class PPOAgent(object):
 
             # Save model every 100 iterations
             if iteration % 100 == 0:
+                print(" Model saved ")
                 self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
 
     def update(self):
@@ -353,7 +347,7 @@ if __name__ == "__main__":
     sess = tf.Session(config=config)
     ppo = PPOAgent(env, session=sess)
     sess.run(tf.global_variables_initializer())
-    #ppo.restore_model("./model/ppo_defeat_banelings")
+    ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
     ppo.run()
 
     env.close()
