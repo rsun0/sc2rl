@@ -113,8 +113,8 @@ class PPOAgent(object):
         self.session=session
         ## hyperparameters - TODO: TUNE
         self.learning_rate = 1e-4
-        self.epochs = 10
-        self.step_size = 3072
+        self.epochs = 5
+        self.step_size = 6000
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -292,7 +292,7 @@ class PPOAgent(object):
                 print("vf_loss: {:.5f}, pol_loss: {:.5f}, entorpy: {:.5f}".format(vf_loss, pol_loss, entropy))
 
             # Save model every 100 iterations
-            if iteration % 100 == 0:
+            if iteration % 10 == 0:
                 print(" Model saved ")
                 self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
 
@@ -340,14 +340,14 @@ class PPOAgent(object):
 if __name__ == "__main__":
     env = MinigameEnvironment(state_modifier.modified_state_space, 
                                 map_name_="DefeatRoaches", 
-                                render=False, 
+                                render=True, 
                                 step_multiplier=6)
     config=tf.ConfigProto()
     config.gpu_options.allow_growth=True
     sess = tf.Session(config=config)
     ppo = PPOAgent(env, session=sess)
     sess.run(tf.global_variables_initializer())
-    ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
+    #ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
     ppo.run()
 
     env.close()
