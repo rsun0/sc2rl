@@ -28,7 +28,6 @@ class Action(Enum):
     DOWN_LEFT = 10
     ATTACK_CLOSEST = 11
     ATTACK_WEAKEST = 12
-    NOTHING = 13
 
 class Actuator:
     def __init__(self):
@@ -95,14 +94,11 @@ class Actuator:
                 return self._compute_move(selected,
                                             -1,
                                             -1)
-            # elif action == Action.ATTACK:
-            #     self.units_selected = False
-            #     return self._compute_attack(enemy_unit_density)
             elif action == Action.ATTACK_CLOSEST:
                 return self._compute_attack_closest(selected, enemy_unit_density)
             elif action == Action.ATTACK_WEAKEST:
                 return self._compute_attack_weakest(selected, enemy_unit_density, enemy_hit_points)
-            elif action == Action.NOTHING:
+            elif action == Action.NO_OP:
                 return actions.FUNCTIONS.no_op()
             assert False, 'Actuator cannot select with preexisting selection'
 
@@ -157,21 +153,20 @@ class Actuator:
         weakest = np.flip(np.array(np.unravel_index(np.argmin(enemy_hit_points), enemy_hit_points.shape)), axis=0)
         return actions.FUNCTIONS.Attack_screen('now', weakest)
 
-    """
     @staticmethod
-    def _screen_normalize(coords):
+    def _screen_normalize(coords, screen_size):
+        coords = coords.reshape((2,))
         for i in range(len(coords)):
             if coords[i] < 0:
                 coords[i] = 0
             if coords[i] > screen_size - 1:
                 coords[i] = screen_size - 1
         return coords
-    """
 
     @staticmethod
     def _compute_move(selected, dx, dy):
         friendly_com = np.expand_dims(np.array(ndimage.measurements.center_of_mass(selected)), axis=0)
         direction_vec = 20 * np.array([dy, dx])
-        move_target = _screen_normalize(friendly_com + direction_vec, 84)
+        move_target = Actuator._screen_normalize(friendly_com + direction_vec, 84)
         return actions.FUNCTIONS.Move_screen('now', move_target)
         

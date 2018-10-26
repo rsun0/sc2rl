@@ -58,7 +58,7 @@ class MinigameEnvironment:
         '''
         
         assert not self._terminal, 'Environment must be reset after init or terminal'
-        #assert action in range(3), 'Agent action must be 0 or 1 or 2'
+        assert action in range(11), 'Agent action must be 0-10'
         if action == 0:
             step_act = Action.LEFT
         elif action == 1:
@@ -80,7 +80,7 @@ class MinigameEnvironment:
         elif action == 9:
             step_act = Action.ATTACK_WEAKEST
         elif action == 10:
-            step_act = Action.NOTHING
+            step_act = Action.NO_OP
         
         self._run_to_next(step_act)
         self._terminal = self._curr_frame.last()

@@ -8,7 +8,7 @@ def random_agent():
     print(state.shape)
     for i in range(10): 
         while (not done):
-            action = randint(0, 2)
+            action = random.randint(0, 10)
             state, reward, done, _ = env.step(action)
         state, reward, done, _ = env.reset()
 
