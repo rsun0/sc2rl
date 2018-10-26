@@ -45,13 +45,13 @@ class Network(object):
                 strides=(4, 4),
                 activation=self.activation)
                 
+                
             x = tf.layers.conv2d(x,
                 filters=64,
                 kernel_size=[4, 4],
                 padding="same",
                 strides=2,
                 activation=self.activation)
-                
                 
             x = tf.contrib.layers.flatten(x)
             
@@ -112,8 +112,8 @@ class PPOAgent(object):
         self.session=session
         ## hyperparameters - TODO: TUNE
         self.learning_rate = 1e-4
-        self.epochs = 10
-        self.step_size = 3072
+        self.epochs = 5
+        self.step_size = 6000
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -125,7 +125,7 @@ class PPOAgent(object):
 
         self.obs_place = tf.placeholder(shape=([None] + env.observation_space),
                                         name="ob", dtype=tf.float32)
-        self.acts_place = tf.placeholder(shape=(None,2),
+        self.acts_place = tf.placeholder(shape=(None,self.env.action_space),
                                          name="ac", dtype=tf.float32)
 
         ## build network
@@ -187,7 +187,7 @@ class PPOAgent(object):
         rewards = np.zeros(self.step_size, 'float32')
         values = np.zeros(self.step_size, 'float32')
         dones = np.zeros(self.step_size, 'int32')
-        actions = np.array([np.zeros((2,)) for _ in range(self.step_size)])
+        actions = np.array([np.zeros((self.env.action_space,)) for _ in range(self.step_size)])
         prevactions = actions.copy()
 
         while True:
@@ -207,9 +207,9 @@ class PPOAgent(object):
             obs[i] = ob
             values[i] = value
             dones[i] = done
-            actions[i] = np.zeros((2,))
+            actions[i] = np.zeros((self.env.action_space,))
             actions[i][action] = 1
-            prevactions[i] = np.zeros((2,))
+            prevactions[i] = np.zeros((self.env.action_space,))
             prevactions[i][prevaction] = 1
 
             ob, reward, done, _ = env.step(action) # TODO: select argmax from action? or is action[0] always?
@@ -291,7 +291,8 @@ class PPOAgent(object):
                 print("vf_loss: {:.5f}, pol_loss: {:.5f}, entorpy: {:.5f}".format(vf_loss, pol_loss, entropy))
 
             # Save model every 100 iterations
-            if iteration % 100 == 0:
+            if iteration % 10 == 0:
+                print(" Model saved ")
                 self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
 
     def update(self):
@@ -338,14 +339,14 @@ class PPOAgent(object):
 if __name__ == "__main__":
     env = MinigameEnvironment(state_modifier.modified_state_space, 
                                 map_name_="DefeatRoaches", 
-                                render=False, 
-                                step_multiplier=2)
+                                render=True, 
+                                step_multiplier=6)
     config=tf.ConfigProto()
     config.gpu_options.allow_growth=True
     sess = tf.Session(config=config)
     ppo = PPOAgent(env, session=sess)
     sess.run(tf.global_variables_initializer())
-    ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
+    #ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
     ppo.run()
 
     env.close()

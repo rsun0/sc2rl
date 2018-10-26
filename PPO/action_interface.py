@@ -4,16 +4,36 @@ import numpy as np
 from scipy import ndimage
 from scipy.spatial import distance
 
+# Function defined up here because of weird python bug
+def _screen_normalize(coords, screen_size):
+    coords = coords.reshape((2,))
+    for i in range(len(coords)):
+        if coords[i] < 0:
+            coords[i] = 0
+        if coords[i] > screen_size - 1:
+            coords[i] = screen_size - 1
+    return coords
+
+
 class Action(Enum):
     NO_OP = 1
     SELECT = 2
-    RETREAT = 3
-    ATTACK_CLOSEST = 5
-    ATTACK_WEAKEST = 6
+    LEFT = 3
+    UP_LEFT = 4
+    UP = 5
+    UP_RIGHT = 6
+    RIGHT = 7
+    DOWN_RIGHT = 8
+    DOWN = 9
+    DOWN_LEFT = 10
+    ATTACK_CLOSEST = 11
+    ATTACK_WEAKEST = 12
+    NOTHING = 13
 
 class Actuator:
     def __init__(self):
         self.units_selected = False
+        self.move_multiplier = 20
 
     def reset(self):
         self.units_selected = False
@@ -21,7 +41,6 @@ class Actuator:
     def compute_action(self, action, custom_obs):
         '''
         Computes the raw action corresponding to the chosen abstract action
-
         :param action: The chosen abstract action (NO_OP, SELECT, RETREAT, or ATTACK)
         :param custom_obs: Custom observations as given by modified state space
         :returns: The raw action to return to environment
@@ -44,9 +63,38 @@ class Actuator:
             return self._compute_select(friendly_unit_density)
         
         else:
-            if action == Action.RETREAT:
-                # self.units_selected = False
-                return self._compute_retreat(selected, enemy_unit_density)
+            if action == Action.LEFT:
+                return self._compute_move(selected,
+                                            -1,
+                                            0)
+            elif action == Action.UP_LEFT:
+                return self._compute_move(selected,
+                                            -1,
+                                            1)
+            elif action == Action.UP:
+                return self._compute_move(selected,
+                                            0,
+                                            1)
+            elif action == Action.UP_RIGHT:
+                return self._compute_move(selected,
+                                            1,
+                                            1)
+            elif action == Action.RIGHT:
+                return self._compute_move(selected,
+                                            1,
+                                            0)
+            elif action == Action.DOWN_RIGHT:
+                return self._compute_move(selected,
+                                            1,
+                                            -1)
+            elif action == Action.DOWN:
+                return self._compute_move(selected,
+                                            0,
+                                            -1)
+            elif action == Action.DOWN_LEFT:
+                return self._compute_move(selected,
+                                            -1,
+                                            -1)
             # elif action == Action.ATTACK:
             #     self.units_selected = False
             #     return self._compute_attack(enemy_unit_density)
@@ -54,6 +102,8 @@ class Actuator:
                 return self._compute_attack_closest(selected, enemy_unit_density)
             elif action == Action.ATTACK_WEAKEST:
                 return self._compute_attack_weakest(selected, enemy_unit_density, enemy_hit_points)
+            elif action == Action.NOTHING:
+                return actions.FUNCTIONS.no_op()
             assert False, 'Actuator cannot select with preexisting selection'
 
     @staticmethod
@@ -106,3 +156,22 @@ class Actuator:
         enemy_hit_points[enemy_unit_density == 0] = np.finfo(enemy_hit_points.dtype).max
         weakest = np.flip(np.array(np.unravel_index(np.argmin(enemy_hit_points), enemy_hit_points.shape)), axis=0)
         return actions.FUNCTIONS.Attack_screen('now', weakest)
+
+    """
+    @staticmethod
+    def _screen_normalize(coords):
+        for i in range(len(coords)):
+            if coords[i] < 0:
+                coords[i] = 0
+            if coords[i] > screen_size - 1:
+                coords[i] = screen_size - 1
+        return coords
+    """
+
+    @staticmethod
+    def _compute_move(selected, dx, dy):
+        friendly_com = np.expand_dims(np.array(ndimage.measurements.center_of_mass(selected)), axis=0)
+        direction_vec = 20 * np.array([dy, dx])
+        move_target = _screen_normalize(friendly_com + direction_vec, 84)
+        return actions.FUNCTIONS.Move_screen('now', move_target)
+        
