@@ -1,6 +1,7 @@
 from custom_env import MinigameEnvironment
 from modified_state_space import state_modifier
 import random
+import time
 
 def random_agent():
     env = MinigameEnvironment(render=True,step_multiplier=4,state_modifier_func=state_modifier.modified_state_space)
