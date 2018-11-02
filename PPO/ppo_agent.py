@@ -115,7 +115,7 @@ class PPOAgent(object):
         ## hyperparameters - TODO: TUNE
         self.learning_rate = 1e-4
         self.epochs = 3
-        self.step_size = 4000
+        self.step_size = 3000
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -136,14 +136,14 @@ class PPOAgent(object):
         self.net = Network(env=self.env,
                            scope="pi",
                            num_layers=2,
-                           num_units=128,
+                           num_units=256,
                            obs_plc=self.obs_place,
                            act_plc=self.acts_place)
 
         self.old_net = Network(env=self.env,
                                scope="old_pi",
                                num_layers=2,
-                               num_units=128,
+                               num_units=256,
                                obs_plc=self.obs_place,
                                act_plc=self.acts_place,
                                trainable=False)
