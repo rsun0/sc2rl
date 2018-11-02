@@ -14,6 +14,8 @@ from custom_env import MinigameEnvironment
 from modified_state_space import state_modifier
 import random
 from time import sleep
+import matplotlib
+import matplotlib.pyplot as plt
 
 class Network(object):
     def __init__(self, env, scope, num_layers, num_units, obs_plc, act_plc, trainable=True):
@@ -112,12 +114,13 @@ class PPOAgent(object):
         self.session=session
         ## hyperparameters - TODO: TUNE
         self.learning_rate = 1e-4
-        self.epochs = 5
-        self.step_size = 6000
+        self.epochs = 3
+        self.step_size = 2000
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
         self.batch_size = 32
+        self.averages = []
 
         ## placeholders
         self.adv_place = tf.placeholder(shape=[None], dtype=tf.float32)
@@ -183,6 +186,9 @@ class PPOAgent(object):
         ep_returns = []
         ep_lengths = []
 
+        scores = []
+        num_games = 0
+
         obs = np.array([ob for _ in range(self.step_size)])
         rewards = np.zeros(self.step_size, 'float32')
         values = np.zeros(self.step_size, 'float32')
@@ -190,11 +196,16 @@ class PPOAgent(object):
         actions = np.array([np.zeros((self.env.action_space,)) for _ in range(self.step_size)])
         prevactions = actions.copy()
 
+
+
         while True:
             prevaction = action
             action_vals, value = self.act(ob)
             action = self.select_action(action_vals)
             if t > 0 and t % self.step_size == 0:
+                self.averages.append(sum(scores) / num_games)
+                scores = []
+                num_games = 0
                 yield {"ob": obs, "reward":rewards, "value": values,
                        "done": dones, "action": actions, "prevaction": prevactions,
                        "nextvalue": value*(1 - done), "ep_returns": ep_returns,
@@ -221,6 +232,8 @@ class PPOAgent(object):
             cur_ep_length += 1
 
             if done:
+                scores.append(cur_ep_return)
+                num_games += 1
                 print("Reward: {}".format(cur_ep_return))
                 ep_returns.append(cur_ep_return)
                 ep_lengths.append(cur_ep_length)
@@ -294,6 +307,7 @@ class PPOAgent(object):
             if iteration % 10 == 0:
                 print(" Model saved ")
                 self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
+            self.plot_results()
 
     def update(self):
         print("--- update called ---")
@@ -335,12 +349,22 @@ class PPOAgent(object):
         self.saver.restore(self.session, model_path)
         print("model restored")
 
+    def plot_results(self):
+        plt.figure(1)
+        plt.clf()
+        plt.suptitle('11-Action Single-unit PPO')
+        plt.title('Agent trained by Ray Sun, David Long, Michael McGuire', fontsize=7)
+        plt.xlabel('Training iteration - DefeatRoaches')
+        plt.ylabel('Average score')
+        plt.plot(self.averages)
+        plt.pause(0.001)  # pause a bit so that plots are updated
+
 
 if __name__ == "__main__":
     env = MinigameEnvironment(state_modifier.modified_state_space, 
                                 map_name_="DefeatRoaches", 
                                 render=True, 
-                                step_multiplier=6)
+                                step_multiplier=2)
     config=tf.ConfigProto()
     config.gpu_options.allow_growth=True
     sess = tf.Session(config=config)
