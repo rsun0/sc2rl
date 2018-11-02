@@ -79,6 +79,8 @@ class MinigameEnvironment:
             step_act = Action.ATTACK_CLOSEST
         elif action == 9:
             step_act = Action.ATTACK_WEAKEST
+        elif action == 10:
+            step_act = Action.NOTHING
         
         self._run_to_next(step_act)
         self._terminal = self._curr_frame.last()
