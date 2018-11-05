@@ -64,7 +64,6 @@ class state_modifier():
 
     """
     def modified_state_space(obs):
-    
         scr = obs.observation.feature_screen
    
         ### Computes array of locations of selected marines

@@ -19,7 +19,7 @@ class Action(Enum):
     ATTACK_WEAKEST = 12
 
 class Actuator:
-    _MOVE_MULTIPLIER = 20
+    _MOVE_MULTIPLIER = 10
 
     def __init__(self):
         self.reset()
