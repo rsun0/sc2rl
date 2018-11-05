@@ -97,7 +97,7 @@ class MinigameEnvironment:
             self._reset_env()
         else:
             last_obs = self.state_modifier_func(self._curr_frame)
-            raw_action = self._actuator.compute_action(start_action, last_obs)
+            raw_action = self._actuator.compute_action(start_action, last_obs, self._curr_frame)
             self._step_env(raw_action)
         
         if self._curr_frame.last():
@@ -110,7 +110,7 @@ class MinigameEnvironment:
 
         selected = custom_obs[0]
         while not self._actuator.units_selected or np.all(selected == 0):
-            raw_action = self._actuator.compute_action(Action.SELECT, custom_obs)
+            raw_action = self._actuator.compute_action(Action.SELECT, custom_obs, self._curr_frame)
             self._step_env(raw_action)
             if self._curr_frame.last():
                 return
