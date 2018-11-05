@@ -28,11 +28,12 @@ class Actuator:
         self.units_selected = False
         self._select_index = 0
 
-    def compute_action(self, action, custom_obs):
+    def compute_action(self, action, custom_obs, raw_obs):
         '''
         Computes the raw action corresponding to the chosen abstract action
         :param action: The chosen abstract action (NO_OP, SELECT, RETREAT, or ATTACK)
         :param custom_obs: Custom observations as given by modified state space
+        :param raw_obs: Observations from pysc2
         :returns: The raw action to return to environment
         '''
         if action == Action.NO_OP:
@@ -50,7 +51,7 @@ class Actuator:
             assert action == Action.SELECT, 'Actuator cannot order units without selection (unit may have died)'
 
             self.units_selected = True
-            return self._compute_select(friendly_unit_density)
+            return self._compute_select(friendly_unit_density, len(raw_obs.observation.feature_units))
         
         else:
             self.units_selected = False
@@ -121,14 +122,15 @@ class Actuator:
     #     enemy_com = np.flip(np.array(ndimage.measurements.center_of_mass(enemy_unit_density)), 0)
     #     return actions.FUNCTIONS.Attack_screen('now', enemy_com)
 
-    def _compute_select(self, friendly_unit_density):
+    def _compute_select(self, friendly_unit_density, num_units):
         # return actions.FUNCTIONS.select_army('select')
         possible_points = np.transpose(np.nonzero(friendly_unit_density))
-        if len(possible_points) == 0:
+        if len(possible_points) == 0 or num_units == 0:
             raise Exception('Actuator cannot select when no units exist')
-        if self._select_index >= len(possible_points):
+        if self._select_index >= num_units:
             self._select_index = 0
-        selection = np.flip(possible_points[self._select_index], 0)
+        idx = int((self._select_index / num_units) * len(possible_points))
+        selection = np.flip(possible_points[idx], 0)
         self._select_index += 1
         return actions.FUNCTIONS.select_point('select', selection)
 
