@@ -28,7 +28,7 @@ class Actuator:
         self.units_selected = False
         self._select_index = 0
 
-    def compute_action(self, action, custom_obs, raw_obs):
+    def compute_action(self, action, custom_obs, raw_obs, topleft=None, botright=None):
         '''
         Computes the raw action corresponding to the chosen abstract action
         :param action: The chosen abstract action (NO_OP, SELECT, RETREAT, or ATTACK)
@@ -46,6 +46,10 @@ class Actuator:
 
         if np.all(selected == 0):
             self.units_selected = False
+
+        if (topleft != None):
+            assert action == Action.SELECT
+            return self._select(topleft, botright)
 
         if not self.units_selected:
             assert action == Action.SELECT, 'Actuator cannot order units without selection (unit may have died)'
@@ -165,3 +169,6 @@ class Actuator:
         move_target = Actuator._screen_normalize(friendly_com + direction_vec, 84)
         return actions.FUNCTIONS.Move_screen('now', move_target)
         
+    @staticmethod
+    def _select(topleft, botright):
+        return actions.FUNCTIONS.select_rect(topleft, botright)

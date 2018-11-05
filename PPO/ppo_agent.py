@@ -223,6 +223,12 @@ class PPOAgent(object):
             prevactions[i] = np.zeros((self.env.action_space,))
             prevactions[i][prevaction] = 1
 
+            """
+            ADD functionality for selecting every other frame
+            Change neural network to spit out selection box coords
+            """
+
+
             ob, reward, done, _ = env.step(action) # TODO: select argmax from action? or is action[0] always?
             ob = ob.reshape(self.input_shape)
             ob = self.normalize(ob)

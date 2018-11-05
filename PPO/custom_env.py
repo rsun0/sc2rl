@@ -50,7 +50,7 @@ class MinigameEnvironment:
         agent_obs = self._combine_frames()
         return agent_obs, self._curr_frame.reward, self._curr_frame.last(), None # exclude selected
 
-    def step(self, action):
+    def step(self, action, topleft=None, botright=None):
         '''
         Runs the environment until the next agent action is required
         :param action: 0 for Action.RETREAT or 1 for Action.ATTACK
@@ -82,12 +82,12 @@ class MinigameEnvironment:
         elif action == 10:
             step_act = Action.NO_OP
         
-        self._run_to_next(step_act)
+        self._run_to_next(step_act, topleft=topleft, botright=botright)
         self._terminal = self._curr_frame.last()
         agent_obs = self._combine_frames()
         return agent_obs, self._curr_frame.reward, self._curr_frame.last(), None # exclude selected
 
-    def _run_to_next(self, start_action=None):
+    def _run_to_next(self, start_action=None, topleft=None, botright=None):
         '''
         Runs the environment with NO_OPs and SELECTs until the next agent action is required
         :param start_action: The chosen agent action, or None for reset
@@ -97,7 +97,7 @@ class MinigameEnvironment:
             self._reset_env()
         else:
             last_obs = self.state_modifier_func(self._curr_frame)
-            raw_action = self._actuator.compute_action(start_action, last_obs, self._curr_frame)
+            raw_action = self._actuator.compute_action(start_action, last_obs, self._curr_frame, topleft=topleft, botright=botright)
             self._step_env(raw_action)
         
         if self._curr_frame.last():
