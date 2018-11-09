@@ -352,7 +352,7 @@ class PPOAgent(object):
     def plot_results(self):
         plt.figure(1)
         plt.clf()
-        plt.suptitle('11-Action Single-unit PPO')
+        plt.suptitle('6-Action Single-unit PPO')
         plt.title('Agent trained by Ray Sun, David Long, Michael McGuire', fontsize=7)
         plt.xlabel('Training iteration - DefeatRoaches')
         plt.ylabel('Average score')
@@ -363,7 +363,7 @@ class PPOAgent(object):
 if __name__ == "__main__":
     env = MinigameEnvironment(state_modifier.modified_state_space, 
                                 map_name_="DefeatRoaches", 
-                                render=True, 
+                                render=False, 
                                 step_multiplier=2)
     config=tf.ConfigProto()
     config.gpu_options.allow_growth=True
