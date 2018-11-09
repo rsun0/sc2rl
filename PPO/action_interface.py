@@ -19,7 +19,7 @@ class Action(Enum):
     ATTACK_WEAKEST = 12
 
 class Actuator:
-    _MOVE_MULTIPLIER = 10
+    _MOVE_MULTIPLIER = 5
 
     def __init__(self):
         self.reset()
@@ -163,5 +163,6 @@ class Actuator:
         friendly_com = np.expand_dims(np.array(ndimage.measurements.center_of_mass(selected)), axis=0)
         direction_vec = Actuator._MOVE_MULTIPLIER * np.array([dy, dx])
         move_target = Actuator._screen_normalize(friendly_com + direction_vec, 84)
+        move_target = np.flip(move_target, 0)
         return actions.FUNCTIONS.Move_screen('now', move_target)
         

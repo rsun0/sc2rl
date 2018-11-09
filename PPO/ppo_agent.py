@@ -113,10 +113,10 @@ class PPOAgent(object):
         self.input_shape = self.env.observation_space
         self.session=session
         ## hyperparameters - TODO: TUNE
-        self.learning_rate = 3e-5
+        self.learning_rate = 1e-4
         self.epochs = 3
         self.step_size = 5000
-        self.gamma = 0.99
+        self.gamma = 0.995
         self.lam = 0.95
         self.clip_param = 0.2
         self.batch_size = 32
@@ -364,7 +364,7 @@ if __name__ == "__main__":
     env = MinigameEnvironment(state_modifier.modified_state_space, 
                                 map_name_="DefeatRoaches", 
                                 render=True, 
-                                step_multiplier=3)
+                                step_multiplier=2)
     config=tf.ConfigProto()
     config.gpu_options.allow_growth=True
     sess = tf.Session(config=config)
