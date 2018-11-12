@@ -54,6 +54,13 @@ class Network(object):
                 padding="same",
                 strides=2,
                 activation=self.activation)
+
+            x = tf.layers.conv2d(x,
+                filters=64,
+                kernel_size=[4,4],
+                padding="same",
+                strides=1,
+                activation=self.activation)
                 
             x = tf.contrib.layers.flatten(x)
             
@@ -81,6 +88,13 @@ class Network(object):
                 strides=(2, 2),
                 activation=self.activation)
                 
+            x = tf.layers.conv2d(x,
+                filters=64,
+                kernel_size=[4,4],
+                padding="same",
+                strides=1,
+                activation=self.activation)
+
             x = tf.contrib.layers.flatten(x)
             
             
@@ -116,7 +130,7 @@ class PPOAgent(object):
         self.learning_rate = 1e-4
         self.epochs = 3
         self.step_size = 5000
-        self.gamma = 0.995
+        self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
         self.batch_size = 32
@@ -135,14 +149,14 @@ class PPOAgent(object):
         self.net = Network(env=self.env,
                            scope="pi",
                            num_layers=2,
-                           num_units=128,
+                           num_units=512,
                            obs_plc=self.obs_place,
                            act_plc=self.acts_place)
 
         self.old_net = Network(env=self.env,
                                scope="old_pi",
                                num_layers=2,
-                               num_units=128,
+                               num_units=512,
                                obs_plc=self.obs_place,
                                act_plc=self.acts_place,
                                trainable=False)
