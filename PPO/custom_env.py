@@ -103,6 +103,10 @@ class MinigameEnvironment:
         if self._curr_frame.last():
             return
         
+        
+        # Following code commented out.
+        # The code above now explicitly handles selection.
+        """
         custom_obs = self.state_modifier_func(self._curr_frame)
 
         friendly_unit_density = custom_obs[2]
@@ -117,6 +121,7 @@ class MinigameEnvironment:
             custom_obs = self.state_modifier_func(self._curr_frame)
             selected = custom_obs[0]
         assert self._actuator.units_selected and np.any(selected > 0), 'Units not selected after select action'
+        """
 
     def _combine_frames(self):
         '''
