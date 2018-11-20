@@ -86,7 +86,7 @@ class MinigameEnvironment:
         self._terminal = self._curr_frame.last()
         agent_obs = self._combine_frames()
         return agent_obs, self._curr_frame.reward, self._curr_frame.last(), None # exclude selected
-
+    """
     def _run_to_next(self, start_action=None, topleft=None, botright=None):
         '''
         Runs the environment with NO_OPs and SELECTs until the next agent action is required
@@ -106,7 +106,7 @@ class MinigameEnvironment:
         
         # Following code commented out.
         # The code above now explicitly handles selection.
-        """
+        
         custom_obs = self.state_modifier_func(self._curr_frame)
 
         friendly_unit_density = custom_obs[2]
@@ -121,7 +121,38 @@ class MinigameEnvironment:
             custom_obs = self.state_modifier_func(self._curr_frame)
             selected = custom_obs[0]
         assert self._actuator.units_selected and np.any(selected > 0), 'Units not selected after select action'
-        """
+    """
+    
+    def _run_to_next(self, start_action=None, topleft=None, botright=None):
+        
+        print("_run_to_next called")
+        if start_action is None:
+            self._reset_env()
+        
+        if self._curr_frame.last():
+            return
+        custom_obs = self.state_modifier_func(self._curr_frame)
+            
+        # Select action
+        if (topleft != None):
+            friendly_unit_density = custom_obs[2]
+            assert not np.all(friendly_unit_density == 0), 'All marines dead but not terminal state'
+            selected = custom_obs[0]
+                
+            while not self._actuator.units_selected or np.all(selected == 0):
+                raw_action = self._actuator.compute_action(action.SELECT, custom_obs, self._curr_frame, topleft=topleft, botright=botright)
+                self._step_env(raw_action)
+                if self._curr_frame.last():
+                    return
+                custom_obs = self.state_modifier_func(self._curr_frame)
+                selected = custom_obs[0]
+            assert self._actuator.units_selected and np.any(selected > 0), 'Units not selected after select action'
+                
+        # Move action
+        elif (start_action is not None):
+            last_obs = self.state_modifier_func(self._curr_frame)
+            raw_action = self._actuator.compute_action(start_action, last_obs, self._curr_frame, topleft=topleft, botright=botright)
+            self._step_env(raw_action)
 
     def _combine_frames(self):
         '''
@@ -136,8 +167,11 @@ class MinigameEnvironment:
         return custom_frames
 
     def _reset_env(self):
+        print("_reset_env called")
         self._prev_frame = self._curr_frame
         self._curr_frame = self._env.reset()[0] # get obs for 1st agent
+        
+        print(self._prev_frame is None, self._curr_frame is None)
 
     def _step_env(self, raw_action):
         self._prev_frame = self._curr_frame
