@@ -8,13 +8,16 @@ def random_agent():
     state, reward, done, _ = env.reset()
     print(state.shape)
     for i in range(10): 
+        print("Beginning game %d" % (i+1))
         t = 0
         while (not done):
             if (t % 2 == 0):
-                topleft = [random.randint(0,41), random.randint(0,41)]
-                botright = [random.randint(42,83), random.randint(42,83)]
+                
+                topleft = [random.randint(0,4), random.randint(0,4)]
+                botright = [random.randint(5,9), random.randint(5,9)]
+                
                 state, reward, done, _ = env.step(0, topleft=topleft, botright=botright)
-            else:    
+            else:
                 action = random.randint(0, 10)
                 state, reward, done, _ = env.step(action)
             t += 1
