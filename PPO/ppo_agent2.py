@@ -174,8 +174,8 @@ class PPOAgent(object):
         self.session=session
         ## hyperparameters - TODO: TUNE
         self.learning_rate = 5e-5
-        self.epochs = 1
-        self.step_size = 5000
+        self.epochs = 2
+        self.step_size = 200
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -280,8 +280,10 @@ class PPOAgent(object):
         num_games = 0
         
         #obs = np.array([ob, ob]for _ in range(self.step_size)]).T
-        select_obs = np.array([ob for _ in range(self.step_size)])
-        move_obs = np.array([ob for _ in range(self.step_size)])
+        #select_obs = np.array([ob for _ in range(self.step_size)])
+        #move_obs = np.array([ob for _ in range(self.step_size)])
+        select_obs = np.zeros((self.step_size, ob.shape[0], ob.shape[1], ob.shape[2]), 'float32')
+        move_obs = np.zeros((self.step_size, ob.shape[0], ob.shape[1], ob.shape[2]), 'float32')
         rewards = np.zeros(self.step_size, 'float32')
         values = np.zeros(self.step_size, 'float32')
         dones = np.zeros(self.step_size, 'int32')
@@ -309,7 +311,8 @@ class PPOAgent(object):
         
             ### Handles return ###
             if (t > 0 and (t % (2*self.step_size)) == 0):
-                self.averages.append(sum(scores) / (1+num_games))
+                self.averages.append(sum(scores) / (num_games))
+                print("Average game score of this batch: {}".format(self.averages[-1]))
                 scores = []
                 num_games = 0
                 yield {"select_ob": select_obs, 
@@ -373,7 +376,7 @@ class PPOAgent(object):
                     rewards[i] += reward
                     scores.append(cur_ep_return)
                     num_games += 1
-                    print("Reward: {}".format(cur_ep_return))
+                    print("Reward: {}. {} of {} steps.".format(cur_ep_return, t%(2*self.step_size), (2*self.step_size)))
                     ep_returns.append(cur_ep_return)
                     ep_lengths.append(cur_ep_length)
                     cur_ep_return = 0
@@ -414,7 +417,7 @@ class PPOAgent(object):
                 if done:
                     scores.append(cur_ep_return)
                     num_games += 1
-                    print("Reward: {}".format(cur_ep_return))
+                    print("Reward: {}. {} of {} steps.".format(cur_ep_return, t%(2*self.step_size), (2*self.step_size)))
                     ep_returns.append(cur_ep_return)
                     ep_lengths.append(cur_ep_length)
                     cur_ep_return = 0
@@ -573,7 +576,9 @@ class PPOAgent(object):
         surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
         
         pol_surr = -tf.reduce_mean(tf.minimum(surr1, surr2))
-        vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place))
+        #vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place))
+        vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))
+        
         total_loss = pol_surr + 10*vf_loss
         
         update_op = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(total_loss)
@@ -588,7 +593,8 @@ class PPOAgent(object):
         surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
 
         pol_surr = -tf.reduce_mean(tf.minimum(surr1, surr2)) # -average(SUM RATIOn * ADVn)
-        vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place)) # -KL
+        #vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place)) # -KL
+        vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))    
 
         total_loss = pol_surr + 10*vf_loss
 
