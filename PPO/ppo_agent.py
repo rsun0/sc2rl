@@ -1,4 +1,4 @@
-# OBJECTIVE: maximize theta in SUM (n 1->N) ( pi_theta(an | sn) / pi_theta_old(an | sn) * ADVn ) - C * KL(pi_theta, pi_theta_old)
+#OBJECTIVE: maximize theta in SUM (n 1->N) ( pi_theta(an | sn) / pi_theta_old(an | sn) * ADVn ) - C * KL(pi_theta, pi_theta_old)
 
 # for i = 1,2, ...
 #   run pi_theta for T timesteps
@@ -114,8 +114,8 @@ class PPOAgent(object):
         self.session=session
         ## hyperparameters - TODO: TUNE
         self.learning_rate = 1e-4
-        self.epochs = 3
-        self.step_size = 3000
+        self.epochs = 2
+        self.step_size = 2000
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -313,6 +313,7 @@ class PPOAgent(object):
                 print(" Model saved ")
                 self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
             self.plot_results()
+            print("Current epoch average score: ", self.averages[-1])
 
     def update(self):
         print("--- update called ---")
@@ -367,7 +368,7 @@ class PPOAgent(object):
 if __name__ == "__main__":
     env = MinigameEnvironment(state_modifier.modified_state_space, 
                                 map_name_="DefeatRoaches", 
-                                render=True, 
+                                render=False, 
                                 step_multiplier=8)
     config=tf.ConfigProto()
     config.gpu_options.allow_growth=True
