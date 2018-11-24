@@ -175,7 +175,7 @@ class PPOAgent(object):
         ## hyperparameters - TODO: TUNE
         self.learning_rate = 5e-5
         self.epochs = 2
-        self.step_size = 200
+        self.step_size = 8000
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -198,7 +198,7 @@ class PPOAgent(object):
         self.net = Network(env=self.env,
                            scope="pi",
                            num_layers=2,
-                           num_units=128,
+                           num_units=512,
                            obs_plc=self.obs_place,
                            act_plc=self.acts_place,
                            select_act_plc=self.select_acts_place)
@@ -206,7 +206,7 @@ class PPOAgent(object):
         self.old_net = Network(env=self.env,
                                scope="old_pi",
                                num_layers=2,
-                               num_units=128,
+                               num_units=512,
                                obs_plc=self.obs_place,
                                act_plc=self.acts_place,
                                select_act_plc=self.select_acts_place,
@@ -507,9 +507,9 @@ class PPOAgent(object):
             
             len = int(self.step_size / self.batch_size)
             
-            if (turn == 0):
+            if (turn == 1):
                 print("\n================= Training selector =================")
-            elif (turn == 1):
+            elif (turn == 0):
                 print("\n================= Training mover =================")
             for _ in range(self.epochs):
                 vf_loss = 0
