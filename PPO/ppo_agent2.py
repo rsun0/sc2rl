@@ -52,7 +52,6 @@ class Network(object):
                 strides=(4, 4),
                 activation=self.activation)
                 
-                
             x = tf.layers.conv2d(x,
                 filters=64,
                 kernel_size=[4, 4],
@@ -60,10 +59,44 @@ class Network(object):
                 strides=2,
                 activation=self.activation)
                 
-                
-            ### select_p network
+            x = tf.contrib.layers.flatten(x)
             
-            ### Maybe add more conv layers            
+            # Initializes fully connected layers
+            for i in range(num_layers):
+                x = tf.layers.dense(x, 
+                                units=num_units, 
+                                activation=self.activation, 
+                                name="p_fc"+str(i), 
+                                trainable=self.trainable)
+                                
+            action = tf.layers.dense(x, 
+                                units=self.action_size, 
+                                activation=tf.nn.softmax,
+                                name="p_fc"+str(num_layers), 
+                                trainable=self.trainable)
+                
+                
+                
+            ### select_p network #####################################
+            
+            x = self.obs_place
+            
+            # Initializes convolutional layers
+            
+            x = tf.layers.conv2d(x,
+                filters=32,
+                kernel_size=[8, 8],
+                padding="same",
+                strides=(4, 4),
+                activation=self.activation)
+                
+            x = tf.layers.conv2d(x,
+                filters=64,
+                kernel_size=[4, 4],
+                padding="same",
+                strides=2,
+                activation=self.activation)
+                         
             select_p = tf.layers.conv2d(x,
                 filters=64,
                 kernel_size=[3,3],
@@ -87,17 +120,30 @@ class Network(object):
             
             
                 
+            
+                                     
+            x = self.obs_place
+            
+            x = tf.layers.conv2d(x,
+                                filters=32,
+                                kernel_size=[8,8],
+                                padding="same",
+                                strides=(4,4),
+                                activation=self.activation)
+                                
+            x = tf.layers.conv2d(x,
+                                filters=64,
+                                kernel_size=[4,4],
+                                padding="same",
+                                strides=(2,2),
+                                activation=self.activation)
+                                
             x = tf.contrib.layers.flatten(x)
             
-            # Initializes fully connected layers
             for i in range(num_layers):
-                x = tf.layers.dense(x, units=num_units, activation=self.activation, name="p_fc"+str(i),
-                                    trainable=self.trainable)
-            action = tf.layers.dense(x, units=self.action_size, activation=tf.nn.softmax,
-                                     name="p_fc"+str(num_layers), trainable=self.trainable)
-
-            value = tf.layers.dense(x, units=1, activation=None, name="v_fc"+str(num_layers),
-                                    trainable=self.trainable)
+                x = tf.layers.dense(x, units=num_units, activation=self.activation, name="v_fc"+str(i), trainable=self.trainable)
+                
+            value = tf.layers.dense(x, units=1, activation=None, name="v_fc"+str(num_layers), trainable=self.trainable)
 
             
             

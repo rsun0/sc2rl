@@ -104,7 +104,7 @@ class Network(object):
         return action, value, [select_p_x1, select_p_y1, select_p_x2, select_p_y2], logstd
 
     def action_sample(self):
-        return self.p # + tf.exp(self.logstd) * tf.random_normal(tf.shape(self.p))
+        return self.p #+ tf.exp(self.logstd) * tf.random_normal(tf.shape(self.p))
 
     def get_variables(self):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.scope)
