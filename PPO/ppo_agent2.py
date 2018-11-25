@@ -172,8 +172,17 @@ class PPOAgent(object):
 
         self.input_shape = self.env.observation_space
         self.session=session
-        ## hyperparameters - TODO: TUNE
-        self.learning_rate = 2e-5
+        
+        
+        ### hyperparameters - TODO: TUNE
+        self.learning_rate = 5e-5
+        
+        ### weight for vf_loss
+        self.c1 = 10
+        
+        ### weight for entropy
+        self.c2 = 1
+        
         self.epochs = 5
         self.step_size = 25600
         self.gamma = 0.99
@@ -579,7 +588,7 @@ class PPOAgent(object):
         vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place))
         #vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))
         
-        total_loss = pol_surr + 10*vf_loss
+        total_loss = pol_surr + self.c1 *vf_loss #- self.c2 * ent
         
         update_op = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(total_loss)
         
@@ -596,7 +605,7 @@ class PPOAgent(object):
         vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place)) # -KL
         #vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))    
 
-        total_loss = pol_surr + 10*vf_loss
+        total_loss = pol_surr + self.c1 *vf_loss #- self.c2 * ent
 
         # Maximizing objective is same as minimizing the negative objective
         update_op = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(total_loss)
