@@ -174,8 +174,8 @@ class PPOAgent(object):
         self.session=session
         ## hyperparameters - TODO: TUNE
         self.learning_rate = 5e-5
-        self.epochs = 2
-        self.step_size = 8000
+        self.epochs = 4
+        self.step_size = 3000
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
