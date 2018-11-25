@@ -173,13 +173,13 @@ class PPOAgent(object):
         self.input_shape = self.env.observation_space
         self.session=session
         ## hyperparameters - TODO: TUNE
-        self.learning_rate = 5e-5
-        self.epochs = 4
-        self.step_size = 3000
+        self.learning_rate = 2e-5
+        self.epochs = 5
+        self.step_size = 25600
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
-        self.batch_size = 32
+        self.batch_size = 128
         self.averages = []
 
         ## placeholders
@@ -311,7 +311,7 @@ class PPOAgent(object):
         
             ### Handles return ###
             if (t > 0 and (t % (2*self.step_size)) == 0):
-                self.averages.append(sum(scores) / (num_games))
+                self.averages.append(sum(scores) / (1+num_games))
                 print("Average game score of this batch: {}".format(self.averages[-1]))
                 scores = []
                 num_games = 0
@@ -553,11 +553,11 @@ class PPOAgent(object):
                     pol_loss += step_losses[2] / len
                     
                 ### Print training statistics for selector training    
-                if (turn == 0):
+                if (turn == 1):
                     print("vf_loss: {:.5f}, select_pol_loss: {:.5f}, entropy: {:.5f}".format(vf_loss, pol_loss, entropy))
                 
                 ### Print training statistics for mover training
-                elif (turn == 1):
+                elif (turn == 0):
                     print("vf_loss: {:.5f}, pol_loss: {:.5f}, entropy: {:.5f}".format(vf_loss, pol_loss, entropy))
                     
                     
@@ -576,8 +576,8 @@ class PPOAgent(object):
         surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
         
         pol_surr = -tf.reduce_mean(tf.minimum(surr1, surr2))
-        #vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place))
-        vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))
+        vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place))
+        #vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))
         
         total_loss = pol_surr + 10*vf_loss
         
@@ -593,8 +593,8 @@ class PPOAgent(object):
         surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
 
         pol_surr = -tf.reduce_mean(tf.minimum(surr1, surr2)) # -average(SUM RATIOn * ADVn)
-        #vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place)) # -KL
-        vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))    
+        vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place)) # -KL
+        #vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))    
 
         total_loss = pol_surr + 10*vf_loss
 
