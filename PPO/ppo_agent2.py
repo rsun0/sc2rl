@@ -32,6 +32,7 @@ class Network(object):
         self.obs_place = obs_plc
         self.acts_place = act_plc
         self.select_acts_place = select_act_plc
+        self.tl_plc = tf.placeholder(shape=[None, 2*env.select_space], dtype=tf.float32)
 
         self.p , self.v, self.select_p, self.logstd, self.select_logstd = self._build_network(num_layers=num_layers, num_units=num_units)
         self.act_op = self.action_sample()
@@ -105,14 +106,19 @@ class Network(object):
                 activation=self.activation)
                 
             ### Maybe add more dense layers
-            select_p = tf.layers.dense(select_p, units=num_units, activation=self.activation, name="select_p_fc1", trainable=self.trainable)
-                
             select_p = tf.contrib.layers.flatten(select_p)
+            
+            for i in range(num_layers):
+                select_p = tf.layers.dense(x,
+                                        units=num_units,
+                                        activation=self.activation
+                                        name="select_p_fc" + str(i)
+                                        trainable=self.trainable)            
             
             select_p_x1 = tf.layers.dense(select_p, units=self.select_width, activation=tf.nn.softmax, name="select_p_x1_fc", trainable=self.trainable)
             select_p_y1 = tf.layers.dense(select_p, units=self.select_height, activation=tf.nn.softmax, name="select_p_y1_fc", trainable=self.trainable)
             
-            x2_y2_in = tf.concat([select_p, select_p_x1, select_p_y1], axis=-1)
+            x2_y2_in = tf.concat([select_p, self.tl_plc], axis=-1)
   
             ### Maybe add dense layers          
             select_p_x2 = tf.layers.dense(x2_y2_in, units=self.select_width, activation=tf.nn.softmax, name="select_p_x2_fc", trainable=self.trainable)
@@ -350,8 +356,8 @@ class PPOAgent(object):
             
             if (j == 0):
                 prev_selection = selection
-                selection_vals, value = self.select(ob)
-                selection_nums = self.select_selection(selection_vals)
+                selection_nums, value = self.select(ob)
+                #selection_nums = self.select_selection(selection_vals)
                 
                 select_obs[i] = ob
                 values[i] += value
@@ -454,8 +460,23 @@ class PPOAgent(object):
         return actions, value
         
     def select(self, ob):
-        x1, y1, x2, y2, value = self.session.run(self.net.select_p + [self.net.v], feed_dict={ self.net.obs_place: ob[None]
+        x1, y1, value = self.session.run(self.net.select_p[:2] + [self.net.v], feed_dict={ self.net.obs_place: ob[None]})
+        tl = self.select_selection([x1, y1])
+        tl_plc = np.zeros((2*self.env.select_space))
+        x1 = tl[0]
+        y1 = tl[1]
+        
+        tl_plc[x1] = 1
+        tl_plc[self.env.select_space+y1] = 1
+        x2, y2 = self.session.run(self.net.select_p[2:], feed_dict={ self.net.obs_place: ob[None], self.net.tl_plc: tl_plc[None]
         })
+        br = self.select_selection([x2, y2])
+        
+        x2 = br[0]
+        y2 = br[1]
+        
+        
+        
         return np.array([x1, y1, x2, y2]), value
         
     def normalize(self, ob):
@@ -483,7 +504,7 @@ class PPOAgent(object):
     """
     def select_selection(self, selection_probs):
         output = []
-        selection_probs = selection_probs.reshape((4, self.env.select_space))
+        #selection_probs = selection_probs.reshape((4, self.env.select_space))
         for i in range(selection_probs.shape[0]):
             num = random.random()
             running_sum = 0.0
