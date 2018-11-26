@@ -134,7 +134,7 @@ class MinigameEnvironment:
         custom_obs = self.state_modifier_func(self._curr_frame)
             
         # Select action
-        if (topleft != None):
+        if (topleft is not None):
             #print("Selecting")
             friendly_unit_density = custom_obs[2]
             assert not np.all(friendly_unit_density == 0), 'All marines dead but not terminal state'

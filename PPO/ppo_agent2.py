@@ -107,17 +107,16 @@ class Network(object):
                 
             ### Maybe add more dense layers
             select_p = tf.contrib.layers.flatten(select_p)
-            
             for i in range(num_layers):
-                select_p = tf.layers.dense(x,
+                select_p = tf.layers.dense(select_p,
                                         units=num_units,
-                                        activation=self.activation
-                                        name="select_p_fc" + str(i)
+                                        activation=self.activation,
+                                        name="select_p_fc" + str(i),
                                         trainable=self.trainable)            
             
             select_p_x1 = tf.layers.dense(select_p, units=self.select_width, activation=tf.nn.softmax, name="select_p_x1_fc", trainable=self.trainable)
             select_p_y1 = tf.layers.dense(select_p, units=self.select_height, activation=tf.nn.softmax, name="select_p_y1_fc", trainable=self.trainable)
-            
+
             x2_y2_in = tf.concat([select_p, self.tl_plc], axis=-1)
   
             ### Maybe add dense layers          
@@ -190,11 +189,11 @@ class PPOAgent(object):
         self.c2 = 1
         
         self.epochs = 15
-        self.step_size = 25600
+        self.step_size = 12800
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
-        self.batch_size = 128
+        self.batch_size = 64
         self.averages = []
 
         ## placeholders
@@ -461,7 +460,7 @@ class PPOAgent(object):
         
     def select(self, ob):
         x1, y1, value = self.session.run(self.net.select_p[:2] + [self.net.v], feed_dict={ self.net.obs_place: ob[None]})
-        tl = self.select_selection([x1, y1])
+        tl = self.select_selection(np.array([x1[0], y1[0]]))
         tl_plc = np.zeros((2*self.env.select_space))
         x1 = tl[0]
         y1 = tl[1]
@@ -470,7 +469,7 @@ class PPOAgent(object):
         tl_plc[self.env.select_space+y1] = 1
         x2, y2 = self.session.run(self.net.select_p[2:], feed_dict={ self.net.obs_place: ob[None], self.net.tl_plc: tl_plc[None]
         })
-        br = self.select_selection([x2, y2])
+        br = self.select_selection(np.array([x2[0], y2[0]]))
         
         x2 = br[0]
         y2 = br[1]
