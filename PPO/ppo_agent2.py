@@ -184,7 +184,7 @@ class PPOAgent(object):
         self.c2 = 1
         
         self.epochs = 5
-        self.step_size = 25600
+        self.step_size = 4096
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -324,6 +324,7 @@ class PPOAgent(object):
                 print("Average game score of this batch: {}".format(self.averages[-1]))
                 scores = []
                 num_games = 0
+                
                 yield {"select_ob": select_obs, 
                        "move_ob": move_obs, 
                        "reward":rewards, 
@@ -381,7 +382,8 @@ class PPOAgent(object):
                         
                     t -= 1
                     i -= 1
-                    values[i] += value
+                    dones[i] = done
+                    values[i] = (2*values[i] + value) / 3
                     rewards[i] += reward
                     scores.append(cur_ep_return)
                     num_games += 1
@@ -407,7 +409,7 @@ class PPOAgent(object):
                 action_vals, value = self.act(ob)
                 movement = self.select_action(action_vals)
                 move_obs[i] = ob
-                values[i] += value
+                values[i] = (values[i] + value) / 2
                 dones[i] = done
                 move_actions[i] = np.zeros((self.env.action_space,))
                 move_actions[i][movement] = 1
@@ -539,9 +541,14 @@ class PPOAgent(object):
                                     self.adv_place: traj["advantage"][cur:upper],
                                     self.return_place: traj["return"][cur:upper]
                                      }
+                                    
+                        
                                      
                         *step_losses, _ = self.session.run(input_list,
                                                         feed_dict=input_dict)
+                        
+                        ### Debug print statement for exploding value function
+                        #print(self.session.run(self.net.v, feed_dict={self.obs_place: traj["move_ob"][cur:upper]}), traj["return"][cur:upper])
                            
                     ### Handles selector training
                     elif (turn == 1):
@@ -556,6 +563,9 @@ class PPOAgent(object):
                         
                         *step_losses, _ = self.session.run(input_list,
                                                         feed_dict=input_dict)
+                        
+                        ### Debug print statement for exploding value function
+                        #print(self.session.run(self.net.v, feed_dict={self.obs_place: traj["select_ob"][cur:upper]}), traj["return"][cur:upper])
                      
                     entropy += step_losses[0] / len
                     vf_loss += step_losses[1] / len
@@ -604,7 +614,6 @@ class PPOAgent(object):
         pol_surr = -tf.reduce_mean(tf.minimum(surr1, surr2)) # -average(SUM RATIOn * ADVn)
         vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place)) # -KL
         #vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))    
-
         total_loss = pol_surr + self.c1 *vf_loss #- self.c2 * ent
 
         # Maximizing objective is same as minimizing the negative objective
