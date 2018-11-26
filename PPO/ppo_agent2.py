@@ -184,7 +184,7 @@ class PPOAgent(object):
         self.c2 = 1
         
         self.epochs = 5
-        self.step_size = 4096
+        self.step_size = 25600
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -379,6 +379,7 @@ class PPOAgent(object):
                     ### Cancel in case this is first step
                     if (i == 0):
                         ob, reward, done, _ = env.reset()
+                        t += 1
                         continue
                         
                     t -= 1
