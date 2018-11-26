@@ -175,7 +175,7 @@ class PPOAgent(object):
         
         
         ### hyperparameters - TODO: TUNE
-        self.learning_rate = 5e-5
+        self.learning_rate = 3e-5
         
         ### weight for vf_loss
         self.c1 = 10
@@ -183,7 +183,7 @@ class PPOAgent(object):
         ### weight for entropy
         self.c2 = 1
         
-        self.epochs = 5
+        self.epochs = 15
         self.step_size = 25600
         self.gamma = 0.99
         self.lam = 0.95
@@ -583,7 +583,7 @@ class PPOAgent(object):
                     
                     
             # Save model every 10 iterations
-            if iteration % 10 == 0:
+            if iteration % 1 == 0:
                 print(" Model saved ")
                 self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
             self.plot_results()
@@ -648,7 +648,7 @@ class PPOAgent(object):
     def plot_results(self):
         plt.figure(1)
         plt.clf()
-        plt.suptitle('11-Action Single-unit PPO')
+        plt.suptitle('Select-Move PPO')
         plt.title('Agent trained by Ray Sun, David Long, Michael McGuire', fontsize=7)
         plt.xlabel('Training iteration - DefeatRoaches')
         plt.ylabel('Average score')
@@ -659,7 +659,7 @@ class PPOAgent(object):
 if __name__ == "__main__":
     env = MinigameEnvironment(state_modifier.modified_state_space, 
                                 map_name_="DefeatRoaches", 
-                                render=True, 
+                                render=False, 
                                 step_multiplier=8)
     config=tf.ConfigProto()
     config.gpu_options.allow_growth=True
