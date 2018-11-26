@@ -378,6 +378,7 @@ class PPOAgent(object):
                     
                     ### Cancel in case this is first step
                     if (i == 0):
+                        ob, reward, done, _ = env.reset()
                         continue
                         
                     t -= 1
@@ -657,7 +658,7 @@ class PPOAgent(object):
 if __name__ == "__main__":
     env = MinigameEnvironment(state_modifier.modified_state_space, 
                                 map_name_="DefeatRoaches", 
-                                render=False, 
+                                render=True, 
                                 step_multiplier=8)
     config=tf.ConfigProto()
     config.gpu_options.allow_growth=True
