@@ -18,7 +18,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 class Network(object):
-    def __init__(self, env, scope, num_layers, num_units, obs_plc, act_plc, select_act_plc, trainable=True):
+    def __init__(self, env, scope, num_layers, num_units, obs_plc, act_plc, select_act_plc, tl_plc, trainable=True):
         self.env = env
         self.observation_size = obs_plc # TODO:
         self.action_size = env.action_space
@@ -32,7 +32,7 @@ class Network(object):
         self.obs_place = obs_plc
         self.acts_place = act_plc
         self.select_acts_place = select_act_plc
-        self.tl_plc = tf.placeholder(shape=[None, 2*env.select_space], dtype=tf.float32)
+        self.tl_plc = tl_plc
 
         self.p , self.v, self.select_p, self.logstd, self.select_logstd = self._build_network(num_layers=num_layers, num_units=num_units)
         self.act_op = self.action_sample()
@@ -208,6 +208,8 @@ class PPOAgent(object):
         self.select_acts_place = tf.placeholder(shape=(None, 4, self.env.select_space),
                                          name="sac", dtype=tf.float32)
 
+        self.tl_place = tf.placeholder(shape=[None, 2*env.select_space], dtype=tf.float32)
+
         ## build network
         self.net = Network(env=self.env,
                            scope="pi",
@@ -215,6 +217,7 @@ class PPOAgent(object):
                            num_units=512,
                            obs_plc=self.obs_place,
                            act_plc=self.acts_place,
+                           tl_plc = self.tl_place,
                            select_act_plc=self.select_acts_place)
 
         self.old_net = Network(env=self.env,
@@ -223,6 +226,7 @@ class PPOAgent(object):
                                num_units=512,
                                obs_plc=self.obs_place,
                                act_plc=self.acts_place,
+                               tl_plc=self.tl_place,
                                select_act_plc=self.select_acts_place,
                                trainable=False)
 
@@ -307,6 +311,10 @@ class PPOAgent(object):
         prev_select_actions = select_actions.copy()
         prev_move_actions = move_actions.copy()
         
+        # Records selected topleft coordinates
+        tl_plc_in = np.zeros((self.step_size, 2*self.env.select_space), 'float32')
+        
+        
         selection = 0
         movement = 0
         prev_selection = [-1 for i in range(4)]
@@ -339,6 +347,7 @@ class PPOAgent(object):
                        "move_action": move_actions,
                        "prevselect_action": prev_select_actions,
                        "prevmove_action": prev_move_actions,
+                       "tl_plc_in": tl_plc_in,
                        "nextvalue": value*(1-done), 
                        "ep_returns": ep_returns,
                        "ep_lengths": ep_lengths
@@ -365,7 +374,9 @@ class PPOAgent(object):
                 select_actions[i, range(4), selection_nums] = 1
                 prev_select_actions[i] = np.zeros((4, self.env.select_space,))
                 prev_select_actions[i, range(4), prev_selection] = 1
-                
+                tl_plc_in[i] = np.zeros((2*self.env.select_space,))
+                tl_plc_in[i][selection_nums[0]] = 1
+                tl_plc_in[i][self.env.select_space + selection_nums[1]] = 1
                 #csa = converted_select_action = self.select_convert(selection_nums)
                 ob, temp_reward, done, _ = self.env.step(0, topleft=selection_nums[:2], botright=selection_nums[2:])
                 
@@ -580,7 +591,8 @@ class PPOAgent(object):
                                   self.obs_place: traj["select_ob"][cur:upper],
                                   self.select_acts_place: traj["select_action"][cur:upper],
                                   self.adv_place: traj["advantage"][cur:upper],
-                                  self.return_place: traj["return"][cur:upper]
+                                  self.return_place: traj["return"][cur:upper],
+                                  self.tl_place: traj["tl_plc_in"][cur:upper]
                                      }
                         
                         *step_losses, _ = self.session.run(input_list,
