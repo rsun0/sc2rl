@@ -188,7 +188,7 @@ class PPOAgent(object):
         self.c2 = 1
         
         self.epochs = 15
-        self.step_size = 128
+        self.step_size = 12800
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
