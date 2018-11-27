@@ -175,4 +175,7 @@ class MinigameEnvironment:
         
     def _step_env(self, raw_action):
         self._prev_frame = self._curr_frame
-        self._curr_frame = self._env.step([raw_action])[0] # get obs for 1st agent
+        try:
+            self._curr_frame = self._env.step([raw_action])[0] # get obs for 1st agent
+        except protocol.ConnectionError:
+            self._curr_frame = self._env.reset()[0]

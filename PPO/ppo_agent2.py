@@ -395,6 +395,7 @@ class PPOAgent(object):
                     ### Cancel in case this is first step
                     if (i == 0):
                         ob, reward, done, _ = env.reset()
+                        ob = ob.reshape(self.input_shape)
                         t += 1
                         continue
                         
@@ -698,7 +699,7 @@ if __name__ == "__main__":
     sess = tf.Session(config=config)
     ppo = PPOAgent(env, session=sess)
     sess.run(tf.global_variables_initializer())
-    #ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
+    ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
     ppo.run()
 
     env.close()
