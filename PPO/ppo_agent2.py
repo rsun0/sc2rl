@@ -45,21 +45,20 @@ class Network(object):
             x = self.obs_place
             
             # Initializes convolutional layers
-            
             x = tf.layers.conv2d(x,
                 filters=32,
                 kernel_size=[8, 8],
                 padding="same",
                 strides=(4, 4),
                 activation=self.activation)
-                
+
             x = tf.layers.conv2d(x,
                 filters=64,
                 kernel_size=[4, 4],
                 padding="same",
                 strides=2,
                 activation=self.activation)
-                
+
             x = tf.contrib.layers.flatten(x)
             
             # Initializes fully connected layers
@@ -189,7 +188,7 @@ class PPOAgent(object):
         self.c2 = 1
         
         self.epochs = 15
-        self.step_size = 12800
+        self.step_size = 128
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -289,7 +288,7 @@ class PPOAgent(object):
         
         done = True
         ob, reward, done, _ = env.reset()
-        ob = ob.reshape(self.input_shape)
+        ob = self.state_reshape(ob)
         ob = self.normalize(ob)
         cur_ep_return = 0
         cur_ep_length = 0
@@ -380,8 +379,7 @@ class PPOAgent(object):
                 #csa = converted_select_action = self.select_convert(selection_nums)
                 ob, temp_reward, done, _ = self.env.step(0, topleft=selection_nums[:2], botright=selection_nums[2:])
                 
-                
-                ob = ob.reshape(self.input_shape)
+                ob = self.state_reshape(ob)
                 ob = self.normalize(ob)
                 reward += temp_reward
                 
@@ -395,7 +393,7 @@ class PPOAgent(object):
                     ### Cancel in case this is first step
                     if (i == 0):
                         ob, reward, done, _ = env.reset()
-                        ob = ob.reshape(self.input_shape)
+                        ob = self.state_reshape(ob)
                         t += 1
                         continue
                         
@@ -412,7 +410,7 @@ class PPOAgent(object):
                     cur_ep_return = 0
                     cur_ep_length = 0
                     ob, reward, done, _ = env.reset()
-                    ob = ob.reshape(self.input_shape)
+                    ob = self.state_reshape(ob)
                     ob = self.normalize(ob)
                     t += 1
                     i += 1
@@ -436,7 +434,7 @@ class PPOAgent(object):
                 prev_move_actions[i][prev_movement] = 1
                 
                 ob, temp_reward, done, _ = self.env.step(movement)
-                ob = ob.reshape(self.input_shape)
+                ob = self.state_reshape(ob)
                 ob = self.normalize(ob)
                 reward += temp_reward
                 rewards[i] = reward
@@ -453,7 +451,7 @@ class PPOAgent(object):
                     cur_ep_return = 0
                     cur_ep_length = 0
                     ob, reward, done, _ = env.reset()
-                    ob = ob.reshape(self.input_shape)
+                    ob = self.state_reshape(ob)
                     ob = self.normalize(ob)
                 
             ### Handles end of 2-phase step        
@@ -687,6 +685,22 @@ class PPOAgent(object):
         plt.ylabel('Average score')
         plt.plot(self.averages)
         plt.pause(0.001)  # pause a bit so that plots are updated
+        
+    def state_reshape(self, ob):
+        return np.swapaxes(np.swapaxes(ob, 0, 1), 1, 2)
+        
+    def displayStack0(self, state):
+        for i in range(state.shape[0]):        
+            self.displayImage(state[i,:,:]) 
+            
+    def displayStack2(self, state):
+        for i in range(state.shape[2]):
+            self.displayImage(state[:,:,i])
+        
+
+    def displayImage(self, image):
+        plt.imshow(image)
+        plt.show()
 
 
 if __name__ == "__main__":
@@ -699,7 +713,7 @@ if __name__ == "__main__":
     sess = tf.Session(config=config)
     ppo = PPOAgent(env, session=sess)
     sess.run(tf.global_variables_initializer())
-    ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
+    #ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
     ppo.run()
 
     env.close()
