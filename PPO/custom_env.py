@@ -1,5 +1,5 @@
 from pysc2.env import sc2_env
-from pysc2.lib import features
+from pysc2.lib import features, protocol
 from action_interface import Action, Actuator
 import numpy as np
 
