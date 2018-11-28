@@ -63,8 +63,9 @@ class Network(object):
             
             # Initializes fully connected layers
             for i in range(num_layers):
+                fc_mul = num_layers - i - 1
                 x = tf.layers.dense(x, 
-                                units=num_units, 
+                                units=(fc_mul * num_units), 
                                 activation=self.activation, 
                                 name="p_fc"+str(i), 
                                 trainable=self.trainable)
@@ -110,8 +111,9 @@ class Network(object):
             ### FC layers for top left
             select_p_tl = select_p
             for i in range(num_layers):
+                fc_mul = num_layers - i - 1
                 select_p_tl = tf.layers.dense(select_p_tl,
-                                        units=num_units,
+                                        units= (fc_mul * num_units),
                                         activation=self.activation,
                                         name="select_p_fc" + str(i),
                                         trainable=self.trainable)            
@@ -124,8 +126,9 @@ class Network(object):
             ### FC layers for bot right
             select_p_br = tf.concat([select_p, self.tl_plc], axis=-1)
             for i in range(num_layers):
+                fc_mul = num_layers - i - 1
                 select_p_br = tf.layers.dense(select_p_br,
-                                        units=num_units,
+                                        units= (fc_mul * num_units),
                                         activation=self.activation,
                                         name="select_p_br_fc" + str(i),
                                         trainable=self.trainable)
@@ -141,14 +144,14 @@ class Network(object):
             x = self.obs_place
             
             x = tf.layers.conv2d(x,
-                                filters=32,
+                                filters=64,
                                 kernel_size=[8,8],
                                 padding="same",
                                 strides=(4,4),
                                 activation=self.activation)
                                 
             x = tf.layers.conv2d(x,
-                                filters=64,
+                                filters=128,
                                 kernel_size=[4,4],
                                 padding="same",
                                 strides=(2,2),
@@ -157,7 +160,8 @@ class Network(object):
             x = tf.contrib.layers.flatten(x)
             
             for i in range(num_layers):
-                x = tf.layers.dense(x, units=num_units, activation=self.activation, name="v_fc"+str(i), trainable=self.trainable)
+                fc_mul = num_layers - i - 1
+                x = tf.layers.dense(x, units=(fc_mul * num_units), activation=self.activation, name="v_fc"+str(i), trainable=self.trainable)
                 
             value = tf.layers.dense(x, units=1, activation=None, name="v_fc"+str(num_layers), trainable=self.trainable)
 
@@ -200,7 +204,7 @@ class PPOAgent(object):
         self.c2 = 1
         
         self.epochs = 10
-        self.step_size = 12800 
+        self.step_size = 19200 
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -225,7 +229,7 @@ class PPOAgent(object):
         self.net = Network(env=self.env,
                            scope="pi",
                            num_layers=2,
-                           num_units=2048,
+                           num_units=1024,
                            obs_plc=self.obs_place,
                            act_plc=self.acts_place,
                            tl_plc = self.tl_place,
@@ -234,7 +238,7 @@ class PPOAgent(object):
         self.old_net = Network(env=self.env,
                                scope="old_pi",
                                num_layers=2,
-                               num_units=2048,
+                               num_units=1024,
                                obs_plc=self.obs_place,
                                act_plc=self.acts_place,
                                tl_plc=self.tl_place,
