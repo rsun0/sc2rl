@@ -3,6 +3,19 @@ from pysc2.lib import features, protocol
 from action_interface import Action, Actuator
 import numpy as np
 
+class MappedAction(Enum):
+    LEFT = 0
+    UP_LEFT = 1
+    UP = 2
+    UP_RIGHT = 3
+    RIGHT = 4
+    DOWN_RIGHT = 5
+    DOWN = 6
+    DOWN_LEFT = 7
+    ATTACK_CLOSEST = 8
+    ATTACK_WEAKEST = 9
+    NO_OP = 10
+
 class MinigameEnvironment:
 
     def __init__(self, state_modifier_func, map_name_="DefeatRoaches", render=False, step_multiplier=None):
@@ -60,27 +73,27 @@ class MinigameEnvironment:
         
         assert not self._terminal, 'Environment must be reset after init or terminal'
         assert action in range(11), 'Agent action must be 0-10'
-        if action == 0:
+        if action == MappedAction.LEFT:
             step_act = Action.LEFT
-        elif action == 1:
+        elif action == MappedAction.UP_LEFT:
             step_act = Action.UP_LEFT
-        elif action == 2:
+        elif action == MappedAction.UP:
             step_act = Action.UP
-        elif action == 3:
+        elif action == MappedAction.UP_RIGHT:
             step_act = Action.UP_RIGHT
-        elif action == 4:
+        elif action == MappedAction.RIGHT:
             step_act = Action.RIGHT
-        elif action == 5:
+        elif action == MappedAction.DOWN_RIGHT:
             step_act = Action.DOWN_RIGHT
-        elif action == 6:
+        elif action == MappedAction.DOWN:
             step_act = Action.DOWN
-        elif action == 7:
+        elif action == MappedAction.DOWN_LEFT:
             step_act = Action.DOWN_LEFT
-        elif action == 8:
+        elif action == MappedAction.ATTACK_CLOSEST:
             step_act = Action.ATTACK_CLOSEST
-        elif action == 9:
+        elif action == MappedAction.ATTACK_WEAKEST:
             step_act = Action.ATTACK_WEAKEST
-        elif action == 10:
+        elif action == MappedAction.NO_OP:
             step_act = Action.NO_OP
         
         self._run_to_next(step_act, topleft=topleft, botright=botright)

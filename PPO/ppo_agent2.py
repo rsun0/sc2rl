@@ -10,17 +10,18 @@
 
 import tensorflow as tf
 import numpy as np
-from custom_env import MinigameEnvironment
+from custom_env import MinigameEnvironment, MappedAction
 from modified_state_space import state_modifier
 import random
 from time import sleep
 import matplotlib
 import matplotlib.pyplot as plt
+import action_interface
 
 class Network(object):
     def __init__(self, env, scope, num_layers, num_units, obs_plc, act_plc, select_act_plc, tl_plc, trainable=True):
         self.env = env
-        self.observation_size = obs_plc # TODO:
+        self.observation_size = obs_plc
         self.action_size = env.action_space
         self.select_size = env.select_space
         self.select_width = env.select_space
@@ -40,7 +41,6 @@ class Network(object):
         
 
     def _build_network(self, num_layers, num_units):
-        # TODO: switch to CONV NETS
         with tf.variable_scope(self.scope):
             x = self.obs_place
             
@@ -497,8 +497,8 @@ class PPOAgent(object):
         })
         br = self.select_selection(np.array([x2[0], y2[0]]))
         
-        x2 = br[0]
-        y2 = br[1]
+        x2 = min((x1+br[0]), self.env.select_space-1)
+        y2 = min((y1+br[1]), self.env.select_space-1)
         
         
         
@@ -540,7 +540,195 @@ class PPOAgent(object):
                     break
         return output
         
+        
+    """
+        Augments data by generating the 8 equivalent transformations of states and actions. See: dihedral group
+        
+    """
+    def rotateReflectionAugmentation(self, traj):
+        ''' 
+        select_obs shape: (self.step_size, 84, 84, 9)
+        {"select_ob": select_obs, 
+                       "move_ob": move_obs, 
+                       "reward":rewards, 
+                       "value": values,
+                       "done": dones, 
+                       "select_action": select_actions,
+                       "move_action": move_actions,
+                       "prevselect_action": prev_select_actions,
+                       "prevmove_action": prev_move_actions,
+                       "tl_plc_in": tl_plc_in,
+                       "nextvalue": value*(1-done), 
+                       "ep_returns": ep_returns,
+                       "ep_lengths": ep_lengths
+                       }
+        '''
+        
+        super_traj = {}
+        super_traj["reward"] = np.tile(traj["reward"], 8)
+        super_traj["values"] = np.tile(traj["values"], 8)
+        super_traj["done"] = np.tile(traj["done"], 8)
+        super_traj["nextvalue"] = np.tile(traj["nextvalue"], 8)
+        super_traj["ep_returns"] = np.tile(traj["ep_returns"], 8)
+        super_traj["ep_lengths"] = np.tile(traj["ep_lengths"], 8)
+        
+        ### Initial values. They will be appended to.
+        super_traj["select_obs"] = traj["select_obs"]
+        super_traj["move_ob"] = traj["move_ob"]
+        super_traj["select_action"] = traj["select_action"]
+        super_traj["move_action"] = traj["move_action"]
+        
+        
+        ### Transformation T to make for easier processing
+        select_obs = np.swapaxes( (np.swapaxes( traj["select_obs"], 0, 1)), 1, 2 )
+        move_ob = np.swapaxes( (np.swapaxes( traj["move_ob"], 0, 1)), 1, 2 )
+        
+        ### Rotations
+        for i in range(3):
+        
+            ### Rotation of observations
+            select_obs_rot = np.rot90( select_obs, i+1 )
+            move_ob_rot = np.rot90( move_ob, i+1 )
+            
+            select_action_rot = self.select_rot(select_action_rot, i+1)
+            move_action_rot = self.move_rot(move_action_rot, i+1)
+
+            super_traj["select_obs"] = np.concatenate([super_traj["select_obs"], select_action_rot], 0)
+            super_traj["move_obs"] = np.concatenate([super_traj["move_obs"], select_action_rot], 0)
+        
+        
+        """
+        for i in range(4):
+            # rotation
+            select_obs_rot = np.rot90( select_obs, i )
+            move_ob_rot = np.rot90( move_ob, i )
+                    
+            # reflection
+            select_obs_ref = np.flip(select_obs_rot, (0))
+            move_ob_ref = np.flip(move_ob_rot, (0))
+            
+            select_action_rot = []
+            move_action_rot = []
+            select_action_ref = []
+            move_action_ref = []
+            for i in range( self.step_size ):
+                s = self.rotate_action( traj["select_action"][i], i)
+                m = traj["move_action"][i] # TODO
+                
+                s_ref = self.flip_action(s)
+                m_ref = # TODO
+                
+                select_action_rot.append(s)
+                move_action_rot.append(m)
+                
+        """
+                
+        ### Transformation T_inv to return back to original format
+        select_obs = np.swapaxes( (np.swapaxes( select_obs, 1, 2)), 0, 1)
+        move_ob = np.swapaxes( (np.swapaxes( move_ob, 1, 2)), 0, 1)
+        
+    def select_rot(self, selections, i):
+        ### i=1: counter clockwise 90.    i=2: counter clockwise 180.     i=3: counter clockwise 270.
+        
+        
+        
+    def move_rot(self, movements, i):
+        ### i=1: counter clockwise 90.    i=2: counter clockwise 180.     i=3: counter clockwise 270.
+        movements[:8] = np.roll(movements[:8], -2 * i)
+        return movements
+
+    def flip_action(self, action):
+        if action == MappedAction.LEFT:
+            return MappedAction.LEFT
+        if action == MappedAction.RIGHT:
+            return MappedAction.RIGHT
+        if action == MappedAction.UP:
+            return MappedAction.DOWN
+        if action == MappedAction.DOWN:
+            return MappedAction.UP
+        if action == MappedAction.UP_LEFT:
+            return MappedAction.DOWN_LEFT
+        if action == MappedAction.UP_RIGHT:
+            return MappedAction.DOWN_RIGHT
+        if action == MappedAction.DOWN_LEFT:
+            return MappedAction.UP_LEFT
+        if action == MappedAction.DOWN_RIGHT:
+            return MappedAction.UP_RIGHT       
+        
+        return action        
+            
+    def rotate_action(self, action, i):
+        i = i % 4
     
+        if i == 0:
+            return action
+            
+        if action == Action.LEFT:
+            if i == 1:
+                return Action.UP 
+            elif i == 2:
+                return Action.RIGHT   
+            else:
+                return Action.DOWN
+                
+        if action == Action.UP:
+            if i == 1:
+                return Action.RIGHT 
+            elif i == 2:
+                return Action.DOWN   
+            else:
+                return Action.LEFT
+
+        if action == Action.RIGHT:
+            if i == 1:
+                return Action.DOWN 
+            elif i == 2:
+                return Action.LEFT   
+            else:
+                return Action.UP
+                
+        if action == Action.DOWN:
+            if i == 1:
+                return Action.LEFT 
+            elif i == 2:
+                return Action.UP   
+            else:
+                return Action.RIGHT                    
+
+        if action == Action.UP_LEFT:
+            if i == 1:
+                return Action.UP_RIGHT 
+            elif i == 2:
+                return Action.DOWN_RIGHT   
+            else:
+                return Action.DOWN_LEFT          
+
+        if action == Action.UP_RIGHT:
+            if i == 1:
+                return Action.DOWN_RIGHT 
+            elif i == 2:
+                return Action.DOWN_LEFT   
+            else:
+                return Action.UP_LEFT  
+                
+         if action == Action.DOWN_RIGHT:
+            if i == 1:
+                return Action.DOWN_LEFT 
+            elif i == 2:
+                return Action.UP_LEFT   
+            else:
+                return Action.UP_RIGHT               
+
+        if action == Action.DOWN_LEFT:
+            if i == 1:
+                return Action.UP_LEFT 
+            elif i == 2:
+                return Action.UP_RIGHT   
+            else:
+                return Action.DOWN_RIGHT      
+
+        return action
+
     def run(self):
         traj_gen = self.traj_generator()
         iteration = 0
@@ -558,8 +746,12 @@ class PPOAgent(object):
             print("\n================= iteration {} =================".format(iteration))
             
             traj = traj_gen.__next__()
+            
             self.add_vtarg_and_adv(traj)
             self.session.run(self.assign_op)
+            
+            # Augment data
+            super_traj = self.rotateReflectAugmentation(traj)
             
             # normalize adv.
             traj["advantage"] = (traj["advantage"] - np.mean(traj["advantage"])) / np.std(traj["advantage"])
