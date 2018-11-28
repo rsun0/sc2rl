@@ -63,7 +63,7 @@ class Network(object):
             
             # Initializes fully connected layers
             for i in range(num_layers):
-                fc_mul = num_layers - i - 1
+                fc_mul = num_layers - i
                 x = tf.layers.dense(x, 
                                 units=(fc_mul * num_units), 
                                 activation=self.activation, 
@@ -111,7 +111,7 @@ class Network(object):
             ### FC layers for top left
             select_p_tl = select_p
             for i in range(num_layers):
-                fc_mul = num_layers - i - 1
+                fc_mul = num_layers - i
                 select_p_tl = tf.layers.dense(select_p_tl,
                                         units= (fc_mul * num_units),
                                         activation=self.activation,
@@ -126,7 +126,7 @@ class Network(object):
             ### FC layers for bot right
             select_p_br = tf.concat([select_p, self.tl_plc], axis=-1)
             for i in range(num_layers):
-                fc_mul = num_layers - i - 1
+                fc_mul = num_layers - i
                 select_p_br = tf.layers.dense(select_p_br,
                                         units= (fc_mul * num_units),
                                         activation=self.activation,
@@ -160,7 +160,7 @@ class Network(object):
             x = tf.contrib.layers.flatten(x)
             
             for i in range(num_layers):
-                fc_mul = num_layers - i - 1
+                fc_mul = num_layers - i
                 x = tf.layers.dense(x, units=(fc_mul * num_units), activation=self.activation, name="v_fc"+str(i), trainable=self.trainable)
                 
             value = tf.layers.dense(x, units=1, activation=None, name="v_fc"+str(num_layers), trainable=self.trainable)
@@ -204,7 +204,7 @@ class PPOAgent(object):
         self.c2 = 1
         
         self.epochs = 10
-        self.step_size = 19200 
+        self.step_size = 5120
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
