@@ -46,14 +46,14 @@ class Network(object):
             
             # Initializes convolutional layers
             x = tf.layers.conv2d(x,
-                filters=32,
+                filters=64,
                 kernel_size=[8, 8],
                 padding="same",
                 strides=(4, 4),
                 activation=self.activation)
 
             x = tf.layers.conv2d(x,
-                filters=64,
+                filters=128,
                 kernel_size=[4, 4],
                 padding="same",
                 strides=2,
@@ -84,21 +84,21 @@ class Network(object):
             # Initializes convolutional layers
             
             x = tf.layers.conv2d(x,
-                filters=32,
+                filters=64,
                 kernel_size=[8, 8],
                 padding="same",
                 strides=(4, 4),
                 activation=self.activation)
                 
             x = tf.layers.conv2d(x,
-                filters=64,
+                filters=128,
                 kernel_size=[4, 4],
                 padding="same",
                 strides=2,
                 activation=self.activation)
                          
             select_p = tf.layers.conv2d(x,
-                filters=64,
+                filters=128,
                 kernel_size=[3,3],
                 padding="same",
                 strides=1,
@@ -106,21 +106,33 @@ class Network(object):
                 
             ### Maybe add more dense layers
             select_p = tf.contrib.layers.flatten(select_p)
+            
+            ### FC layers for top left
+            select_p_tl = select_p
             for i in range(num_layers):
-                select_p = tf.layers.dense(select_p,
+                select_p_tl = tf.layers.dense(select_p_tl,
                                         units=num_units,
                                         activation=self.activation,
                                         name="select_p_fc" + str(i),
                                         trainable=self.trainable)            
             
-            select_p_x1 = tf.layers.dense(select_p, units=self.select_width, activation=tf.nn.softmax, name="select_p_x1_fc", trainable=self.trainable)
-            select_p_y1 = tf.layers.dense(select_p, units=self.select_height, activation=tf.nn.softmax, name="select_p_y1_fc", trainable=self.trainable)
+            ### Placeholders for top left probabilities
+            select_p_x1 = tf.layers.dense(select_p_tl, units=self.select_width, activation=tf.nn.softmax, name="select_p_x1_fc", trainable=self.trainable)
+            select_p_y1 = tf.layers.dense(select_p_tl, units=self.select_height, activation=tf.nn.softmax, name="select_p_y1_fc", trainable=self.trainable)
 
-            x2_y2_in = tf.concat([select_p, self.tl_plc], axis=-1)
-  
-            ### Maybe add dense layers          
-            select_p_x2 = tf.layers.dense(x2_y2_in, units=self.select_width, activation=tf.nn.softmax, name="select_p_x2_fc", trainable=self.trainable)
-            select_p_y2 = tf.layers.dense(x2_y2_in, units=self.select_height, activation=tf.nn.softmax, name="select_p_y2_fc", trainable=self.trainable)
+
+            ### FC layers for bot right
+            select_p_br = tf.concat([select_p, self.tl_plc], axis=-1)
+            for i in range(num_layers):
+                select_p_br = tf.layers.dense(select_p_br,
+                                        units=num_units,
+                                        activation=self.activation,
+                                        name="select_p_br_fc" + str(i),
+                                        trainable=self.trainable)
+            
+            ### Placeholders for bot right         
+            select_p_x2 = tf.layers.dense(select_p_br, units=self.select_width, activation=tf.nn.softmax, name="select_p_x2_fc", trainable=self.trainable)
+            select_p_y2 = tf.layers.dense(select_p_br, units=self.select_height, activation=tf.nn.softmax, name="select_p_y2_fc", trainable=self.trainable)
             
             
                 
@@ -187,8 +199,8 @@ class PPOAgent(object):
         ### weight for entropy
         self.c2 = 1
         
-        self.epochs = 15
-        self.step_size = 12800
+        self.epochs = 10
+        self.step_size = 12800 
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -213,7 +225,7 @@ class PPOAgent(object):
         self.net = Network(env=self.env,
                            scope="pi",
                            num_layers=2,
-                           num_units=512,
+                           num_units=2048,
                            obs_plc=self.obs_place,
                            act_plc=self.acts_place,
                            tl_plc = self.tl_place,
@@ -222,7 +234,7 @@ class PPOAgent(object):
         self.old_net = Network(env=self.env,
                                scope="old_pi",
                                num_layers=2,
-                               num_units=512,
+                               num_units=2048,
                                obs_plc=self.obs_place,
                                act_plc=self.acts_place,
                                tl_plc=self.tl_place,
