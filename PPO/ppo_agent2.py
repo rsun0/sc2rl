@@ -583,19 +583,51 @@ class PPOAgent(object):
         select_obs = np.swapaxes( (np.swapaxes( traj["select_obs"], 0, 1)), 1, 2 )
         move_ob = np.swapaxes( (np.swapaxes( traj["move_ob"], 0, 1)), 1, 2 )
         
-        ### Rotations
-        for i in range(3):
+        select_action = traj["select_action"]
+        select_action_rot = traj["select_action"]
+        move_action_rot = traj["move_action"]
+        
+        ### Reflections and Rotations
+        for i in range(4):
+        
+            ### Reflection of observations
+            select_obs_ref = np.flip(select_obs, 0)
+            move_ob_ref = np.flip(move_ob, 0)
+            
+            select_action_ref = self.select_ref(select_action)
+            move_action_ref = self.move_ref(move_action)
+            tl_plc_in_ref = np.zeros((2*self.env.select_space,))
+            tl_plc_in_ref[:self.env.select_space] = select_action_ref[0,:]
+            tl_plc_in_red[self.env.select_space:] = select_action_ref[1,:]
+            
+            super_traj["select_obs"] = np.concatenate([super_traj["select_obs"], select_obs_ref], 0)
+            super_traj["move_obs"] = np.concatenate([super_traj["move_obs"], move_ob_ref], 0)
+            super_traj["select_action"] = np.concatenate([super_traj["select_action"], select_action_ref], 0)
+            super_traj["move_action"] = np.concatenate([super_traj["move_action"], move_action_ref], 0)
+            super_traj["tl_plc_in"] = np.concatenate([super_traj["tl_plc_in"], tl_plc_in_ref], 0)
         
             ### Rotation of observations
-            select_obs_rot = np.rot90( select_obs, i+1 )
-            move_ob_rot = np.rot90( move_ob, i+1 )
             
-            select_action_rot = self.select_rot(select_action_rot, i+1)
-            move_action_rot = self.move_rot(move_action_rot, i+1)
+            # No need to perform a rotation of 0
+            if (i == 0):
+                continue
+                
+                
+            select_obs_rot = np.rot90( select_obs, i )
+            move_ob_rot = np.rot90( move_ob, i )
+            
+            select_action_rot = self.select_rot(select_action_rot, 1)
+            move_action_rot = self.move_rot(move_action_rot, 1)
+            
+            tl_plc_in_rot = np.zeros((2*self.env.select_space,))
+            tl_plc_in_rot[:self.env.select_space] = select_action_rot[0,:]
+            tl_plc_in_rot[self.env.select_space:] = select_action_rot[1,:]
 
-            super_traj["select_obs"] = np.concatenate([super_traj["select_obs"], select_action_rot], 0)
-            super_traj["move_obs"] = np.concatenate([super_traj["move_obs"], select_action_rot], 0)
-        
+            super_traj["select_obs"] = np.concatenate([super_traj["select_obs"], select_obs_rot], 0)
+            super_traj["move_obs"] = np.concatenate([super_traj["move_obs"], move_ob_rot], 0)
+            super_traj["select_action"] = np.concatenate([super_traj["select_action"], select_action_rot], 0)
+            super_traj["move_action"] = np.concatenate([super_traj["move_action"], move_action_rot], 0)
+            super_traj["tl_plc_in"] = np.concatenate([super_traj["tl_plc_in"], tl_plc_in_rot], 0)
         
         """
         for i in range(4):
@@ -627,9 +659,37 @@ class PPOAgent(object):
         select_obs = np.swapaxes( (np.swapaxes( select_obs, 1, 2)), 0, 1)
         move_ob = np.swapaxes( (np.swapaxes( move_ob, 1, 2)), 0, 1)
         
+    def select_ref(self, selections):
+        coords = selections.nonzero()[1].reshape((2, 2))
+        coords[0,1] = (self.env.select_space-1) - (coords[0,1] + coords[1,1])
+        coords = coords.reshape((4,))
+        selections = np.zeros(selections.shape)
+        selections[range(4), coords] = 1
+        return selections
+    
+    def move_ref(self, movements):
+        output = np.zeros(movements.shape)
+        output[0] = movements[0]
+        output[1:4] = movements[5:8]
+        output[4] = movements[4]
+        output[5:8] = movements[1:4]
+        output[9:] = movements[9:]
+        return output
+    
+    
+    
+        
     def select_rot(self, selections, i):
         ### i=1: counter clockwise 90.    i=2: counter clockwise 180.     i=3: counter clockwise 270.
-        
+        ### Conversion to 2x2 simple array
+        coords = selections.nonzero()[1].reshape((2, 2))
+        for i in range(i):
+            coords[0,:] = [coords[0,1], ((self.env.select_space - 1) - (coords[0,0] + coords[1,0]))]
+            coords[1,:] = np.flip(coords[1,:])
+        coords = coords.reshape((4,))
+        output = np.zeros((4, self.env.select_space))
+        output[range(4), coords] = 1
+        return output
         
         
     def move_rot(self, movements, i):
