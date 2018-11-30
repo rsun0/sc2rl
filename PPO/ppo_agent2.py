@@ -10,7 +10,7 @@
 
 import tensorflow as tf
 import numpy as np
-from custom_env import MinigameEnvironment, MappedAction
+from custom_env import MinigameEnvironment
 from modified_state_space import state_modifier
 import random
 from time import sleep
@@ -20,6 +20,12 @@ import action_interface
 
 class Network(object):
     def __init__(self, env, scope, num_layers, num_units, obs_plc, act_plc, select_act_plc, tl_plc, trainable=True):
+        
+        self.filters1 = 1
+        self.filters2 = 2
+        self.filters3 = 2
+    
+    
         self.env = env
         self.observation_size = obs_plc
         self.action_size = env.action_space
@@ -46,14 +52,14 @@ class Network(object):
             
             # Initializes convolutional layers
             x = tf.layers.conv2d(x,
-                filters=64,
+                filters=self.filters1,
                 kernel_size=[8, 8],
                 padding="same",
                 strides=(4, 4),
                 activation=self.activation)
 
             x = tf.layers.conv2d(x,
-                filters=128,
+                filters=self.filters2,
                 kernel_size=[4, 4],
                 padding="same",
                 strides=2,
@@ -85,21 +91,21 @@ class Network(object):
             # Initializes convolutional layers
             
             x = tf.layers.conv2d(x,
-                filters=64,
+                filters=self.filters1,
                 kernel_size=[8, 8],
                 padding="same",
                 strides=(4, 4),
                 activation=self.activation)
                 
             x = tf.layers.conv2d(x,
-                filters=128,
+                filters=self.filters2,
                 kernel_size=[4, 4],
                 padding="same",
                 strides=2,
                 activation=self.activation)
                          
             select_p = tf.layers.conv2d(x,
-                filters=128,
+                filters=self.filters3,
                 kernel_size=[3,3],
                 padding="same",
                 strides=1,
@@ -144,14 +150,14 @@ class Network(object):
             x = self.obs_place
             
             x = tf.layers.conv2d(x,
-                                filters=64,
+                                filters=self.filters1,
                                 kernel_size=[8,8],
                                 padding="same",
                                 strides=(4,4),
                                 activation=self.activation)
                                 
             x = tf.layers.conv2d(x,
-                                filters=128,
+                                filters=self.filters2,
                                 kernel_size=[4,4],
                                 padding="same",
                                 strides=(2,2),
@@ -204,7 +210,7 @@ class PPOAgent(object):
         self.c2 = 1
         
         self.epochs = 10
-        self.step_size = 5120
+        self.step_size = 256
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -229,7 +235,7 @@ class PPOAgent(object):
         self.net = Network(env=self.env,
                            scope="pi",
                            num_layers=2,
-                           num_units=1024,
+                           num_units=8,
                            obs_plc=self.obs_place,
                            act_plc=self.acts_place,
                            tl_plc = self.tl_place,
@@ -238,7 +244,7 @@ class PPOAgent(object):
         self.old_net = Network(env=self.env,
                                scope="old_pi",
                                num_layers=2,
-                               num_units=1024,
+                               num_units=8,
                                obs_plc=self.obs_place,
                                act_plc=self.acts_place,
                                tl_plc=self.tl_place,
@@ -385,8 +391,17 @@ class PPOAgent(object):
                 select_obs[i] = ob
                 values[i] += value
                 dones[i] = done
+                
+                
+                transformed_select = selection_nums
+                transformed_select[2:] -= transformed_select[:2]
+                if (transformed_select[2] == self.env.select_space - 1):
+                    transformed_select[2] = random.randint(transformed_select[2], self.env.select_space-1)
+                if (transformed_select[3] == self.env.select_space - 1):
+                    transformed_select[3] = random.randint(transformed_select[3], self.env.select_space-1)
+                
                 select_actions[i] = np.zeros((4, self.env.select_space,))
-                select_actions[i, range(4), selection_nums] = 1
+                select_actions[i, range(4), transformed_select] = 1
                 prev_select_actions[i] = np.zeros((4, self.env.select_space,))
                 prev_select_actions[i, range(4), prev_selection] = 1
                 tl_plc_in[i] = np.zeros((2*self.env.select_space,))
@@ -432,7 +447,7 @@ class PPOAgent(object):
                     i += 1
                     continue
                     
-                selection = selection_nums
+                selection = transformed_select
                     
                     
             ### Handles movement ###
@@ -545,7 +560,7 @@ class PPOAgent(object):
         Augments data by generating the 8 equivalent transformations of states and actions. See: dihedral group
         
     """
-    def rotateReflectionAugmentation(self, traj):
+    def rotateReflectAugmentation(self, traj):
         ''' 
         select_obs shape: (self.step_size, 84, 84, 9)
         {"select_ob": select_obs, 
@@ -566,42 +581,52 @@ class PPOAgent(object):
         
         super_traj = {}
         super_traj["reward"] = np.tile(traj["reward"], 8)
-        super_traj["values"] = np.tile(traj["values"], 8)
+        super_traj["value"] = np.tile(traj["value"], 8)
         super_traj["done"] = np.tile(traj["done"], 8)
         super_traj["nextvalue"] = np.tile(traj["nextvalue"], 8)
         super_traj["ep_returns"] = np.tile(traj["ep_returns"], 8)
         super_traj["ep_lengths"] = np.tile(traj["ep_lengths"], 8)
+        super_traj["advantage"] = np.tile(traj["advantage"], 8)
+        super_traj["return"] = np.tile(traj["return"], 8)
         
         ### Initial values. They will be appended to.
-        super_traj["select_obs"] = traj["select_obs"]
+        super_traj["select_ob"] = traj["select_ob"]
         super_traj["move_ob"] = traj["move_ob"]
         super_traj["select_action"] = traj["select_action"]
         super_traj["move_action"] = traj["move_action"]
-        
+        super_traj["tl_plc_in"] = traj["tl_plc_in"]
         
         ### Transformation T to make for easier processing
-        select_obs = np.swapaxes( (np.swapaxes( traj["select_obs"], 0, 1)), 1, 2 )
+        select_ob = np.swapaxes( (np.swapaxes( traj["select_ob"], 0, 1)), 1, 2 )
         move_ob = np.swapaxes( (np.swapaxes( traj["move_ob"], 0, 1)), 1, 2 )
         
         select_action = traj["select_action"]
+        move_action = traj["move_action"]
         select_action_rot = traj["select_action"]
         move_action_rot = traj["move_action"]
+        
+        select_ob_rot = select_ob
+        move_ob_rot = move_ob
         
         ### Reflections and Rotations
         for i in range(4):
         
             ### Reflection of observations
-            select_obs_ref = np.flip(select_obs, 0)
-            move_ob_ref = np.flip(move_ob, 0)
+            select_ob_ref = np.flip(select_ob_rot, 0)
+            move_ob_ref = np.flip(move_ob_rot, 0)
             
             select_action_ref = self.select_ref(select_action)
             move_action_ref = self.move_ref(move_action)
-            tl_plc_in_ref = np.zeros((2*self.env.select_space,))
-            tl_plc_in_ref[:self.env.select_space] = select_action_ref[0,:]
-            tl_plc_in_red[self.env.select_space:] = select_action_ref[1,:]
+            tl_plc_in_ref = np.zeros((self.step_size, 2*self.env.select_space,))
+            tl_plc_in_ref[:,:self.env.select_space] = select_action_ref[:,0,:]
+            tl_plc_in_ref[:,self.env.select_space:] = select_action_ref[:,1,:]
             
-            super_traj["select_obs"] = np.concatenate([super_traj["select_obs"], select_obs_ref], 0)
-            super_traj["move_obs"] = np.concatenate([super_traj["move_obs"], move_ob_ref], 0)
+            ### Inverse transformation
+            select_ob_ref = np.swapaxes( (np.swapaxes( select_ob_ref, 1, 2)), 0, 1)
+            move_ob_ref = np.swapaxes( (np.swapaxes( move_ob_ref, 1, 2)), 0, 1)
+            
+            super_traj["select_ob"] = np.concatenate([super_traj["select_ob"], select_ob_ref], 0)
+            super_traj["move_ob"] = np.concatenate([super_traj["move_ob"], move_ob_ref], 0)
             super_traj["select_action"] = np.concatenate([super_traj["select_action"], select_action_ref], 0)
             super_traj["move_action"] = np.concatenate([super_traj["move_action"], move_action_ref], 0)
             super_traj["tl_plc_in"] = np.concatenate([super_traj["tl_plc_in"], tl_plc_in_ref], 0)
@@ -613,18 +638,22 @@ class PPOAgent(object):
                 continue
                 
                 
-            select_obs_rot = np.rot90( select_obs, i )
+            select_ob_rot = np.rot90( select_ob, i )
             move_ob_rot = np.rot90( move_ob, i )
             
             select_action_rot = self.select_rot(select_action_rot, 1)
             move_action_rot = self.move_rot(move_action_rot, 1)
             
-            tl_plc_in_rot = np.zeros((2*self.env.select_space,))
-            tl_plc_in_rot[:self.env.select_space] = select_action_rot[0,:]
-            tl_plc_in_rot[self.env.select_space:] = select_action_rot[1,:]
+            tl_plc_in_rot = np.zeros((self.step_size,2*self.env.select_space))
+            tl_plc_in_rot[:,:self.env.select_space] = select_action_rot[:,0,:]
+            tl_plc_in_rot[:,self.env.select_space:] = select_action_rot[:,1,:]
+            
+            ### Inverse transformation
+            select_ob_in = np.swapaxes( (np.swapaxes( select_ob_rot, 1, 2)), 0, 1)
+            move_ob_in = np.swapaxes( (np.swapaxes( move_ob_rot, 1, 2)), 0, 1)
 
-            super_traj["select_obs"] = np.concatenate([super_traj["select_obs"], select_obs_rot], 0)
-            super_traj["move_obs"] = np.concatenate([super_traj["move_obs"], move_ob_rot], 0)
+            super_traj["select_ob"] = np.concatenate([super_traj["select_ob"], select_ob_in], 0)
+            super_traj["move_ob"] = np.concatenate([super_traj["move_ob"], move_ob_in], 0)
             super_traj["select_action"] = np.concatenate([super_traj["select_action"], select_action_rot], 0)
             super_traj["move_action"] = np.concatenate([super_traj["move_action"], move_action_rot], 0)
             super_traj["tl_plc_in"] = np.concatenate([super_traj["tl_plc_in"], tl_plc_in_rot], 0)
@@ -654,26 +683,25 @@ class PPOAgent(object):
                 move_action_rot.append(m)
                 
         """
-                
+        return super_traj
         ### Transformation T_inv to return back to original format
-        select_obs = np.swapaxes( (np.swapaxes( select_obs, 1, 2)), 0, 1)
-        move_ob = np.swapaxes( (np.swapaxes( move_ob, 1, 2)), 0, 1)
+        #select_obs = np.swapaxes( (np.swapaxes( select_obs, 1, 2)), 0, 1)
+        #move_ob = np.swapaxes( (np.swapaxes( move_ob, 1, 2)), 0, 1)
         
     def select_ref(self, selections):
-        coords = selections.nonzero()[1].reshape((2, 2))
-        coords[0,1] = (self.env.select_space-1) - (coords[0,1] + coords[1,1])
-        coords = coords.reshape((4,))
-        selections = np.zeros(selections.shape)
-        selections[range(4), coords] = 1
+        coords = selections.nonzero()[1].reshape((-1, 2, 2))
+        coords[:,0,1] = (self.env.select_space-1) - (coords[:,0,1] + coords[:,1,1])
+        coords = coords.reshape((-1, 4))
+        selections = (coords[...,None] == np.arange(self.env.select_space)).astype(np.float)
         return selections
     
     def move_ref(self, movements):
         output = np.zeros(movements.shape)
-        output[0] = movements[0]
-        output[1:4] = movements[5:8]
-        output[4] = movements[4]
-        output[5:8] = movements[1:4]
-        output[9:] = movements[9:]
+        output[:,0] = movements[:,0]
+        output[:,1:4] = movements[:,5:8]
+        output[:,4] = movements[:,4]
+        output[:,5:8] = movements[:,1:4]
+        output[:,9:] = movements[:,9:]
         return output
     
     
@@ -682,13 +710,12 @@ class PPOAgent(object):
     def select_rot(self, selections, i):
         ### i=1: counter clockwise 90.    i=2: counter clockwise 180.     i=3: counter clockwise 270.
         ### Conversion to 2x2 simple array
-        coords = selections.nonzero()[1].reshape((2, 2))
+        coords = selections.nonzero()[1].reshape((-1, 2, 2))
         for i in range(i):
             coords[0,:] = [coords[0,1], ((self.env.select_space - 1) - (coords[0,0] + coords[1,0]))]
             coords[1,:] = np.flip(coords[1,:])
-        coords = coords.reshape((4,))
-        output = np.zeros((4, self.env.select_space))
-        output[range(4), coords] = 1
+        coords = coords.reshape((-1, 4))
+        output = (coords[...,None] == np.arange(self.env.select_space)).astype(np.float)
         return output
         
         
@@ -697,6 +724,7 @@ class PPOAgent(object):
         movements[:8] = np.roll(movements[:8], -2 * i)
         return movements
 
+    """
     def flip_action(self, action):
         if action == MappedAction.LEFT:
             return MappedAction.LEFT
@@ -789,6 +817,8 @@ class PPOAgent(object):
 
         return action
 
+    """
+
     def run(self):
         traj_gen = self.traj_generator()
         iteration = 0
@@ -809,14 +839,15 @@ class PPOAgent(object):
             
             self.add_vtarg_and_adv(traj)
             self.session.run(self.assign_op)
+            traj["advantage"] = (traj["advantage"] - np.mean(traj["advantage"])) / np.std(traj["advantage"])
             
             # Augment data
             super_traj = self.rotateReflectAugmentation(traj)
             
             # normalize adv.
-            traj["advantage"] = (traj["advantage"] - np.mean(traj["advantage"])) / np.std(traj["advantage"])
             
-            len = int(self.step_size / self.batch_size)
+            
+            len = int(8*self.step_size / self.batch_size)
             
             if (turn == 1):
                 print("\n================= Training selector =================")
@@ -826,20 +857,25 @@ class PPOAgent(object):
                 vf_loss = 0
                 pol_loss = 0
                 entropy = 0
+                index_order = np.arange(len * self.batch_size)
+                np.random.shuffle(index_order)
                 
                 for i in range(len):
                     cur = i*self.batch_size
                     upper = cur+self.batch_size
+                    curr_indices = index_order[cur:upper]    
+                    
                     
                     ### Handles mover training
                     if (turn == 0):
+                        
                     
                         input_list = [self.move_ent, self.vf_loss, self.move_pol_loss, self.move_update_op]
                         input_dict = {
-                                    self.obs_place: traj["move_ob"][cur:upper],
-                                    self.acts_place: traj["move_action"][cur:upper],
-                                    self.adv_place: traj["advantage"][cur:upper],
-                                    self.return_place: traj["return"][cur:upper]
+                                    self.obs_place: super_traj["move_ob"][cur:upper],
+                                    self.acts_place: super_traj["move_action"][cur:upper],
+                                    self.adv_place: super_traj["advantage"][cur:upper],
+                                    self.return_place: super_traj["return"][cur:upper]
                                      }
                                     
                         
@@ -855,11 +891,11 @@ class PPOAgent(object):
                         
                         input_list = [self.select_ent, self.vf_loss, self.select_pol_loss, self.select_update_op]
                         input_dict = {
-                                  self.obs_place: traj["select_ob"][cur:upper],
-                                  self.select_acts_place: traj["select_action"][cur:upper],
-                                  self.adv_place: traj["advantage"][cur:upper],
-                                  self.return_place: traj["return"][cur:upper],
-                                  self.tl_place: traj["tl_plc_in"][cur:upper]
+                                  self.obs_place: super_traj["select_ob"][cur:upper],
+                                  self.select_acts_place: super_traj["select_action"][cur:upper],
+                                  self.adv_place: super_traj["advantage"][cur:upper],
+                                  self.return_place: super_traj["return"][cur:upper],
+                                  self.tl_place: super_traj["tl_plc_in"][cur:upper]
                                      }
                         
                         *step_losses, _ = self.session.run(input_list,

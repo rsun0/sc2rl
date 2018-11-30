@@ -2,7 +2,8 @@ from pysc2.env import sc2_env
 from pysc2.lib import features, protocol
 from action_interface import Action, Actuator
 import numpy as np
-
+from enum import Enum
+"""
 class MappedAction(Enum):
     LEFT = 0
     UP_LEFT = 1
@@ -15,7 +16,7 @@ class MappedAction(Enum):
     ATTACK_CLOSEST = 8
     ATTACK_WEAKEST = 9
     NO_OP = 10
-
+"""
 class MinigameEnvironment:
 
     def __init__(self, state_modifier_func, map_name_="DefeatRoaches", render=False, step_multiplier=None):
@@ -73,28 +74,31 @@ class MinigameEnvironment:
         
         assert not self._terminal, 'Environment must be reset after init or terminal'
         assert action in range(11), 'Agent action must be 0-10'
-        if action == MappedAction.LEFT:
+
+        if action == 0:
             step_act = Action.LEFT
-        elif action == MappedAction.UP_LEFT:
+        elif action == 1:
             step_act = Action.UP_LEFT
-        elif action == MappedAction.UP:
+        elif action == 2:
             step_act = Action.UP
-        elif action == MappedAction.UP_RIGHT:
+        elif action == 3:
             step_act = Action.UP_RIGHT
-        elif action == MappedAction.RIGHT:
+        elif action == 4:
             step_act = Action.RIGHT
-        elif action == MappedAction.DOWN_RIGHT:
+        elif action == 5:
             step_act = Action.DOWN_RIGHT
-        elif action == MappedAction.DOWN:
+        elif action == 6:
             step_act = Action.DOWN
-        elif action == MappedAction.DOWN_LEFT:
+        elif action == 7:
             step_act = Action.DOWN_LEFT
-        elif action == MappedAction.ATTACK_CLOSEST:
+        elif action == 8:
             step_act = Action.ATTACK_CLOSEST
-        elif action == MappedAction.ATTACK_WEAKEST:
+        elif action == 9:
             step_act = Action.ATTACK_WEAKEST
-        elif action == MappedAction.NO_OP:
+        elif action == 10:
             step_act = Action.NO_OP
+        else:
+            step_act = 0
         
         self._run_to_next(step_act, topleft=topleft, botright=botright)
         self._terminal = self._curr_frame.last()
