@@ -214,7 +214,7 @@ class PPOAgent(object):
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
-        self.batch_size = 64
+        self.batch_size = 128
         self.averages = []
 
         ## placeholders
@@ -889,13 +889,15 @@ class PPOAgent(object):
                         
                     
                         input_list = [self.move_ent, self.vf_loss, self.move_pol_loss, self.move_update_op]
+                        
+                        self.state_normalize(super_traj["move_ob"][curr_indices]) 
+                        
                         input_dict = {
                                     self.obs_place: super_traj["move_ob"][curr_indices],
                                     self.acts_place: super_traj["move_action"][curr_indices],
                                     self.adv_place: super_traj["advantage"][curr_indices],
                                     self.return_place: super_traj["return"][curr_indices]
                                      }
-                        self.state_normalize(super_traj["move_ob"][curr_indices])           
                         
                                      
                         *step_losses, _ = self.session.run(input_list,
@@ -908,6 +910,9 @@ class PPOAgent(object):
                     elif (turn == 1):
                         
                         input_list = [self.select_ent, self.vf_loss, self.select_pol_loss, self.select_update_op]
+                        
+                        self.state_normalize(super_traj["select_ob"][curr_indices])
+                        
                         input_dict = {
                                   self.obs_place: super_traj["select_ob"][curr_indices],
                                   self.select_acts_place: super_traj["select_action"][curr_indices],
@@ -915,6 +920,7 @@ class PPOAgent(object):
                                   self.return_place: super_traj["return"][curr_indices],
                                   self.tl_place: super_traj["tl_plc_in"][curr_indices]
                                      }
+                        
                         
                         *step_losses, _ = self.session.run(input_list,
                                                         feed_dict=input_dict)
