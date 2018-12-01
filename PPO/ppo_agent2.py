@@ -210,7 +210,7 @@ class PPOAgent(object):
         self.c2 = 1
         
         self.epochs = 5
-        self.step_size = 1024
+        self.step_size = 4096
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -321,8 +321,8 @@ class PPOAgent(object):
         #obs = np.array([ob, ob]for _ in range(self.step_size)]).T
         #select_obs = np.array([ob for _ in range(self.step_size)])
         #move_obs = np.array([ob for _ in range(self.step_size)])
-        select_obs = np.zeros((self.step_size, ob.shape[0], ob.shape[1], ob.shape[2]), 'float32')
-        move_obs = np.zeros((self.step_size, ob.shape[0], ob.shape[1], ob.shape[2]), 'float32')
+        select_obs = np.zeros((self.step_size, ob.shape[0], ob.shape[1], ob.shape[2]), 'uint8')
+        move_obs = np.zeros((self.step_size, ob.shape[0], ob.shape[1], ob.shape[2]), 'uint8')
         rewards = np.zeros(self.step_size, 'float32')
         values = np.zeros(self.step_size, 'float32')
         dones = np.zeros(self.step_size, 'int32')
@@ -385,7 +385,7 @@ class PPOAgent(object):
             
             if (j == 0):
                 prev_selection = selection
-                selection_nums, value = self.select(ob)
+                selection_nums, value = self.select(self.normalize(ob))
                 #selection_nums = self.select_selection(selection_vals)
                 
                 select_obs[i] = ob
@@ -411,7 +411,6 @@ class PPOAgent(object):
                 ob, temp_reward, done, _ = self.env.step(0, topleft=selection_nums[:2], botright=selection_nums[2:])
                 
                 ob = self.state_reshape(ob)
-                ob = self.normalize(ob)
                 reward += temp_reward
                 
                 cur_ep_return += reward
@@ -442,7 +441,6 @@ class PPOAgent(object):
                     cur_ep_length = 0
                     ob, reward, done, _ = env.reset()
                     ob = self.state_reshape(ob)
-                    ob = self.normalize(ob)
                     t += 1
                     i += 1
                     continue
@@ -454,7 +452,7 @@ class PPOAgent(object):
             
             else:
                 prev_movement = movement
-                action_vals, value = self.act(ob)
+                action_vals, value = self.act(self.normalize(ob))
                 movement = self.select_action(action_vals)
                 move_obs[i] = ob
                 values[i] = (values[i] + value) / 2
@@ -521,7 +519,25 @@ class PPOAgent(object):
         
     def normalize(self, ob):
         #return ((ob.T - np.mean(ob, axis=(1,2))) / (1 + np.max(ob, axis=(1,2)) - np.min(ob, axis=(1,2)))).T
+        x, y, z = ob.shape
+        ob = ob.reshape((1, x, y, z))
+        self.state_normalize(ob)
+        ob = ob.reshape((x, y, z))
         return ob
+        
+    def state_normalize(self, ob):
+        self.zero_one_norm(ob[:,:,:,1])
+        self.zero_one_norm(ob[:,:,:,3])
+        
+        
+    def zero_one_norm(self, array):
+        n = array.shape[0]
+        arr_max = np.max(array, tuple(range(1, len(array.shape)))).reshape((n, 1, 1))
+        arr_min = np.min(array, tuple(range(1, len(array.shape)))).reshape((n, 1, 1))
+        denom = arr_max - arr_min + 1
+        array -= arr_min
+        array = array *  (1/denom)
+        
     """
     Returns some element i in range(len(action_probs)), each with action_probs[i] probability.
     """
@@ -879,7 +895,7 @@ class PPOAgent(object):
                                     self.adv_place: super_traj["advantage"][curr_indices],
                                     self.return_place: super_traj["return"][curr_indices]
                                      }
-                                    
+                        self.state_normalize(super_traj["move_ob"][curr_indices])           
                         
                                      
                         *step_losses, _ = self.session.run(input_list,
@@ -1012,7 +1028,7 @@ class PPOAgent(object):
 
 
 if __name__ == "__main__":
-    env = MinigameEnvironment(state_modifier.modified_state_space, 
+    env = MinigameEnvironment(state_modifier.modified_state_space,
                                 map_name_="DefeatRoaches", 
                                 render=False, 
                                 step_multiplier=8)
