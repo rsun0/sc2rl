@@ -150,7 +150,7 @@ class Actuator:
 
     @staticmethod
     def _compute_attack_weakest(selected, enemy_unit_density, enemy_hit_points):
-        enemy_hit_points[enemy_unit_density == 0] = np.finfo(enemy_hit_points.dtype).max
+        enemy_hit_points[enemy_unit_density == 0] = np.iinfo(enemy_hit_points.dtype).max
         weakest = np.flip(np.array(np.unravel_index(np.argmin(enemy_hit_points), enemy_hit_points.shape)), axis=0)
         return actions.FUNCTIONS.Attack_screen('now', weakest)
 

@@ -67,33 +67,34 @@ class state_modifier():
         scr = obs.observation.feature_screen
    
         ### Computes array of locations of selected marines
-        friendly_selected = np.array(scr.selected)
+        friendly_selected = np.array(scr.selected).astype(np.uint8)
     
         ### Computes arrays of locations of marines and enemy units
         player_relative = np.array(scr.player_relative)
-        player_friendly = (player_relative == _PLAYER_FRIENDLY).astype(int)
-        player_hostile = (player_relative == _PLAYER_HOSTILE).astype(int)
+        player_friendly = (player_relative == _PLAYER_FRIENDLY).astype(np.uint8)
+        player_hostile = (player_relative == _PLAYER_HOSTILE).astype(np.uint8)
         
         ### Computes arrays of hitpoints for marines and enemy units
-        player_hitpoints = np.array(scr.unit_hit_points) 
+        player_hitpoints = np.array(scr.unit_hit_points).astype(np.uint8)
         friendly_hitpoints = np.multiply(player_hitpoints, player_friendly)
         hostile_hitpoints = np.multiply(player_hitpoints, player_hostile)
         
         ### Computes arrays of density for marines and enemy units
-        unit_density = np.array(scr.unit_density)
+        unit_density = np.array(scr.unit_density).astype(np.uint8)
         friendly_density = np.multiply(unit_density, player_friendly)
         hostile_density = np.multiply(unit_density, player_hostile) 
         
         
         # Normalize friendly_hitpoints and hostile_hitpoints to between 0 and 1
-        friendly_hitpoints = zero_one_norm(friendly_hitpoints)
-        hostile_hitpoints = zero_one_norm(hostile_hitpoints)
+        #friendly_hitpoints = zero_one_norm(friendly_hitpoints)
+        #hostile_hitpoints = zero_one_norm(hostile_hitpoints)
         
         
         ### Stacks the previous arrays in the order given in the documentation. This will be the primary input to the neural network.
         
-        array = np.stack([friendly_selected, friendly_hitpoints, friendly_density, hostile_hitpoints, hostile_density], axis=0)
         
+        array = np.stack([friendly_selected, friendly_hitpoints, friendly_density, hostile_hitpoints, hostile_density], axis=0)
+
         return array
         
         

@@ -210,7 +210,7 @@ class PPOAgent(object):
         self.c2 = 1
         
         self.epochs = 5
-        self.step_size = 2048
+        self.step_size = 1024
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -839,10 +839,13 @@ class PPOAgent(object):
             
             self.add_vtarg_and_adv(traj)
             self.session.run(self.assign_op)
+            
+            
             traj["advantage"] = (traj["advantage"] - np.mean(traj["advantage"])) / np.std(traj["advantage"])
             
             # Augment data
             super_traj = self.rotateReflectAugmentation(traj)
+            traj = {}
             #super_traj = traj
             # normalize adv.
             
@@ -857,8 +860,6 @@ class PPOAgent(object):
                 vf_loss = 0
                 pol_loss = 0
                 entropy = 0
-                index_order = np.arange(len * self.batch_size)
-                np.random.shuffle(index_order)
                 
                 for i in range(len):
                     cur = i*self.batch_size
