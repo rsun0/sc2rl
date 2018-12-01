@@ -21,9 +21,9 @@ import action_interface
 class Network(object):
     def __init__(self, env, scope, num_layers, num_units, obs_plc, act_plc, select_act_plc, tl_plc, trainable=True):
         
-        self.filters1 = 1
-        self.filters2 = 2
-        self.filters3 = 2
+        self.filters1 = 64
+        self.filters2 = 128
+        self.filters3 = 128
     
     
         self.env = env
@@ -209,8 +209,8 @@ class PPOAgent(object):
         ### weight for entropy
         self.c2 = 1
         
-        self.epochs = 10
-        self.step_size = 256
+        self.epochs = 5
+        self.step_size = 2048
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -235,7 +235,7 @@ class PPOAgent(object):
         self.net = Network(env=self.env,
                            scope="pi",
                            num_layers=2,
-                           num_units=8,
+                           num_units=1024,
                            obs_plc=self.obs_place,
                            act_plc=self.acts_place,
                            tl_plc = self.tl_place,
@@ -244,7 +244,7 @@ class PPOAgent(object):
         self.old_net = Network(env=self.env,
                                scope="old_pi",
                                num_layers=2,
-                               num_units=8,
+                               num_units=1024,
                                obs_plc=self.obs_place,
                                act_plc=self.acts_place,
                                tl_plc=self.tl_place,
@@ -843,11 +843,11 @@ class PPOAgent(object):
             
             # Augment data
             super_traj = self.rotateReflectAugmentation(traj)
-            
+            #super_traj = traj
             # normalize adv.
             
             
-            len = int(8*self.step_size / self.batch_size)
+            len = int(super_traj["move_ob"].shape[0] / self.batch_size)
             
             if (turn == 1):
                 print("\n================= Training selector =================")
@@ -863,8 +863,9 @@ class PPOAgent(object):
                 for i in range(len):
                     cur = i*self.batch_size
                     upper = cur+self.batch_size
-                    curr_indices = index_order[cur:upper]    
-                    
+                    #curr_indices = index_order[cur:upper]    
+                    #print(curr_indices)
+                    curr_indices = range(cur, upper)
                     
                     ### Handles mover training
                     if (turn == 0):
@@ -872,10 +873,10 @@ class PPOAgent(object):
                     
                         input_list = [self.move_ent, self.vf_loss, self.move_pol_loss, self.move_update_op]
                         input_dict = {
-                                    self.obs_place: super_traj["move_ob"][cur:upper],
-                                    self.acts_place: super_traj["move_action"][cur:upper],
-                                    self.adv_place: super_traj["advantage"][cur:upper],
-                                    self.return_place: super_traj["return"][cur:upper]
+                                    self.obs_place: super_traj["move_ob"][curr_indices],
+                                    self.acts_place: super_traj["move_action"][curr_indices],
+                                    self.adv_place: super_traj["advantage"][curr_indices],
+                                    self.return_place: super_traj["return"][curr_indices]
                                      }
                                     
                         
@@ -891,11 +892,11 @@ class PPOAgent(object):
                         
                         input_list = [self.select_ent, self.vf_loss, self.select_pol_loss, self.select_update_op]
                         input_dict = {
-                                  self.obs_place: super_traj["select_ob"][cur:upper],
-                                  self.select_acts_place: super_traj["select_action"][cur:upper],
-                                  self.adv_place: super_traj["advantage"][cur:upper],
-                                  self.return_place: super_traj["return"][cur:upper],
-                                  self.tl_place: super_traj["tl_plc_in"][cur:upper]
+                                  self.obs_place: super_traj["select_ob"][curr_indices],
+                                  self.select_acts_place: super_traj["select_action"][curr_indices],
+                                  self.adv_place: super_traj["advantage"][curr_indices],
+                                  self.return_place: super_traj["return"][curr_indices],
+                                  self.tl_place: super_traj["tl_plc_in"][curr_indices]
                                      }
                         
                         *step_losses, _ = self.session.run(input_list,
@@ -916,9 +917,11 @@ class PPOAgent(object):
                 elif (turn == 0):
                     print("vf_loss: {:.5f}, pol_loss: {:.5f}, entropy: {:.5f}".format(vf_loss, pol_loss, entropy))
                     
-                    
-            # Save model every 10 iterations
-            if iteration % 1 == 0:
+            super_traj = {}
+            traj = {}  
+            n = 5
+            # Save model every n iterations
+            if iteration % n == 0:
                 print(" Model saved ")
                 self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
             self.plot_results()
