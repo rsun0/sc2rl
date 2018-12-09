@@ -58,14 +58,14 @@ class Network(object):
                 strides=(4, 4),
                 activation=self.activation)
 
-            x = tf.layers.conv2d(x,
+            baseline_conv_output = tf.layers.conv2d(x,
                 filters=self.filters2,
                 kernel_size=[4, 4],
                 padding="same",
                 strides=2,
                 activation=self.activation)
 
-            x = tf.contrib.layers.flatten(x)
+            x = tf.contrib.layers.flatten(baseline_conv_output)
             
             # Initializes fully connected layers
             for i in range(num_layers):
@@ -85,7 +85,7 @@ class Network(object):
                 
                 
             ### select_p network #####################################
-            
+            """
             x = self.obs_place
             
             # Initializes convolutional layers
@@ -103,8 +103,9 @@ class Network(object):
                 padding="same",
                 strides=2,
                 activation=self.activation)
-                         
-            select_p = tf.layers.conv2d(x,
+            
+            """
+            select_p = tf.layers.conv2d(baseline_conv_output,
                 filters=self.filters3,
                 kernel_size=[3,3],
                 padding="same",
@@ -148,7 +149,7 @@ class Network(object):
             
                                      
             x = self.obs_place
-            
+            """
             x = tf.layers.conv2d(x,
                                 filters=self.filters1,
                                 kernel_size=[8,8],
@@ -162,8 +163,9 @@ class Network(object):
                                 padding="same",
                                 strides=(2,2),
                                 activation=self.activation)
-                                
-            x = tf.contrib.layers.flatten(x)
+            """
+                          
+            x = tf.contrib.layers.flatten(baseline_conv_output)
             
             for i in range(num_layers):
                 fc_mul = num_layers - i
@@ -204,13 +206,13 @@ class PPOAgent(object):
         self.learning_rate = 3e-5
         
         ### weight for vf_loss
-        self.c1 = 10
+        self.c1 = 1
         
         ### weight for entropy
-        self.c2 = 1
+        self.c2 = 0.01
         
         self.epochs = 5
-        self.step_size = 4096
+        self.step_size = 5120
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
@@ -267,6 +269,7 @@ class PPOAgent(object):
                 + tf.reduce_sum(net.select_logstd, axis=-1)) )
         return logp / 4
         
+        
     @staticmethod
     def move_logp(net):
         logp = -(0.5 * tf.reduce_sum(tf.square((net.acts_place - net.p) / tf.exp(net.logstd)), axis=-1) \
@@ -277,12 +280,19 @@ class PPOAgent(object):
 
     @staticmethod
     def move_entropy(net):
-        ent = tf.reduce_sum(net.logstd + .5 * np.log(2.0 * np.pi * np.e), axis=-1)
+        #ent = tf.reduce_sum(net.logstd + .5 * np.log(2.0 * np.pi * np.e), axis=-1)
+        ent = tf.reduce_sum(net.p * tf.log(net.p))
+        print(ent)
         return ent
 
     @staticmethod
     def select_entropy(net):
-        ent = tf.reduce_sum(net.select_logstd + 0.5 * np.log(2.0 * np.pi * np.e), axis=-1)
+        #ent = tf.reduce_sum(net.select_logstd + 0.5 * np.log(2.0 * np.pi * np.e), axis=-1)
+        ent = tf.reduce_sum(net.select_p[0] * tf.log(net.select_p[0]))
+        for i in range(3):
+            p = net.select_p[i+1]
+            ent += tf.reduce_sum(p * tf.log(p))
+        print(ent)
         return ent
 
     @staticmethod
@@ -857,12 +867,13 @@ class PPOAgent(object):
             self.session.run(self.assign_op)
             
             
-            traj["advantage"] = (traj["advantage"] - np.mean(traj["advantage"])) / np.std(traj["advantage"])
+            #traj["advantage"] = (traj["advantage"] - np.mean(traj["advantage"])) / np.std(traj["advantage"])
             
             # Augment data
-            super_traj = self.rotateReflectAugmentation(traj)
+            #super_traj = self.rotateReflectAugmentation(traj)
+            #traj = {}
+            super_traj = traj
             traj = {}
-            #super_traj = traj
             # normalize adv.
             
             
@@ -876,6 +887,10 @@ class PPOAgent(object):
                 vf_loss = 0
                 pol_loss = 0
                 entropy = 0
+                
+                index_order = list(range(self.batch_size * len))
+                np.random.shuffle(index_order)
+
                 
                 for i in range(len):
                     cur = i*self.batch_size
@@ -912,6 +927,7 @@ class PPOAgent(object):
                         input_list = [self.select_ent, self.vf_loss, self.select_pol_loss, self.select_update_op]
                         
                         self.state_normalize(super_traj["select_ob"][curr_indices])
+                        
                         
                         input_dict = {
                                   self.obs_place: super_traj["select_ob"][curr_indices],
@@ -961,7 +977,7 @@ class PPOAgent(object):
         vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place))
         #vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))
         
-        total_loss = pol_surr + self.c1 *vf_loss #- self.c2 * ent
+        total_loss = pol_surr + self.c1 *vf_loss - self.c2 * ent
         
         update_op = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(total_loss)
         
@@ -977,7 +993,7 @@ class PPOAgent(object):
         pol_surr = -tf.reduce_mean(tf.minimum(surr1, surr2)) # -average(SUM RATIOn * ADVn)
         vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place)) # -KL
         #vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))    
-        total_loss = pol_surr + self.c1 *vf_loss #- self.c2 * ent
+        total_loss = pol_surr + self.c1 *vf_loss - self.c2 * ent
 
         # Maximizing objective is same as minimizing the negative objective
         update_op = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(total_loss)
