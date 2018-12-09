@@ -209,7 +209,7 @@ class PPOAgent(object):
         self.c1 = 1
         
         ### weight for entropy
-        self.c2 = 0.01
+        self.c2 = 0.001
         
         self.epochs = 5
         self.step_size = 5120
