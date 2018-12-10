@@ -279,21 +279,19 @@ class PPOAgent(object):
         return logp
 
     @staticmethod
-    def move_entropy(net):
+    def move_entropy(net, batch_size):
         #ent = tf.reduce_sum(net.logstd + .5 * np.log(2.0 * np.pi * np.e), axis=-1)
-        ent = tf.reduce_mean(net.p * tf.log(net.p))
-        print(ent)
-        return -ent
+        ent = tf.reduce_sum(net.p * tf.log(net.p))
+        return - (ent / batch_size)
 
     @staticmethod
-    def select_entropy(net):
+    def select_entropy(net, batch_size):
         #ent = tf.reduce_sum(net.select_logstd + 0.5 * np.log(2.0 * np.pi * np.e), axis=-1)
         ent = tf.reduce_mean(net.select_p[0] * tf.log(net.select_p[0]))
         for i in range(3):
             p = net.select_p[i+1]
-            ent += tf.reduce_mean(p * tf.log(p))
-        print(ent)
-        return -ent
+            ent += tf.reduce_sum(p * tf.log(p))
+        return -(ent / batch_size)
 
     @staticmethod
     def assign(net, old_net):
@@ -968,7 +966,7 @@ class PPOAgent(object):
             
     def select_update(self):
         
-        ent = self.select_entropy(self.net)
+        ent = self.select_entropy(self.net, self.batch_size)
         ratio = tf.exp(self.select_logp(self.net) - tf.stop_gradient(self.select_logp(self.old_net)))
         surr1 = ratio * self.adv_place
         surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
@@ -985,7 +983,7 @@ class PPOAgent(object):
 
     def move_update(self):
         
-        ent = self.move_entropy(self.net)
+        ent = self.move_entropy(self.net, self.batch_size)
         ratio = tf.exp(self.move_logp(self.net) - tf.stop_gradient(self.move_logp(self.old_net)))
         surr1 = ratio * self.adv_place
         surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
