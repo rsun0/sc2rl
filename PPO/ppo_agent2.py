@@ -281,17 +281,17 @@ class PPOAgent(object):
     @staticmethod
     def move_entropy(net):
         #ent = tf.reduce_sum(net.logstd + .5 * np.log(2.0 * np.pi * np.e), axis=-1)
-        ent = tf.reduce_sum(net.p * tf.log(net.p))
+        ent = tf.reduce_mean(net.p * tf.log(net.p))
         print(ent)
         return -ent
 
     @staticmethod
     def select_entropy(net):
         #ent = tf.reduce_sum(net.select_logstd + 0.5 * np.log(2.0 * np.pi * np.e), axis=-1)
-        ent = tf.reduce_sum(net.select_p[0] * tf.log(net.select_p[0]))
+        ent = tf.reduce_mean(net.select_p[0] * tf.log(net.select_p[0]))
         for i in range(3):
             p = net.select_p[i+1]
-            ent += tf.reduce_sum(p * tf.log(p))
+            ent += tf.reduce_mean(p * tf.log(p))
         print(ent)
         return -ent
 
@@ -1059,7 +1059,7 @@ if __name__ == "__main__":
     sess = tf.Session(config=config)
     ppo = PPOAgent(env, session=sess)
     sess.run(tf.global_variables_initializer())
-    ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
+    #ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
     ppo.run()
 
     env.close()
