@@ -203,13 +203,13 @@ class PPOAgent(object):
         
         
         ### hyperparameters - TODO: TUNE
-        self.learning_rate = 3e-5
+        self.learning_rate = 1e-4
         
         ### weight for vf_loss
         self.c1 = 1
         
         ### weight for entropy
-        self.c2 = 0.001
+        self.c2 = 1e-3
         
         self.epochs = 5
         self.step_size = 5120
@@ -283,7 +283,7 @@ class PPOAgent(object):
         #ent = tf.reduce_sum(net.logstd + .5 * np.log(2.0 * np.pi * np.e), axis=-1)
         ent = tf.reduce_sum(net.p * tf.log(net.p))
         print(ent)
-        return ent
+        return -ent
 
     @staticmethod
     def select_entropy(net):
@@ -293,7 +293,7 @@ class PPOAgent(object):
             p = net.select_p[i+1]
             ent += tf.reduce_sum(p * tf.log(p))
         print(ent)
-        return ent
+        return -ent
 
     @staticmethod
     def assign(net, old_net):
@@ -1059,7 +1059,7 @@ if __name__ == "__main__":
     sess = tf.Session(config=config)
     ppo = PPOAgent(env, session=sess)
     sess.run(tf.global_variables_initializer())
-    #ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
+    ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
     ppo.run()
 
     env.close()
