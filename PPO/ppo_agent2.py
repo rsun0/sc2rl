@@ -18,6 +18,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import action_interface
 
+np.set_printoptions(linewidth=200, precision=4)
+
 class Network(object):
     def __init__(self, env, scope, num_layers, num_units, obs_plc, act_plc, select_act_plc, tl_plc, trainable=True):
         
@@ -33,7 +35,7 @@ class Network(object):
         self.select_width = env.select_space
         self.select_height = env.select_space
         self.trainable = trainable
-        self.activation = tf.nn.relu
+        self.activation = tf.nn.leaky_relu
         self.scope = scope
 
         self.obs_place = obs_plc
@@ -203,20 +205,24 @@ class PPOAgent(object):
         
         
         ### hyperparameters - TODO: TUNE
-        self.learning_rate = 1e-4
+        self.learning_rate = 5e-5
         
         ### weight for vf_loss
         self.c1 = 1
         
         ### weight for entropy
-        self.c2 = 1e-3
+        self.c2 = 1e-4
+        
+        ### Constant used for numerical stability in log and division operations
+        self.epsilon = 1e-8
         
         self.epochs = 5
-        self.step_size = 5120
+        self.step_size = 2048
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
-        self.batch_size = 128
+        self.batch_size = 64
+        self.hidden_size = 512
         self.averages = []
 
         ## placeholders
@@ -237,7 +243,7 @@ class PPOAgent(object):
         self.net = Network(env=self.env,
                            scope="pi",
                            num_layers=2,
-                           num_units=1024,
+                           num_units=self.hidden_size,
                            obs_plc=self.obs_place,
                            act_plc=self.acts_place,
                            tl_plc = self.tl_place,
@@ -246,7 +252,7 @@ class PPOAgent(object):
         self.old_net = Network(env=self.env,
                                scope="old_pi",
                                num_layers=2,
-                               num_units=1024,
+                               num_units=self.hidden_size,
                                obs_plc=self.obs_place,
                                act_plc=self.acts_place,
                                tl_plc=self.tl_place,
@@ -259,8 +265,7 @@ class PPOAgent(object):
         self.move_ent, self.move_pol_loss, self.vf_loss, self.move_update_op = self.move_update()
         self.saver = tf.train.Saver()
 
-    @staticmethod
-    def select_logp(net):
+    def select_logp(self, net):
         logp = 0
         for i in range(4):
             p = net.select_p[i]
@@ -270,31 +275,27 @@ class PPOAgent(object):
         return logp / 4
         
         
-    @staticmethod
-    def move_logp(net):
+    def move_logp(self, net):
         logp = -(0.5 * tf.reduce_sum(tf.square((net.acts_place - net.p) / tf.exp(net.logstd)), axis=-1) \
             + 0.5 * np.log(2.0 * np.pi) * tf.to_float(tf.shape(net.p)[-1]) \
             + tf.reduce_sum(net.logstd, axis=-1))
 
         return logp
 
-    @staticmethod
-    def move_entropy(net, batch_size):
+    def move_entropy(self, net, batch_size):
         #ent = tf.reduce_sum(net.logstd + .5 * np.log(2.0 * np.pi * np.e), axis=-1)
-        ent = tf.reduce_sum(net.p * tf.log(net.p))
+        ent = tf.reduce_sum(net.p * tf.log(net.p + self.epsilon))
         return - (ent / batch_size)
 
-    @staticmethod
-    def select_entropy(net, batch_size):
+    def select_entropy(self, net, batch_size):
         #ent = tf.reduce_sum(net.select_logstd + 0.5 * np.log(2.0 * np.pi * np.e), axis=-1)
-        ent = tf.reduce_mean(net.select_p[0] * tf.log(net.select_p[0]))
+        ent = tf.reduce_mean(net.select_p[0] * tf.log(net.select_p[0] + self.epsilon))
         for i in range(3):
             p = net.select_p[i+1]
-            ent += tf.reduce_sum(p * tf.log(p))
+            ent += tf.reduce_sum(p * tf.log(p + self.epsilon))
         return -(ent / batch_size)
 
-    @staticmethod
-    def assign(net, old_net):
+    def assign(self, net, old_net):
         assign_op = []
         for (newv, oldv) in zip(net.get_variables(), old_net.get_variables()):
             assign_op.append(tf.assign(oldv, newv))
@@ -748,100 +749,7 @@ class PPOAgent(object):
         movements[:8] = np.roll(movements[:8], -2 * i)
         return movements
 
-    """
-    def flip_action(self, action):
-        if action == MappedAction.LEFT:
-            return MappedAction.LEFT
-        if action == MappedAction.RIGHT:
-            return MappedAction.RIGHT
-        if action == MappedAction.UP:
-            return MappedAction.DOWN
-        if action == MappedAction.DOWN:
-            return MappedAction.UP
-        if action == MappedAction.UP_LEFT:
-            return MappedAction.DOWN_LEFT
-        if action == MappedAction.UP_RIGHT:
-            return MappedAction.DOWN_RIGHT
-        if action == MappedAction.DOWN_LEFT:
-            return MappedAction.UP_LEFT
-        if action == MappedAction.DOWN_RIGHT:
-            return MappedAction.UP_RIGHT       
-        
-        return action        
-            
-    def rotate_action(self, action, i):
-        i = i % 4
-    
-        if i == 0:
-            return action
-            
-        if action == Action.LEFT:
-            if i == 1:
-                return Action.UP 
-            elif i == 2:
-                return Action.RIGHT   
-            else:
-                return Action.DOWN
-                
-        if action == Action.UP:
-            if i == 1:
-                return Action.RIGHT 
-            elif i == 2:
-                return Action.DOWN   
-            else:
-                return Action.LEFT
 
-        if action == Action.RIGHT:
-            if i == 1:
-                return Action.DOWN 
-            elif i == 2:
-                return Action.LEFT   
-            else:
-                return Action.UP
-                
-        if action == Action.DOWN:
-            if i == 1:
-                return Action.LEFT 
-            elif i == 2:
-                return Action.UP   
-            else:
-                return Action.RIGHT                    
-
-        if action == Action.UP_LEFT:
-            if i == 1:
-                return Action.UP_RIGHT 
-            elif i == 2:
-                return Action.DOWN_RIGHT   
-            else:
-                return Action.DOWN_LEFT          
-
-        if action == Action.UP_RIGHT:
-            if i == 1:
-                return Action.DOWN_RIGHT 
-            elif i == 2:
-                return Action.DOWN_LEFT   
-            else:
-                return Action.UP_LEFT  
-                
-         if action == Action.DOWN_RIGHT:
-            if i == 1:
-                return Action.DOWN_LEFT 
-            elif i == 2:
-                return Action.UP_LEFT   
-            else:
-                return Action.UP_RIGHT               
-
-        if action == Action.DOWN_LEFT:
-            if i == 1:
-                return Action.UP_LEFT 
-            elif i == 2:
-                return Action.UP_RIGHT   
-            else:
-                return Action.DOWN_RIGHT      
-
-        return action
-
-    """
 
     def run(self):
         traj_gen = self.traj_generator()
@@ -893,9 +801,9 @@ class PPOAgent(object):
                 for i in range(len):
                     cur = i*self.batch_size
                     upper = cur+self.batch_size
-                    #curr_indices = index_order[cur:upper]    
+                    curr_indices = index_order[cur:upper]    
                     #print(curr_indices)
-                    curr_indices = range(cur, upper)
+                    #curr_indices = range(cur, upper)
                     
                     ### Handles mover training
                     if (turn == 0):
@@ -968,10 +876,18 @@ class PPOAgent(object):
         
         ent = self.select_entropy(self.net, self.batch_size)
         ratio = tf.exp(self.select_logp(self.net) - tf.stop_gradient(self.select_logp(self.old_net)))
-        surr1 = ratio * self.adv_place
-        surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
+        #ratio = self.net.select_p / (self.old_net.select_p + self.epsilon)
         
-        pol_surr = -tf.reduce_mean(tf.minimum(surr1, surr2))
+        pol_surr = 0
+        for i in range(len(self.net.select_p)):
+            ratio = tf.boolean_mask(self.net.select_p[i], self.select_acts_place[:,i,:]) / (tf.boolean_mask(self.old_net.select_p[i], self.select_acts_place[:,i,:]) + self.epsilon)
+            surr1 = ratio * self.adv_place
+            surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
+            if i == 0:
+                pol_surr = -tf.reduce_mean(tf.minimum(surr1, surr2))
+            else:
+                pol_surr += (-tf.reduce_mean(tf.minimum(surr1, surr2))) 
+        
         vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place))
         #vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))
         
@@ -984,9 +900,13 @@ class PPOAgent(object):
     def move_update(self):
         
         ent = self.move_entropy(self.net, self.batch_size)
-        ratio = tf.exp(self.move_logp(self.net) - tf.stop_gradient(self.move_logp(self.old_net)))
+        #ratio = tf.exp(self.move_logp(self.net) - tf.stop_gradient(self.move_logp(self.old_net)))
+        ratio = tf.boolean_mask(self.net.p, self.acts_place) / (tf.boolean_mask(self.old_net.p, self.acts_place) + self.epsilon)
+        #print(ratio.shape)
         surr1 = ratio * self.adv_place
         surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
+        #print(self.net.p.shape, self.acts_place.shape)
+        #print(ratio.shape, surr1.shape, surr2.shape)
 
         pol_surr = -tf.reduce_mean(tf.minimum(surr1, surr2)) # -average(SUM RATIOn * ADVn)
         vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place)) # -KL
