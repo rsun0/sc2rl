@@ -205,23 +205,23 @@ class PPOAgent(object):
         
         
         ### hyperparameters - TODO: TUNE
-        self.learning_rate = 5e-5
+        self.learning_rate = 1e-4
         
         ### weight for vf_loss
         self.c1 = 1
         
         ### weight for entropy
-        self.c2 = 1e-4
+        self.c2 = 0
         
         ### Constant used for numerical stability in log and division operations
         self.epsilon = 1e-8
         
         self.epochs = 5
-        self.step_size = 2048
+        self.step_size = 1024
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
-        self.batch_size = 64
+        self.batch_size = 128
         self.hidden_size = 512
         self.averages = []
 
@@ -875,7 +875,7 @@ class PPOAgent(object):
     def select_update(self):
         
         ent = self.select_entropy(self.net, self.batch_size)
-        ratio = tf.exp(self.select_logp(self.net) - tf.stop_gradient(self.select_logp(self.old_net)))
+        #ratio = tf.exp(self.select_logp(self.net) - tf.stop_gradient(self.select_logp(self.old_net)))
         #ratio = self.net.select_p / (self.old_net.select_p + self.epsilon)
         
         pol_surr = 0
@@ -888,8 +888,9 @@ class PPOAgent(object):
             else:
                 pol_surr += (-tf.reduce_mean(tf.minimum(surr1, surr2))) 
         
-        vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place))
-        #vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))
+        pol_surr /= 4
+        #vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place))
+        vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))
         
         total_loss = pol_surr + self.c1 *vf_loss - self.c2 * ent
         
@@ -909,8 +910,8 @@ class PPOAgent(object):
         #print(ratio.shape, surr1.shape, surr2.shape)
 
         pol_surr = -tf.reduce_mean(tf.minimum(surr1, surr2)) # -average(SUM RATIOn * ADVn)
-        vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place)) # -KL
-        #vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))    
+        #vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place)) # -KL
+        vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))    
         total_loss = pol_surr + self.c1 *vf_loss - self.c2 * ent
 
         # Maximizing objective is same as minimizing the negative objective
