@@ -211,18 +211,18 @@ class PPOAgent(object):
         self.c1 = 1
         
         ### weight for entropy
-        self.c2 = 0
+        self.c2 = 2e-3
         
         ### Constant used for numerical stability in log and division operations
         self.epsilon = 1e-8
         
         self.epochs = 5
-        self.step_size = 1024
+        self.step_size = 5120
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.2
         self.batch_size = 128
-        self.hidden_size = 512
+        self.hidden_size = 1024
         self.averages = []
 
         ## placeholders
@@ -758,7 +758,7 @@ class PPOAgent(object):
         ### Stores previous iterations training data to augment current iteration data.
         ### May be useful, may be counterproductive. 
         previous_traj = {}
-        
+        max_avg = 0
         for i in range(100000):
         
             ### 0 if training selector, 1 if training mover
@@ -864,9 +864,10 @@ class PPOAgent(object):
                     
             super_traj = {}
             traj = {}  
-            n = 5
+            n = 1
             # Save model every n iterations
-            if iteration % n == 0:
+            if iteration % n == 0 and self.averages[-1] > max_avg:
+                max_avg = self.averages[-1]
                 print(" Model saved ")
                 self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
             self.plot_results()
