@@ -20,6 +20,7 @@ class Action(Enum):
 
 class Actuator:
     _MOVE_MULTIPLIER = 10
+    _SELECT_SPACE = 10
 
     def __init__(self):
         self.reset()
@@ -47,12 +48,13 @@ class Actuator:
         if np.all(selected == 0):
             self.units_selected = False
 
-        if (topleft != None):
+        if (topleft is not None):
             assert action == Action.SELECT
-            return self._select(topleft, botright)
+            self.units_selected = True
+            return self._select(topleft, botright, friendly_unit_density)
 
         if not self.units_selected:
-            assert action == Action.SELECT, 'Actuator cannot order units without selection (unit may have died)'
+            #assert action == Action.SELECT, 'Actuator cannot order units without selection (unit may have died)'
 
             self.units_selected = True
             return self._compute_select(friendly_unit_density, len(raw_obs.observation.feature_units))
@@ -148,7 +150,7 @@ class Actuator:
 
     @staticmethod
     def _compute_attack_weakest(selected, enemy_unit_density, enemy_hit_points):
-        enemy_hit_points[enemy_unit_density == 0] = np.finfo(enemy_hit_points.dtype).max
+        enemy_hit_points[enemy_unit_density == 0] = np.iinfo(enemy_hit_points.dtype).max
         weakest = np.flip(np.array(np.unravel_index(np.argmin(enemy_hit_points), enemy_hit_points.shape)), axis=0)
         return actions.FUNCTIONS.Attack_screen('now', weakest)
 
@@ -170,5 +172,44 @@ class Actuator:
         return actions.FUNCTIONS.Move_screen('now', move_target)
         
     @staticmethod
-    def _select(topleft, botright):
-        return actions.FUNCTIONS.select_rect(topleft, botright)
+    def _select(topleft, botright, friendly_unit_density):
+        topleft = np.array(topleft)
+        botright = np.array(botright)
+        x, y = friendly_unit_density.nonzero()
+        tl_map = np.flip(np.array([min(x), min(y)]))
+        br_map = np.flip(np.array([max(x), max(y)]))
+        
+        
+        ## Map 0 to tl_map, map max topleft or botright value (currently 9) to br_map
+        dividend = Actuator._SELECT_SPACE - 1
+        
+        ## map distance per unit of decision coordinates
+        interval = (br_map - tl_map) / dividend
+        
+        ## Used to stretch decision box beyond the smallest that fits units. Adjust this value as needed. 
+        stretch_constant = 1.0
+        tl_map = Actuator._screen_normalize(tl_map - stretch_constant * interval, 84)
+        br_map = Actuator._screen_normalize(br_map + stretch_constant * interval, 84)
+        interval = (br_map - tl_map) / dividend
+        
+        tl_transform = Actuator._screen_normalize((tl_map + topleft * interval), 84)
+        br_transform = Actuator._screen_normalize((br_map + botright * interval), 84)
+        
+        return actions.FUNCTIONS.select_rect('select', tl_transform, br_transform)
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        

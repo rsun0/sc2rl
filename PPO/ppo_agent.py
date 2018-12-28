@@ -29,7 +29,7 @@ class Network(object):
         self.obs_place = obs_plc
         self.acts_place = act_plc
 
-        self.p , self.v, self.logstd = self._build_network(num_layers=num_layers, num_units=num_units)
+        self.p , self.v, self.select_p, self.logstd = self._build_network(num_layers=num_layers, num_units=num_units)
         self.act_op = self.action_sample()
         
 
@@ -55,6 +55,33 @@ class Network(object):
                 strides=2,
                 activation=self.activation)
                 
+                
+            ### select_p network
+            
+            ### Maybe add more conv layers            
+            select_p = tf.layers.conv2d(x,
+                filters=64,
+                kernel_size=[3,3],
+                padding="same",
+                strides=1,
+                activation=self.activation)
+                
+            ### Maybe add more dense layers
+            select_p = tf.layers.dense(select_p, units=num_units, activation=self.activation, name="select_p_fc1", trainable=self.trainable)
+                
+            select_p = tf.contrib.layers(flatten(select_p))
+            
+            select_p_x1 = tf.layers.dense(select_p, units=self.select_width, activation=tf.nn.softmax, name="select_p_x1_fc", trainable=self.trainable)
+            select_p_y1 = tf.layers.dense(select_p, units=self.select_height, activation=tf.nn.softmax, name="select_p_y1_fc", trainable=self.trainable)
+            
+            x2_y2_in = tf.concat([select_p, select_p_x1, select_p_x2])
+  
+            ### Maybe add dense layers          
+            select_p_x2 = tf.layers.dense(x2_y2_in, units=self.select_width, activation=tf.nn.softmax, name="select_p_x2_fc", trainable=self.trainable)
+            select_p_y2 = tf.layers.dense(x2_y2_in, units=self.select_height, activation=tf.nn.softmax, name="select_p_y2_fc", trainable=self.trainable)
+            
+            
+                
             x = tf.contrib.layers.flatten(x)
             
             # Initializes fully connected layers
@@ -64,40 +91,20 @@ class Network(object):
             action = tf.layers.dense(x, units=self.action_size, activation=tf.nn.softmax,
                                      name="p_fc"+str(num_layers), trainable=self.trainable)
 
-
-            x = self.obs_place
-            
-            x = tf.layers.conv2d(x,
-                filters=32,
-                kernel_size=[8,8],
-                padding="same",
-                strides=(4, 4),
-                activation=self.activation)
-                
-            x = tf.layers.conv2d(x,
-                filters=64,
-                kernel_size=[4,4],
-                padding="same",
-                strides=(2, 2),
-                activation=self.activation)
-                
-            x = tf.contrib.layers.flatten(x)
-            
-            
-            
-            for i in range(num_layers):
-                x = tf.layers.dense(x, units=num_units, activation=self.activation, name="v_fc"+str(i),
-                                    trainable=self.trainable)
             value = tf.layers.dense(x, units=1, activation=None, name="v_fc"+str(num_layers),
                                     trainable=self.trainable)
+
+            
+            
+            
 
             logstd = tf.get_variable(name="logstd", shape=[self.action_size],
                                      initializer=tf.zeros_initializer)
 
-        return action, value, logstd
+        return action, value, [select_p_x1, select_p_y1, select_p_x2, select_p_y2], logstd
 
     def action_sample(self):
-        return self.p # + tf.exp(self.logstd) * tf.random_normal(tf.shape(self.p))
+        return self.p #+ tf.exp(self.logstd) * tf.random_normal(tf.shape(self.p))
 
     def get_variables(self):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.scope)
@@ -229,7 +236,7 @@ class PPOAgent(object):
             """
 
 
-            ob, reward, done, _ = env.step(action) # TODO: select argmax from action? or is action[0] always?
+            ob, reward, done, _ = env.step(action) 
             ob = ob.reshape(self.input_shape)
             ob = self.normalize(ob)
             rewards[i] = reward
