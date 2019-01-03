@@ -9,6 +9,7 @@
 # based on code from https://github.com/wooridle/DeepRL-PPO-tutorial/blob/master/ppo.py
 
 import tensorflow as tf
+import tensorflow.distributions as tfp
 import numpy as np
 from custom_env import MinigameEnvironment
 from modified_state_space import state_modifier
@@ -128,26 +129,28 @@ class Network(object):
                                         trainable=self.trainable)            
             
             ### Placeholders for top left probabilities
-            select_p_x1 = tf.layers.dense(select_p_tl, units=self.select_width, activation=tf.nn.softmax, name="select_p_x1_fc", trainable=self.trainable)
-            select_p_y1 = tf.layers.dense(select_p_tl, units=self.select_height, activation=tf.nn.softmax, name="select_p_y1_fc", trainable=self.trainable)
+            select_p_x1 = tf.layers.dense(select_p_tl, units=2, activation=tf.nn.sigmoid, name="select_p_x1_fc", trainable=self.trainable)
+            select_p_y1 = tf.layers.dense(select_p_tl, units=2, activation=tf.nn.sigmoid, name="select_p_y1_fc", trainable=self.trainable)
 
 
             ### FC layers for bot right
-            select_p_br = tf.concat([select_p, self.tl_plc], axis=-1)
             for i in range(num_layers):
                 fc_mul = num_layers - i
+                select_p_br = tf.concat([select_p, self.tl_plc], axis=-1)
                 select_p_br = tf.layers.dense(select_p_br,
                                         units= (fc_mul * num_units),
                                         activation=self.activation,
                                         name="select_p_br_fc" + str(i),
                                         trainable=self.trainable)
+                                        
+                
             
             ### Placeholders for bot right         
-            select_p_x2 = tf.layers.dense(select_p_br, units=self.select_width, activation=tf.nn.softmax, name="select_p_x2_fc", trainable=self.trainable)
-            select_p_y2 = tf.layers.dense(select_p_br, units=self.select_height, activation=tf.nn.softmax, name="select_p_y2_fc", trainable=self.trainable)
+            select_p_x2 = tf.layers.dense(select_p_br, units=2, activation=tf.nn.sigmoid, name="select_p_x2_fc", trainable=self.trainable)
+            select_p_y2 = tf.layers.dense(select_p_br, units=2, activation=tf.nn.sigmoid, name="select_p_y2_fc", trainable=self.trainable)
             
             
-                
+            coord_params = [select_p_x1, select_p_y1, select_p_x2, select_p_y2]
             
                                      
             x = self.obs_place
@@ -184,7 +187,7 @@ class Network(object):
                                      
             select_logstd = tf.get_variable(name="select_logstd", shape=[self.select_size], initializer=tf.zeros_initializer)
 
-        return action, value, [select_p_x1, select_p_y1, select_p_x2, select_p_y2], logstd, select_logstd
+        return action, value, coord_params, logstd, select_logstd
 
     def action_sample(self):
         return self.p #+ tf.exp(self.logstd) * tf.random_normal(tf.shape(self.p))
@@ -205,24 +208,31 @@ class PPOAgent(object):
         
         
         ### hyperparameters - TODO: TUNE
-        self.learning_rate = 1e-4
+        self.learning_rate = 1e-5
+        
+        ### weight for policy loss
+        self.c0 = 1
         
         ### weight for vf_loss
-        self.c1 = 1
+        self.c1 = 1 #1
         
         ### weight for entropy
-        self.c2 = 2e-3
+        self.c2 = 0.01 #1e-2
         
         ### Constant used for numerical stability in log and division operations
-        self.epsilon = 1e-8
+        self.epsilon = 1e-4
         
-        self.epochs = 5
-        self.step_size = 5120
+        self.epochs = 3
+        self.move_step_size = 1024
+        self.select_multiplier = 8
+        self.step_size = self.move_step_size * self.select_multiplier
         self.gamma = 0.99
         self.lam = 0.95
-        self.clip_param = 0.2
-        self.batch_size = 128
-        self.hidden_size = 1024
+        self.clip_param = 0.1
+        self.batch_size = 32
+        self.move_batch_size = 64
+        self.select_batch_size = 512
+        self.hidden_size = 512
         self.averages = []
 
         ## placeholders
@@ -234,10 +244,10 @@ class PPOAgent(object):
         self.acts_place = tf.placeholder(shape=(None,self.env.action_space),
                                          name="ac", dtype=tf.float32)
                                          
-        self.select_acts_place = tf.placeholder(shape=(None, 4, self.env.select_space),
+        self.select_acts_place = tf.placeholder(shape=(None, 4),
                                          name="sac", dtype=tf.float32)
 
-        self.tl_place = tf.placeholder(shape=[None, 2*env.select_space], dtype=tf.float32)
+        self.tl_place = tf.placeholder(shape=[None, 2], dtype=tf.float32)
 
         ## build network
         self.net = Network(env=self.env,
@@ -283,17 +293,22 @@ class PPOAgent(object):
         return logp
 
     def move_entropy(self, net, batch_size):
-        #ent = tf.reduce_sum(net.logstd + .5 * np.log(2.0 * np.pi * np.e), axis=-1)
         ent = tf.reduce_sum(net.p * tf.log(net.p + self.epsilon))
         return - (ent / batch_size)
 
     def select_entropy(self, net, batch_size):
-        #ent = tf.reduce_sum(net.select_logstd + 0.5 * np.log(2.0 * np.pi * np.e), axis=-1)
+        """
         ent = tf.reduce_mean(net.select_p[0] * tf.log(net.select_p[0] + self.epsilon))
         for i in range(3):
             p = net.select_p[i+1]
             ent += tf.reduce_sum(p * tf.log(p + self.epsilon))
         return -(ent / batch_size)
+        """
+        ent = tf.reduce_mean(net.select_p[0][:,1])
+        for i in range(3):
+            p = net.select_p[i+1]
+            ent += tf.reduce_mean(p[:,1])
+        return -ent
 
     def assign(self, net, old_net):
         assign_op = []
@@ -315,6 +330,7 @@ class PPOAgent(object):
     """   
     
     def traj_generator(self):
+        step = 0
         t = 0
         
         done = True
@@ -335,14 +351,14 @@ class PPOAgent(object):
         rewards = np.zeros(self.step_size, 'float32')
         values = np.zeros(self.step_size, 'float32')
         dones = np.zeros(self.step_size, 'int32')
-        select_actions = np.zeros((self.step_size, 4, self.env.select_space), 'float32')
+        select_actions = np.zeros((self.step_size, 4), 'float32')
         move_actions = np.zeros((self.step_size, self.env.action_space), 'float32')
         
         prev_select_actions = select_actions.copy()
         prev_move_actions = move_actions.copy()
         
         # Records selected topleft coordinates
-        tl_plc_in = np.zeros((self.step_size, 2*self.env.select_space), 'float32')
+        tl_plc_in = np.zeros((self.step_size, 2), 'float32')
         
         
         selection = 0
@@ -355,14 +371,12 @@ class PPOAgent(object):
         
         while True:
         
-            ### Stores index of current step
-            i = int((t % (2 * self.step_size)) / 2)
-        
-            ### Even if selecting, odd if moving
-            j = t % 2
+            
         
             ### Handles return ###
-            if (t > 0 and (t % (2*self.step_size)) == 0):
+            ### Enters if statement depending on if training selector or mover
+            if (t > 0 and (((t % (2*self.step_size)) == 0 and step == 1) or (t % (2*self.move_step_size) == 0 and step == 0)) ):
+                step = (step + 1) % 2
                 self.averages.append(sum(scores) / (1+num_games))
                 print("Average game score of this batch: {}".format(self.averages[-1]))
                 scores = []
@@ -380,8 +394,12 @@ class PPOAgent(object):
                        "tl_plc_in": tl_plc_in,
                        "nextvalue": value*(1-done), 
                        "ep_returns": ep_returns,
-                       "ep_lengths": ep_lengths
+                       "ep_lengths": ep_lengths,
+                       "step_size": i
                        }
+                       
+                i = 0
+                t = 0
 
                 ep_returns = []
                 ep_lengths = []
@@ -389,6 +407,12 @@ class PPOAgent(object):
                 rewards = np.zeros(self.step_size, 'float32')
                 values = np.zeros(self.step_size, 'float32')
                 
+                
+            ### Stores index of current step
+            i = int((t % (2 * self.step_size)) / 2)
+        
+            ### Even if selecting, odd if moving
+            j = t % 2
                 
             ### Handles selection ###
             
@@ -402,22 +426,13 @@ class PPOAgent(object):
                 dones[i] = done
                 
                 
-                transformed_select = selection_nums
-                transformed_select[2:] -= transformed_select[:2]
-                if (transformed_select[2] == self.env.select_space - 1):
-                    transformed_select[2] = random.randint(transformed_select[2], self.env.select_space-1)
-                if (transformed_select[3] == self.env.select_space - 1):
-                    transformed_select[3] = random.randint(transformed_select[3], self.env.select_space-1)
                 
-                select_actions[i] = np.zeros((4, self.env.select_space,))
-                select_actions[i, range(4), transformed_select] = 1
-                prev_select_actions[i] = np.zeros((4, self.env.select_space,))
-                prev_select_actions[i, range(4), prev_selection] = 1
-                tl_plc_in[i] = np.zeros((2*self.env.select_space,))
-                tl_plc_in[i][selection_nums[0]] = 1
-                tl_plc_in[i][self.env.select_space + selection_nums[1]] = 1
-                #csa = converted_select_action = self.select_convert(selection_nums)
-                ob, temp_reward, done, _ = self.env.step(0, topleft=selection_nums[:2], botright=selection_nums[2:])
+                select_actions[i, range(4)] = selection_nums
+                transformed_select = selection_nums
+                transformed_select[2:] += transformed_select[:2]
+                tl_plc_in[i] = selection_nums[:2]
+                selection_nums *= (self.env.select_space - 1)
+                ob, temp_reward, done, _ = self.env.step(0, topleft=transformed_select[:2], botright=transformed_select[2:])
                 
                 ob = self.state_reshape(ob)
                 reward += temp_reward
@@ -509,22 +524,17 @@ class PPOAgent(object):
     def select(self, ob):
         x1, y1, value = self.session.run(self.net.select_p[:2] + [self.net.v], feed_dict={ self.net.obs_place: ob[None]})
         tl = self.select_selection(np.array([x1[0], y1[0]]))
-        tl_plc = np.zeros((2*self.env.select_space))
-        x1 = tl[0]
-        y1 = tl[1]
+        tl_plc = np.zeros((2))
+        tl_plc[0] = x1 = tl[0]
+        tl_plc[1] = y1 = tl[1]
         
-        tl_plc[x1] = 1
-        tl_plc[self.env.select_space+y1] = 1
         x2, y2 = self.session.run(self.net.select_p[2:], feed_dict={ self.net.obs_place: ob[None], self.net.tl_plc: tl_plc[None]
         })
-        br = self.select_selection(np.array([x2[0], y2[0]]))
+        br = [x2, y2] = self.select_selection(np.array([x2[0], y2[0]]))
+        coords = np.array([x1, y1, x2, y2]).reshape((4,))
+        coords = np.clip(coords, 0, 1)
         
-        x2 = min((x1+br[0]), self.env.select_space-1)
-        y2 = min((y1+br[1]), self.env.select_space-1)
-        
-        
-        
-        return np.array([x1, y1, x2, y2]), value
+        return coords, value
         
     def normalize(self, ob):
         #return ((ob.T - np.mean(ob, axis=(1,2))) / (1 + np.max(ob, axis=(1,2)) - np.min(ob, axis=(1,2)))).T
@@ -567,22 +577,20 @@ class PPOAgent(object):
         select_selection takes in selection_probs: numpy array of shape (4, self.env.select_space)
         returns: list of length 4
     """
-    def select_selection(self, selection_probs):
+    def select_selection(self, selection_params):
         output = []
         #selection_probs = selection_probs.reshape((4, self.env.select_space))
-        for i in range(selection_probs.shape[0]):
-            num = random.random()
-            running_sum = 0.0
-            for j in range(len(selection_probs[i])):
-                running_sum += selection_probs[i][j]
-                if num < running_sum:
-                    output.append(j)
-                    break
+        for i in range(selection_params.shape[0]):
+            row = selection_params[i]
+            coord = np.clip([np.random.normal(loc=row[0], scale=row[1])], 0, 1)
+            output.append(coord)            
+            
         return output
         
         
     """
         Augments data by generating the 8 equivalent transformations of states and actions. See: dihedral group
+        Currently does not work with continuous selection space. Do not use this function until it is integrated with continuous selection space.
         
     """
     def rotateReflectAugmentation(self, traj):
@@ -766,6 +774,12 @@ class PPOAgent(object):
             iteration = i + 1
             
             print("\n================= iteration {} =================".format(iteration))
+            if (turn == 1):
+                print("\n================= Training selector =================")
+                self.batch_size = self.select_batch_size
+            elif (turn == 0):
+                print("\n================= Training mover =================")
+                self.batch_size = self.move_batch_size
             
             traj = traj_gen.__next__()
             
@@ -782,13 +796,10 @@ class PPOAgent(object):
             traj = {}
             # normalize adv.
             
+            len = int(super_traj["step_size"] / self.batch_size)
             
-            len = int(super_traj["move_ob"].shape[0] / self.batch_size)
+            print(super_traj["step_size"], self.batch_size, len)
             
-            if (turn == 1):
-                print("\n================= Training selector =================")
-            elif (turn == 0):
-                print("\n================= Training mover =================")
             for _ in range(self.epochs):
                 vf_loss = 0
                 pol_loss = 0
@@ -824,12 +835,13 @@ class PPOAgent(object):
                         *step_losses, _ = self.session.run(input_list,
                                                         feed_dict=input_dict)
                         
+                        
                         ### Debug print statement for exploding value function
                         #print(self.session.run(self.net.v, feed_dict={self.obs_place: traj["move_ob"][cur:upper]}), traj["return"][cur:upper])
-                           
+                        
                     ### Handles selector training
                     elif (turn == 1):
-                        
+                        print("training selector")
                         input_list = [self.select_ent, self.vf_loss, self.select_pol_loss, self.select_update_op]
                         
                         self.state_normalize(super_traj["select_ob"][curr_indices])
@@ -843,12 +855,19 @@ class PPOAgent(object):
                                   self.tl_place: super_traj["tl_plc_in"][curr_indices]
                                      }
                         
-                        
+                        """
+                        ent_temp, vf_temp, pol_temp, update_op, ratios = self.session.run(input_list,
+                                                        feed_dict=input_dict)
+                        """
                         *step_losses, _ = self.session.run(input_list,
                                                         feed_dict=input_dict)
                         
+                        print(step_losses)
+                        
                         ### Debug print statement for exploding value function
                         #print(self.session.run(self.net.v, feed_dict={self.obs_place: traj["select_ob"][cur:upper]}), traj["return"][cur:upper])
+                     
+                     
                      
                     entropy += step_losses[0] / len
                     vf_loss += step_losses[1] / len
@@ -881,7 +900,18 @@ class PPOAgent(object):
         
         pol_surr = 0
         for i in range(len(self.net.select_p)):
-            ratio = tf.boolean_mask(self.net.select_p[i], self.select_acts_place[:,i,:]) / (tf.boolean_mask(self.old_net.select_p[i], self.select_acts_place[:,i,:]) + self.epsilon)
+            
+            p = self.net.select_p[i]
+            old_p = self.old_net.select_p[i]
+            
+            dist = tfp.Normal(p[:,0], p[:,1])
+            old_dist = tfp.Normal(old_p[:,0], old_p[:,1])
+            
+            numerator = dist.prob(self.select_acts_place[:,i])
+            denominator = old_dist.prob(self.select_acts_place[:,i])
+            ratio = tf.exp( tf.log(numerator) - tf.log(denominator + self.epsilon) )
+                        
+            #ratio = tf.boolean_mask(self.net.select_p[i], self.select_acts_place[:,i,:]) / (tf.boolean_mask(self.old_net.select_p[i], self.select_acts_place[:,i,:]) + self.epsilon)
             surr1 = ratio * self.adv_place
             surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
             if i == 0:
@@ -893,7 +923,7 @@ class PPOAgent(object):
         #vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place))
         vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))
         
-        total_loss = pol_surr + self.c1 *vf_loss - self.c2 * ent
+        total_loss = self.c0 * pol_surr + self.c1 *vf_loss - self.c2 * ent
         
         update_op = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(total_loss)
         
@@ -903,7 +933,9 @@ class PPOAgent(object):
         
         ent = self.move_entropy(self.net, self.batch_size)
         #ratio = tf.exp(self.move_logp(self.net) - tf.stop_gradient(self.move_logp(self.old_net)))
-        ratio = tf.boolean_mask(self.net.p, self.acts_place) / (tf.boolean_mask(self.old_net.p, self.acts_place) + self.epsilon)
+        numerator = tf.boolean_mask(self.net.p, self.acts_place)
+        denominator = tf.boolean_mask(self.old_net.p, self.acts_place)
+        ratio = tf.exp( tf.log(numerator) - tf.log(denominator + self.epsilon) )
         #print(ratio.shape)
         surr1 = ratio * self.adv_place
         surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
@@ -913,7 +945,7 @@ class PPOAgent(object):
         pol_surr = -tf.reduce_mean(tf.minimum(surr1, surr2)) # -average(SUM RATIOn * ADVn)
         #vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place)) # -KL
         vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))    
-        total_loss = pol_surr + self.c1 *vf_loss - self.c2 * ent
+        total_loss = self.c0 * pol_surr + self.c1 *vf_loss - self.c2 * ent
 
         # Maximizing objective is same as minimizing the negative objective
         update_op = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(total_loss)
@@ -933,6 +965,8 @@ class PPOAgent(object):
             delta = reward[t] + self.gamma * value[t+1] * nonterminal - value[t]
             gaelam[t] = lastgaelam = delta + self.gamma * self.lam * nonterminal * lastgaelam
         traj["return"] = traj["advantage"] + traj["value"]
+        
+        traj["advantage"] = (traj["advantage"] - np.mean(traj["advantage"])) / (np.std(traj["advantage"]) + self.epsilon)
 
     def save_model(self, model_path):
         self.saver.save(self.session, model_path)
