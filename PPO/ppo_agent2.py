@@ -223,15 +223,15 @@ class PPOAgent(object):
         self.epsilon = 1e-4
         
         self.epochs = 3
-        self.move_step_size = 1024
-        self.select_multiplier = 8
+        self.move_step_size = 2048
+        self.select_multiplier = 4
         self.step_size = self.move_step_size * self.select_multiplier
         self.gamma = 0.99
         self.lam = 0.95
-        self.clip_param = 0.1
+        self.clip_param = 0.2
         self.batch_size = 32
         self.move_batch_size = 64
-        self.select_batch_size = 512
+        self.select_batch_size = 1024
         self.hidden_size = 512
         self.averages = []
 
@@ -308,7 +308,7 @@ class PPOAgent(object):
         for i in range(3):
             p = net.select_p[i+1]
             ent += tf.reduce_mean(p[:,1])
-        return -ent
+        return ent
 
     def assign(self, net, old_net):
         assign_op = []
@@ -841,7 +841,6 @@ class PPOAgent(object):
                         
                     ### Handles selector training
                     elif (turn == 1):
-                        print("training selector")
                         input_list = [self.select_ent, self.vf_loss, self.select_pol_loss, self.select_update_op]
                         
                         self.state_normalize(super_traj["select_ob"][curr_indices])
@@ -862,7 +861,6 @@ class PPOAgent(object):
                         *step_losses, _ = self.session.run(input_list,
                                                         feed_dict=input_dict)
                         
-                        print(step_losses)
                         
                         ### Debug print statement for exploding value function
                         #print(self.session.run(self.net.v, feed_dict={self.obs_place: traj["select_ob"][cur:upper]}), traj["return"][cur:upper])
@@ -923,7 +921,7 @@ class PPOAgent(object):
         #vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place))
         vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))
         
-        total_loss = self.c0 * pol_surr + self.c1 *vf_loss - self.c2 * ent
+        total_loss = self.c0 * pol_surr + self.c1 *vf_loss #- self.c2 * ent
         
         update_op = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(total_loss)
         
