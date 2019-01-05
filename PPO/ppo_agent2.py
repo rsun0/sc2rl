@@ -208,7 +208,9 @@ class PPOAgent(object):
         
         
         ### hyperparameters - TODO: TUNE
-        self.learning_rate = 1e-5
+        self.learning_rate = 5e-5
+        self.select_learning_rate = 2e-5
+        
         
         ### weight for policy loss
         self.c0 = 1
@@ -223,15 +225,17 @@ class PPOAgent(object):
         self.epsilon = 1e-4
         
         self.epochs = 3
-        self.move_step_size = 2048
+        self.select_epochs = 10
+        self.move_step_size = 512
         self.select_multiplier = 4
         self.step_size = self.move_step_size * self.select_multiplier
         self.gamma = 0.99
         self.lam = 0.95
-        self.clip_param = 0.2
+        self.clip_param = 0.1
         self.batch_size = 32
-        self.move_batch_size = 64
-        self.select_batch_size = 1024
+        self.move_batch_size = 32
+        self.select_batch_size = 512
+        self.select_std = 0.5
         self.hidden_size = 512
         self.averages = []
 
@@ -377,7 +381,7 @@ class PPOAgent(object):
             ### Enters if statement depending on if training selector or mover
             if (t > 0 and (((t % (2*self.step_size)) == 0 and step == 1) or (t % (2*self.move_step_size) == 0 and step == 0)) ):
                 step = (step + 1) % 2
-                self.averages.append(sum(scores) / (1+num_games))
+                self.averages.append(sum(scores) / (num_games))
                 print("Average game score of this batch: {}".format(self.averages[-1]))
                 scores = []
                 num_games = 0
@@ -582,7 +586,7 @@ class PPOAgent(object):
         #selection_probs = selection_probs.reshape((4, self.env.select_space))
         for i in range(selection_params.shape[0]):
             row = selection_params[i]
-            coord = np.clip([np.random.normal(loc=row[0], scale=row[1])], 0, 1)
+            coord = np.clip([np.random.normal(loc=row[0], scale=self.select_std)], 0, 1)
             output.append(coord)            
             
         return output
@@ -772,11 +776,12 @@ class PPOAgent(object):
             ### 0 if training selector, 1 if training mover
             turn = i % 2
             iteration = i + 1
-            
+            num_epochs = self.epochs
             print("\n================= iteration {} =================".format(iteration))
             if (turn == 1):
                 print("\n================= Training selector =================")
                 self.batch_size = self.select_batch_size
+                num_epochs = self.select_epochs
             elif (turn == 0):
                 print("\n================= Training mover =================")
                 self.batch_size = self.move_batch_size
@@ -800,7 +805,7 @@ class PPOAgent(object):
             
             print(super_traj["step_size"], self.batch_size, len)
             
-            for _ in range(self.epochs):
+            for _ in range(num_epochs):
                 vf_loss = 0
                 pol_loss = 0
                 entropy = 0
@@ -888,6 +893,9 @@ class PPOAgent(object):
                 print(" Model saved ")
                 self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
             self.plot_results()
+            
+            if iteration % 200 == 0 and iteration != 0 and self.select_std > 0.05:
+                self.select_std *= 0.75
     
             
     def select_update(self):
@@ -902,8 +910,8 @@ class PPOAgent(object):
             p = self.net.select_p[i]
             old_p = self.old_net.select_p[i]
             
-            dist = tfp.Normal(p[:,0], p[:,1])
-            old_dist = tfp.Normal(old_p[:,0], old_p[:,1])
+            dist = tfp.Normal(p[:,0], self.select_std)
+            old_dist = tfp.Normal(old_p[:,0], self.select_std)
             
             numerator = dist.prob(self.select_acts_place[:,i])
             denominator = old_dist.prob(self.select_acts_place[:,i])
@@ -923,7 +931,7 @@ class PPOAgent(object):
         
         total_loss = self.c0 * pol_surr + self.c1 *vf_loss #- self.c2 * ent
         
-        update_op = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(total_loss)
+        update_op = tf.train.AdamOptimizer(learning_rate=self.select_learning_rate).minimize(total_loss)
         
         return ent, pol_surr, vf_loss, update_op
 
