@@ -226,8 +226,8 @@ class PPOAgent(object):
         
         self.epochs = 3
         self.select_epochs = 10
-        self.move_step_size = 512
-        self.select_multiplier = 4
+        self.move_step_size = 1024
+        self.select_multiplier = 2
         self.step_size = self.move_step_size * self.select_multiplier
         self.gamma = 0.99
         self.lam = 0.95
@@ -376,7 +376,7 @@ class PPOAgent(object):
         while True:
         
             
-        
+            
             ### Handles return ###
             ### Enters if statement depending on if training selector or mover
             if (t > 0 and (((t % (2*self.step_size)) == 0 and step == 1) or (t % (2*self.move_step_size) == 0 and step == 0)) ):
@@ -399,7 +399,7 @@ class PPOAgent(object):
                        "nextvalue": value*(1-done), 
                        "ep_returns": ep_returns,
                        "ep_lengths": ep_lengths,
-                       "step_size": i
+                       "step_size": i+1
                        }
                        
                 i = 0
@@ -894,8 +894,8 @@ class PPOAgent(object):
                 self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
             self.plot_results()
             
-            if iteration % 200 == 0 and iteration != 0 and self.select_std > 0.05:
-                self.select_std *= 0.75
+            if iteration % 20 == 0 and iteration != 0 and self.select_std > 0.05:
+                self.select_std *= 0.97
     
             
     def select_update(self):
