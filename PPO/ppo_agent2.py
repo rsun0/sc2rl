@@ -9,7 +9,8 @@
 # based on code from https://github.com/wooridle/DeepRL-PPO-tutorial/blob/master/ppo.py
 
 import tensorflow as tf
-import tensorflow.distributions as tfp
+#import tensorflow.distributions as tfp
+tfp = tf.distributions
 import numpy as np
 from custom_env import MinigameEnvironment
 from modified_state_space import state_modifier
@@ -24,9 +25,9 @@ np.set_printoptions(linewidth=200, precision=4)
 class Network(object):
     def __init__(self, env, scope, num_layers, num_units, obs_plc, act_plc, select_act_plc, tl_plc, trainable=True):
         
-        self.filters1 = 64
-        self.filters2 = 128
-        self.filters3 = 128
+        self.filters1 = 32
+        self.filters2 = 64
+        self.filters3 = 64
     
     
         self.env = env
@@ -235,7 +236,7 @@ class PPOAgent(object):
         self.batch_size = 32
         self.move_batch_size = 32
         self.select_batch_size = 512
-        self.select_std = 0.5
+        self.select_std = 0.3
         self.hidden_size = 512
         self.averages = []
 
@@ -892,10 +893,10 @@ class PPOAgent(object):
                 max_avg = self.averages[-1]
                 print(" Model saved ")
                 self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
-            self.plot_results()
+            #self.plot_results()
             
             if iteration % 20 == 0 and iteration != 0 and self.select_std > 0.05:
-                self.select_std *= 0.97
+                self.select_std *= 0.985
     
             
     def select_update(self):
