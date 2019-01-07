@@ -89,7 +89,7 @@ class Network(object):
                 
                 
             ### select_p network #####################################
-            """
+            
             x = self.obs_place
             
             # Initializes convolutional layers
@@ -108,8 +108,8 @@ class Network(object):
                 strides=2,
                 activation=self.activation)
             
-            """
-            select_p = tf.layers.conv2d(baseline_conv_output,
+            
+            select_p = tf.layers.conv2d(x,
                 filters=self.filters3,
                 kernel_size=[3,3],
                 padding="same",
@@ -155,7 +155,7 @@ class Network(object):
             
                                      
             x = self.obs_place
-            """
+            
             x = tf.layers.conv2d(x,
                                 filters=self.filters1,
                                 kernel_size=[8,8],
@@ -169,9 +169,9 @@ class Network(object):
                                 padding="same",
                                 strides=(2,2),
                                 activation=self.activation)
-            """
+            
                           
-            x = tf.contrib.layers.flatten(baseline_conv_output)
+            x = tf.contrib.layers.flatten(x)
             
             for i in range(num_layers):
                 fc_mul = num_layers - i
@@ -210,7 +210,7 @@ class PPOAgent(object):
         
         ### hyperparameters - TODO: TUNE
         self.learning_rate = 5e-5
-        self.select_learning_rate = 2e-5
+        self.select_learning_rate = 3e-5
         
         
         ### weight for policy loss
@@ -228,14 +228,14 @@ class PPOAgent(object):
         self.epochs = 3
         self.select_epochs = 10
         self.move_step_size = 1024
-        self.select_multiplier = 2
+        self.select_multiplier = 8
         self.step_size = self.move_step_size * self.select_multiplier
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.1
         self.batch_size = 32
-        self.move_batch_size = 32
-        self.select_batch_size = 512
+        self.move_batch_size = 64
+        self.select_batch_size = 1024
         self.select_std = 0.3
         self.hidden_size = 512
         self.averages = []
