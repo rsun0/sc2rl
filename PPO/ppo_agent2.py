@@ -232,7 +232,7 @@ class PPOAgent(object):
         self.step_size = self.move_step_size * self.select_multiplier
         self.gamma = 0.99
         self.lam = 0.95
-        self.clip_param = 0.1
+        self.clip_param = 0.15
         self.batch_size = 32
         self.move_batch_size = 32
         self.select_batch_size = 512
@@ -436,7 +436,7 @@ class PPOAgent(object):
                 transformed_select = selection_nums
                 transformed_select[2:] += transformed_select[:2]
                 tl_plc_in[i] = selection_nums[:2]
-                selection_nums *= (self.env.select_space - 1)
+                #selection_nums *= (self.env.select_space - 1)
                 ob, temp_reward, done, _ = self.env.step(0, topleft=transformed_select[:2], botright=transformed_select[2:])
                 
                 ob = self.state_reshape(ob)
@@ -895,12 +895,12 @@ class PPOAgent(object):
                 self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
             self.plot_results()
             
+            """
             if iteration % 200 == 0 and iteration != 0 and self.select_std > 0.1:
                 self.select_std *= 0.985
-                
-            if iteration % 20000 == 0 and iteration != 0:
-                self.select_std = 0.05
-    
+            """                
+            if iteration % 5000 == 0 and iteration != 0:
+                self.select_std /= 2
             
     def select_update(self):
         
@@ -935,7 +935,11 @@ class PPOAgent(object):
         
         total_loss = self.c0 * pol_surr + self.c1 *vf_loss #- self.c2 * ent
         
-        update_op = tf.train.AdamOptimizer(learning_rate=self.select_learning_rate).minimize(total_loss)
+        optimizer = tf.train.AdamOptimizer(learning_rate=self.select_learning_rate)
+        grads, variables = zip(*optimizer.compute_gradients(total_loss))
+        grads, _ = tf.clip_by_global_norm(grads, 5.0)
+        update_op = optimizer.apply_gradients(zip(grads, variables))
+        #update_op = tf.train.AdamOptimizer(learning_rate=self.select_learning_rate).minimize(total_loss)
         
         return ent, pol_surr, vf_loss, update_op
 
@@ -958,7 +962,11 @@ class PPOAgent(object):
         total_loss = self.c0 * pol_surr + self.c1 *vf_loss - self.c2 * ent
 
         # Maximizing objective is same as minimizing the negative objective
-        update_op = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(total_loss)
+        optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
+        grads, variables = zip(*optimizer.compute_gradients(total_loss))
+        grads, _ = tf.clip_by_global_norm(grads, 5.0)
+        update_op = optimizer.apply_gradients(zip(grads, variables))
+        #tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(total_loss)
 
         return ent, pol_surr, vf_loss, update_op
 

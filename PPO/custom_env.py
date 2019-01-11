@@ -60,7 +60,7 @@ class MinigameEnvironment:
         self._actuator.reset()
         self._terminal = False
 
-        self._run_to_next(topleft=[0,0], botright=[self.select_space-1, self.select_space-1])
+        self._run_to_next(topleft=[0,0], botright=[1,1])
         self._terminal = self._curr_frame.last()
         agent_obs = self._combine_frames()
         return agent_obs, self._curr_frame.reward, self._curr_frame.last(), None # exclude selected
@@ -142,7 +142,6 @@ class MinigameEnvironment:
     """
     
     def _run_to_next(self, start_action=None, topleft=None, botright=None):
-        
         if start_action is None:
             self._reset_env()
         

@@ -173,8 +173,11 @@ class Actuator:
         
     @staticmethod
     def _select(topleft, botright, friendly_unit_density):
-        topleft = np.array(topleft)
-        botright = np.array(botright)
+        topleft = Actuator._screen_normalize(np.array(topleft) * (84 - 1), 84)
+        botright = Actuator._screen_normalize(np.array(botright) * (84 - 1), 84)
+        return actions.FUNCTIONS.select_rect('select', topleft, botright)
+        
+        """
         x, y = friendly_unit_density.nonzero()
         tl_map = np.flip(np.array([min(x), min(y)]))
         br_map = np.flip(np.array([max(x), max(y)]))
@@ -196,7 +199,7 @@ class Actuator:
         br_transform = Actuator._screen_normalize((br_map + botright * interval), 84)
         
         return actions.FUNCTIONS.select_rect('select', tl_transform, br_transform)
-        
+        """
         
         
         
