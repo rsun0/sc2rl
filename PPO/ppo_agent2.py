@@ -228,15 +228,15 @@ class PPOAgent(object):
         self.epochs = 3
         self.select_epochs = 10
         self.move_step_size = 1024
-        self.select_multiplier = 8
+        self.select_multiplier = 4
         self.step_size = self.move_step_size * self.select_multiplier
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.1
         self.batch_size = 32
-        self.move_batch_size = 64
-        self.select_batch_size = 1024
-        self.select_std = 0.3
+        self.move_batch_size = 32
+        self.select_batch_size = 512
+        self.select_std = 0.30
         self.hidden_size = 512
         self.averages = []
 
@@ -893,10 +893,13 @@ class PPOAgent(object):
                 max_avg = self.averages[-1]
                 print(" Model saved ")
                 self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
-            #self.plot_results()
+            self.plot_results()
             
-            if iteration % 20 == 0 and iteration != 0 and self.select_std > 0.05:
+            if iteration % 200 == 0 and iteration != 0 and self.select_std > 0.1:
                 self.select_std *= 0.985
+                
+            if iteration % 20000 == 0 and iteration != 0:
+                self.select_std = 0.05
     
             
     def select_update(self):
