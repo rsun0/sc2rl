@@ -25,9 +25,9 @@ np.set_printoptions(linewidth=200, precision=4)
 class Network(object):
     def __init__(self, env, scope, num_layers, num_units, obs_plc, act_plc, select_act_plc, tl_plc, trainable=True):
         
-        self.filters1 = 32
-        self.filters2 = 64
-        self.filters3 = 64
+        self.filters1 = 64
+        self.filters2 = 128
+        self.filters3 = 128
     
     
         self.env = env
@@ -210,7 +210,7 @@ class PPOAgent(object):
         
         ### hyperparameters - TODO: TUNE
         self.learning_rate = 5e-5
-        self.select_learning_rate = 3e-5
+        self.select_learning_rate = 4e-6
         
         
         ### weight for policy loss
@@ -228,15 +228,22 @@ class PPOAgent(object):
         self.epochs = 3
         self.select_epochs = 10
         self.move_step_size = 1024
-        self.select_multiplier = 4
+        self.select_multiplier = 2
         self.step_size = self.move_step_size * self.select_multiplier
         self.gamma = 0.99
         self.lam = 0.95
-        self.clip_param = 0.15
+        self.clip_param = 0.1
         self.batch_size = 32
         self.move_batch_size = 32
-        self.select_batch_size = 512
-        self.select_std = 0.30
+        self.select_batch_size = 1024
+        self.select_std = 0.03
+        self.select_eps_std = 0.3
+        
+        # Used to randomly select selections, will linearly decay
+        self.eps_select = 1.0
+        self.eps_select_min = 0.1
+        self.eps_select_horizon = 10000000
+        
         self.hidden_size = 512
         self.averages = []
 
@@ -253,6 +260,9 @@ class PPOAgent(object):
                                          name="sac", dtype=tf.float32)
 
         self.tl_place = tf.placeholder(shape=[None, 2], dtype=tf.float32)
+
+        self.select_std_train = tf.placeholder(shape=(None, 4), 
+                                         name="sstds", dtype=tf.float32)
 
         ## build network
         self.net = Network(env=self.env,
@@ -335,6 +345,7 @@ class PPOAgent(object):
     """   
     
     def traj_generator(self):
+        num_frames = 0
         step = 0
         t = 0
         
@@ -358,6 +369,7 @@ class PPOAgent(object):
         dones = np.zeros(self.step_size, 'int32')
         select_actions = np.zeros((self.step_size, 4), 'float32')
         move_actions = np.zeros((self.step_size, self.env.action_space), 'float32')
+        select_stds = np.zeros((self.step_size, 4), 'float32')
         
         prev_select_actions = select_actions.copy()
         prev_move_actions = move_actions.copy()
@@ -400,7 +412,8 @@ class PPOAgent(object):
                        "nextvalue": value*(1-done), 
                        "ep_returns": ep_returns,
                        "ep_lengths": ep_lengths,
-                       "step_size": i+1
+                       "step_size": i+1,
+                       "select_stds": select_stds
                        }
                        
                 i = 0
@@ -423,12 +436,13 @@ class PPOAgent(object):
             
             if (j == 0):
                 prev_selection = selection
-                selection_nums, value = self.select(self.normalize(ob))
+                selection_nums, value, curr_std = self.select(self.normalize(ob), num_frames)
                 #selection_nums = self.select_selection(selection_vals)
                 
                 select_obs[i] = ob
                 values[i] += value
                 dones[i] = done
+                select_stds[i, range(4)] = np.array(curr_std)
                 
                 
                 
@@ -519,6 +533,7 @@ class PPOAgent(object):
                 
             ### Increments time count    
             t += 1
+            num_frames += 1            
 
     def act(self, ob):
         actions, value = self.session.run([self.net.act_op, self.net.v], feed_dict={
@@ -526,20 +541,25 @@ class PPOAgent(object):
         })
         return actions, value
         
-    def select(self, ob):
+    def select(self, ob, num_frames):
+    
+        curr_eps = max(self.eps_select_min, self.eps_select - (self.eps_select - self.eps_select_min) * (num_frames / self.eps_select_horizon))
+        curr_std = [self.select_std if random.random() > curr_eps else self.select_eps_std for i in range(4)]
+    
+    
         x1, y1, value = self.session.run(self.net.select_p[:2] + [self.net.v], feed_dict={ self.net.obs_place: ob[None]})
-        tl = self.select_selection(np.array([x1[0], y1[0]]))
+        tl = self.select_selection(np.array([x1[0], y1[0]]), curr_std[:2])
         tl_plc = np.zeros((2))
         tl_plc[0] = x1 = tl[0]
         tl_plc[1] = y1 = tl[1]
         
         x2, y2 = self.session.run(self.net.select_p[2:], feed_dict={ self.net.obs_place: ob[None], self.net.tl_plc: tl_plc[None]
         })
-        br = [x2, y2] = self.select_selection(np.array([x2[0], y2[0]]))
+        br = [x2, y2] = self.select_selection(np.array([x2[0], y2[0]]), curr_std[2:])
         coords = np.array([x1, y1, x2, y2]).reshape((4,))
         coords = np.clip(coords, 0, 1)
         
-        return coords, value
+        return coords, value, curr_std
         
     def normalize(self, ob):
         #return ((ob.T - np.mean(ob, axis=(1,2))) / (1 + np.max(ob, axis=(1,2)) - np.min(ob, axis=(1,2)))).T
@@ -582,12 +602,13 @@ class PPOAgent(object):
         select_selection takes in selection_probs: numpy array of shape (4, self.env.select_space)
         returns: list of length 4
     """
-    def select_selection(self, selection_params):
+    def select_selection(self, selection_params, curr_std):
         output = []
-        #selection_probs = selection_probs.reshape((4, self.env.select_space))
+        # Determin randomness
+        
         for i in range(selection_params.shape[0]):
             row = selection_params[i]
-            coord = np.clip([np.random.normal(loc=row[0], scale=self.select_std)], 0, 1)
+            coord = np.clip(np.random.normal(loc=row[0], scale=curr_std[i]), 0, 1)
             output.append(coord)            
             
         return output
@@ -814,7 +835,6 @@ class PPOAgent(object):
                 index_order = list(range(self.batch_size * len))
                 np.random.shuffle(index_order)
 
-                
                 for i in range(len):
                     cur = i*self.batch_size
                     upper = cur+self.batch_size
@@ -851,22 +871,22 @@ class PPOAgent(object):
                         
                         self.state_normalize(super_traj["select_ob"][curr_indices])
                         
-                        
                         input_dict = {
                                   self.obs_place: super_traj["select_ob"][curr_indices],
                                   self.select_acts_place: super_traj["select_action"][curr_indices],
                                   self.adv_place: super_traj["advantage"][curr_indices],
                                   self.return_place: super_traj["return"][curr_indices],
-                                  self.tl_place: super_traj["tl_plc_in"][curr_indices]
+                                  self.tl_place: super_traj["tl_plc_in"][curr_indices],
+                                  self.select_std_train: super_traj["select_stds"][curr_indices]
                                      }
                         
                         """
                         ent_temp, vf_temp, pol_temp, update_op, ratios = self.session.run(input_list,
                                                         feed_dict=input_dict)
                         """
+                        
                         *step_losses, _ = self.session.run(input_list,
                                                         feed_dict=input_dict)
-                        
                         
                         ### Debug print statement for exploding value function
                         #print(self.session.run(self.net.v, feed_dict={self.obs_place: traj["select_ob"][cur:upper]}), traj["return"][cur:upper])
@@ -896,11 +916,9 @@ class PPOAgent(object):
             self.plot_results()
             
             """
-            if iteration % 200 == 0 and iteration != 0 and self.select_std > 0.1:
-                self.select_std *= 0.985
-            """                
-            if iteration % 5000 == 0 and iteration != 0:
-                self.select_std /= 2
+            if iteration % 200 == 0 and iteration != 0 and self.select_std > 0.01:
+                self.select_std *= 0.973
+            """       
             
     def select_update(self):
         
@@ -914,8 +932,8 @@ class PPOAgent(object):
             p = self.net.select_p[i]
             old_p = self.old_net.select_p[i]
             
-            dist = tfp.Normal(p[:,0], self.select_std)
-            old_dist = tfp.Normal(old_p[:,0], self.select_std)
+            dist = tfp.Normal(p[:,0], self.select_std_train[:,i])
+            old_dist = tfp.Normal(old_p[:,0], self.select_std_train[:,i])
             
             numerator = dist.prob(self.select_acts_place[:,i])
             denominator = old_dist.prob(self.select_acts_place[:,i])
@@ -935,11 +953,13 @@ class PPOAgent(object):
         
         total_loss = self.c0 * pol_surr + self.c1 *vf_loss #- self.c2 * ent
         
+        """
         optimizer = tf.train.AdamOptimizer(learning_rate=self.select_learning_rate)
         grads, variables = zip(*optimizer.compute_gradients(total_loss))
         grads, _ = tf.clip_by_global_norm(grads, 5.0)
         update_op = optimizer.apply_gradients(zip(grads, variables))
-        #update_op = tf.train.AdamOptimizer(learning_rate=self.select_learning_rate).minimize(total_loss)
+        """
+        update_op = tf.train.AdamOptimizer(learning_rate=self.select_learning_rate).minimize(total_loss)
         
         return ent, pol_surr, vf_loss, update_op
 
@@ -1026,6 +1046,7 @@ if __name__ == "__main__":
                                 map_name_="DefeatRoaches", 
                                 render=False, 
                                 step_multiplier=8)
+                                
     config=tf.ConfigProto()
     config.gpu_options.allow_growth=True
     sess = tf.Session(config=config)
