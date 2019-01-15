@@ -71,6 +71,8 @@ class Network(object):
 
             x = tf.contrib.layers.flatten(baseline_conv_output)
             
+            #x = tf.contrib.layers.batch_norm(x, trainable=self.trainable, center=True, scale=True)
+            
             # Initializes fully connected layers
             for i in range(num_layers):
                 fc_mul = num_layers - i
@@ -79,6 +81,7 @@ class Network(object):
                                 activation=self.activation, 
                                 name="p_fc"+str(i), 
                                 trainable=self.trainable)
+                #x = tf.contrib.layers.batch_norm(x, trainable=self.trainable, center=True, scale=True)
                                 
             action = tf.layers.dense(x, 
                                 units=self.action_size, 
@@ -115,9 +118,11 @@ class Network(object):
                 padding="same",
                 strides=1,
                 activation=self.activation)
-                
+             
             ### Maybe add more dense layers
             select_p = tf.contrib.layers.flatten(select_p)
+            
+            #select_p = tf.contrib.layers.batch_norm(select_p, trainable=self.trainable, center=True, scale=True, epsilon=0.01)
             
             ### FC layers for top left
             select_p_tl = select_p
@@ -127,7 +132,9 @@ class Network(object):
                                         units= (fc_mul * num_units),
                                         activation=self.activation,
                                         name="select_p_fc" + str(i),
-                                        trainable=self.trainable)            
+                                        trainable=self.trainable)      
+                                        
+                #select_p_tl = tf.contrib.layers.batch_norm(select_p_tl, trainable=self.trainable, center=True, scale=True, epsilon=0.01)      
             
             ### Placeholders for top left probabilities
             select_p_x1 = tf.layers.dense(select_p_tl, units=2, activation=tf.nn.sigmoid, name="select_p_x1_fc", trainable=self.trainable)
@@ -135,15 +142,19 @@ class Network(object):
 
 
             ### FC layers for bot right
+            
+            select_p_br = select_p
+            
             for i in range(num_layers):
                 fc_mul = num_layers - i
-                select_p_br = tf.concat([select_p, self.tl_plc], axis=-1)
+                select_p_br = tf.concat([select_p_br, self.tl_plc], axis=-1)
                 select_p_br = tf.layers.dense(select_p_br,
                                         units= (fc_mul * num_units),
                                         activation=self.activation,
                                         name="select_p_br_fc" + str(i),
                                         trainable=self.trainable)
-                                        
+                
+                #select_p_br = tf.contrib.layers.batch_norm(select_p_br, trainable=self.trainable, center=True, scale=True, epsilon=0.01)      
                 
             
             ### Placeholders for bot right         
@@ -153,7 +164,7 @@ class Network(object):
             
             coord_params = [select_p_x1, select_p_y1, select_p_x2, select_p_y2]
             
-                                     
+            
             x = self.obs_place
             
             x = tf.layers.conv2d(x,
@@ -170,12 +181,17 @@ class Network(object):
                                 strides=(2,2),
                                 activation=self.activation)
             
-                          
+            
+                       
             x = tf.contrib.layers.flatten(x)
+            
+            #x = tf.contrib.layers.batch_norm(x, trainable=self.trainable, center=True, scale=True)
             
             for i in range(num_layers):
                 fc_mul = num_layers - i
                 x = tf.layers.dense(x, units=(fc_mul * num_units), activation=self.activation, name="v_fc"+str(i), trainable=self.trainable)
+                
+                x = tf.contrib.layers.batch_norm(x, trainable=self.trainable, center=True, scale=True)
                 
             value = tf.layers.dense(x, units=1, activation=None, name="v_fc"+str(num_layers), trainable=self.trainable)
 
@@ -210,7 +226,7 @@ class PPOAgent(object):
         
         ### hyperparameters - TODO: TUNE
         self.learning_rate = 5e-5
-        self.select_learning_rate = 4e-6
+        self.select_learning_rate = 5e-6
         
         
         ### weight for policy loss
@@ -223,7 +239,7 @@ class PPOAgent(object):
         self.c2 = 0.01 #1e-2
         
         ### Constant used for numerical stability in log and division operations
-        self.epsilon = 1e-4
+        self.epsilon = 1e-3
         
         self.epochs = 3
         self.select_epochs = 10
@@ -236,7 +252,7 @@ class PPOAgent(object):
         self.batch_size = 32
         self.move_batch_size = 32
         self.select_batch_size = 1024
-        self.select_std = 0.03
+        self.select_std = 0.05
         self.select_eps_std = 0.3
         
         # Used to randomly select selections, will linearly decay
@@ -913,7 +929,7 @@ class PPOAgent(object):
                 max_avg = self.averages[-1]
                 print(" Model saved ")
                 self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
-            self.plot_results()
+            #self.plot_results()
             
             """
             if iteration % 200 == 0 and iteration != 0 and self.select_std > 0.01:
@@ -953,13 +969,13 @@ class PPOAgent(object):
         
         total_loss = self.c0 * pol_surr + self.c1 *vf_loss #- self.c2 * ent
         
-        """
+        
         optimizer = tf.train.AdamOptimizer(learning_rate=self.select_learning_rate)
         grads, variables = zip(*optimizer.compute_gradients(total_loss))
-        grads, _ = tf.clip_by_global_norm(grads, 5.0)
+        grads, _ = tf.clip_by_global_norm(grads, 1.0)
         update_op = optimizer.apply_gradients(zip(grads, variables))
-        """
-        update_op = tf.train.AdamOptimizer(learning_rate=self.select_learning_rate).minimize(total_loss)
+        
+        #update_op = tf.train.AdamOptimizer(learning_rate=self.select_learning_rate).minimize(total_loss)
         
         return ent, pol_surr, vf_loss, update_op
 
@@ -984,7 +1000,7 @@ class PPOAgent(object):
         # Maximizing objective is same as minimizing the negative objective
         optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
         grads, variables = zip(*optimizer.compute_gradients(total_loss))
-        grads, _ = tf.clip_by_global_norm(grads, 5.0)
+        grads, _ = tf.clip_by_global_norm(grads, 1.0)
         update_op = optimizer.apply_gradients(zip(grads, variables))
         #tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(total_loss)
 
