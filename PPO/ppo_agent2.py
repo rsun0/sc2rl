@@ -96,7 +96,7 @@ class Network(object):
             x = self.obs_place
             
             # Initializes convolutional layers
-            
+            """
             x = tf.layers.conv2d(x,
                 filters=self.filters1,
                 kernel_size=[8, 8],
@@ -110,7 +110,9 @@ class Network(object):
                 padding="same",
                 strides=2,
                 activation=self.activation)
+            """
             
+            x = baseline_conv_output
             
             select_p = tf.layers.conv2d(x,
                 filters=self.filters3,
@@ -164,7 +166,7 @@ class Network(object):
             
             coord_params = [select_p_x1, select_p_y1, select_p_x2, select_p_y2]
             
-            
+            """
             x = self.obs_place
             
             x = tf.layers.conv2d(x,
@@ -181,9 +183,9 @@ class Network(object):
                                 strides=(2,2),
                                 activation=self.activation)
             
-            
+            """
                        
-            x = tf.contrib.layers.flatten(x)
+            x = tf.contrib.layers.flatten(baseline_conv_output)
             
             #x = tf.contrib.layers.batch_norm(x, trainable=self.trainable, center=True, scale=True)
             
@@ -226,7 +228,7 @@ class PPOAgent(object):
         
         ### hyperparameters - TODO: TUNE
         self.learning_rate = 5e-5
-        self.select_learning_rate = 5e-6
+        self.select_learning_rate = 1e-5
         
         
         ### weight for policy loss
@@ -244,7 +246,7 @@ class PPOAgent(object):
         self.epochs = 3
         self.select_epochs = 10
         self.move_step_size = 1024
-        self.select_multiplier = 2
+        self.select_multiplier = 4
         self.step_size = self.move_step_size * self.select_multiplier
         self.gamma = 0.99
         self.lam = 0.95
@@ -252,7 +254,7 @@ class PPOAgent(object):
         self.batch_size = 32
         self.move_batch_size = 32
         self.select_batch_size = 1024
-        self.select_std = 0.05
+        self.select_std = 0.5
         self.select_eps_std = 0.3
         
         # Used to randomly select selections, will linearly decay
@@ -624,7 +626,7 @@ class PPOAgent(object):
         
         for i in range(selection_params.shape[0]):
             row = selection_params[i]
-            coord = np.clip(np.random.normal(loc=row[0], scale=curr_std[i]), 0, 1)
+            coord = np.clip(np.random.normal(loc=row[0], scale=self.select_std), 0, 1)
             output.append(coord)            
             
         return output
@@ -808,7 +810,7 @@ class PPOAgent(object):
         ### Stores previous iterations training data to augment current iteration data.
         ### May be useful, may be counterproductive. 
         previous_traj = {}
-        max_avg = 0
+        max_avg = -10
         for i in range(100000):
         
             ### 0 if training selector, 1 if training mover
@@ -929,12 +931,12 @@ class PPOAgent(object):
                 max_avg = self.averages[-1]
                 print(" Model saved ")
                 self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
-            #self.plot_results()
+            self.plot_results()
             
-            """
-            if iteration % 200 == 0 and iteration != 0 and self.select_std > 0.01:
-                self.select_std *= 0.973
-            """       
+            
+            if iteration % 20 == 0 and iteration != 0 and self.select_std > 0.02:
+                self.select_std *= 0.987
+                   
             
     def select_update(self):
         
@@ -948,8 +950,8 @@ class PPOAgent(object):
             p = self.net.select_p[i]
             old_p = self.old_net.select_p[i]
             
-            dist = tfp.Normal(p[:,0], self.select_std_train[:,i])
-            old_dist = tfp.Normal(old_p[:,0], self.select_std_train[:,i])
+            dist = tfp.Normal(p[:,0], self.select_std)
+            old_dist = tfp.Normal(old_p[:,0], self.select_std)
             
             numerator = dist.prob(self.select_acts_place[:,i])
             denominator = old_dist.prob(self.select_acts_place[:,i])
@@ -970,7 +972,7 @@ class PPOAgent(object):
         total_loss = self.c0 * pol_surr + self.c1 *vf_loss #- self.c2 * ent
         
         
-        optimizer = tf.train.AdamOptimizer(learning_rate=self.select_learning_rate)
+        optimizer = tf.train.AdamOptimizer(learning_rate=self.select_learning_rate, epsilon=1e-5)
         grads, variables = zip(*optimizer.compute_gradients(total_loss))
         grads, _ = tf.clip_by_global_norm(grads, 1.0)
         update_op = optimizer.apply_gradients(zip(grads, variables))
@@ -998,7 +1000,7 @@ class PPOAgent(object):
         total_loss = self.c0 * pol_surr + self.c1 *vf_loss - self.c2 * ent
 
         # Maximizing objective is same as minimizing the negative objective
-        optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
+        optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-5)
         grads, variables = zip(*optimizer.compute_gradients(total_loss))
         grads, _ = tf.clip_by_global_norm(grads, 1.0)
         update_op = optimizer.apply_gradients(zip(grads, variables))
