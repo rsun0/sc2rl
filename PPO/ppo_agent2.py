@@ -25,9 +25,9 @@ np.set_printoptions(linewidth=200, precision=4)
 class Network(object):
     def __init__(self, env, scope, num_layers, num_units, obs_plc, act_plc, select_act_plc, tl_plc, trainable=True):
         
-        self.filters1 = 64
-        self.filters2 = 128
-        self.filters3 = 128
+        self.filters1 = 32
+        self.filters2 = 64
+        self.filters3 = 64
     
     
         self.env = env
@@ -53,7 +53,6 @@ class Network(object):
     def _build_network(self, num_layers, num_units):
         with tf.variable_scope(self.scope):
             x = self.obs_place
-            
             # Initializes convolutional layers
             x = tf.layers.conv2d(x,
                 filters=self.filters1,
@@ -75,7 +74,7 @@ class Network(object):
             
             # Initializes fully connected layers
             for i in range(num_layers):
-                fc_mul = num_layers - i
+                fc_mul = 1 #num_layers - i
                 x = tf.layers.dense(x, 
                                 units=(fc_mul * num_units), 
                                 activation=self.activation, 
@@ -129,7 +128,7 @@ class Network(object):
             ### FC layers for top left
             select_p_tl = select_p
             for i in range(num_layers):
-                fc_mul = num_layers - i
+                fc_mul = 1 #num_layers - i
                 select_p_tl = tf.layers.dense(select_p_tl,
                                         units= (fc_mul * num_units),
                                         activation=self.activation,
@@ -148,7 +147,7 @@ class Network(object):
             select_p_br = select_p
             
             for i in range(num_layers):
-                fc_mul = num_layers - i
+                fc_mul = 1 #num_layers - i
                 select_p_br = tf.concat([select_p_br, self.tl_plc], axis=-1)
                 select_p_br = tf.layers.dense(select_p_br,
                                         units= (fc_mul * num_units),
@@ -193,7 +192,7 @@ class Network(object):
                 fc_mul = num_layers - i
                 x = tf.layers.dense(x, units=(fc_mul * num_units), activation=self.activation, name="v_fc"+str(i), trainable=self.trainable)
                 
-                x = tf.contrib.layers.batch_norm(x, trainable=self.trainable, center=True, scale=True)
+                #x = tf.contrib.layers.batch_norm(x, trainable=self.trainable, center=True, scale=True)
                 
             value = tf.layers.dense(x, units=1, activation=None, name="v_fc"+str(num_layers), trainable=self.trainable)
 
@@ -227,7 +226,7 @@ class PPOAgent(object):
         
         
         ### hyperparameters - TODO: TUNE
-        self.learning_rate = 5e-5
+        self.learning_rate = 2e-5
         self.select_learning_rate = 1e-5
         
         
@@ -241,7 +240,7 @@ class PPOAgent(object):
         self.c2 = 0.01 #1e-2
         
         ### Constant used for numerical stability in log and division operations
-        self.epsilon = 1e-3
+        self.epsilon = 1e-4
         
         self.epochs = 3
         self.select_epochs = 10
@@ -254,7 +253,7 @@ class PPOAgent(object):
         self.batch_size = 32
         self.move_batch_size = 32
         self.select_batch_size = 1024
-        self.select_std = 0.5
+        self.select_std = 0.2
         self.select_eps_std = 0.3
         
         # Used to randomly select selections, will linearly decay
@@ -626,7 +625,7 @@ class PPOAgent(object):
         
         for i in range(selection_params.shape[0]):
             row = selection_params[i]
-            coord = np.clip(np.random.normal(loc=row[0], scale=self.select_std), 0, 1)
+            coord = np.clip(np.random.normal(loc=row[0], scale=row[1]), 0, 1)
             output.append(coord)            
             
         return output
@@ -935,7 +934,7 @@ class PPOAgent(object):
             
             
             if iteration % 20 == 0 and iteration != 0 and self.select_std > 0.02:
-                self.select_std *= 0.987
+                self.select_std *= 0.9908
                    
             
     def select_update(self):
@@ -950,8 +949,8 @@ class PPOAgent(object):
             p = self.net.select_p[i]
             old_p = self.old_net.select_p[i]
             
-            dist = tfp.Normal(p[:,0], self.select_std)
-            old_dist = tfp.Normal(old_p[:,0], self.select_std)
+            dist = tfp.Normal(p[:,0], p[:,1])
+            old_dist = tfp.Normal(old_p[:,0], old_p[:,1])
             
             numerator = dist.prob(self.select_acts_place[:,i])
             denominator = old_dist.prob(self.select_acts_place[:,i])
@@ -960,6 +959,9 @@ class PPOAgent(object):
             #ratio = tf.boolean_mask(self.net.select_p[i], self.select_acts_place[:,i,:]) / (tf.boolean_mask(self.old_net.select_p[i], self.select_acts_place[:,i,:]) + self.epsilon)
             surr1 = ratio * self.adv_place
             surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
+            
+            surr_in = tf.minimum(surr1, surr2)
+            surr_in = tf.where(tf.is_nan(surr_in), tf.ones_like(surr_in), surr_in)
             if i == 0:
                 pol_surr = -tf.reduce_mean(tf.minimum(surr1, surr2))
             else:
@@ -994,17 +996,23 @@ class PPOAgent(object):
         #print(self.net.p.shape, self.acts_place.shape)
         #print(ratio.shape, surr1.shape, surr2.shape)
 
-        pol_surr = -tf.reduce_mean(tf.minimum(surr1, surr2)) # -average(SUM RATIOn * ADVn)
+        surr_in = tf.minimum(surr1, surr2)
+        
+        surr_in = tf.where(tf.is_nan(surr_in), tf.ones_like(surr_in), surr_in)
+
+        pol_surr = -tf.reduce_mean(surr_in) # -average(SUM RATIOn * ADVn)
         #vf_loss = tf.reduce_mean(tf.square(self.net.v - self.return_place)) # -KL
         vf_loss = tf.losses.huber_loss(self.net.v, tf.reshape(self.return_place, [-1,1]))    
         total_loss = self.c0 * pol_surr + self.c1 *vf_loss - self.c2 * ent
 
         # Maximizing objective is same as minimizing the negative objective
+        
         optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-5)
         grads, variables = zip(*optimizer.compute_gradients(total_loss))
         grads, _ = tf.clip_by_global_norm(grads, 1.0)
         update_op = optimizer.apply_gradients(zip(grads, variables))
-        #tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(total_loss)
+        
+        #update_op = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(total_loss)
 
         return ent, pol_surr, vf_loss, update_op
 
