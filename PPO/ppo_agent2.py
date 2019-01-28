@@ -23,9 +23,9 @@ np.set_printoptions(linewidth=200, precision=4)
 class Network(object):
     def __init__(self, env, scope, num_layers, num_units, obs_plc, act_plc, select_act_plc, tl_plc, trainable=True):
         
-        self.filters1 = 64
-        self.filters2 = 128
-        self.filters3 = 128
+        self.filters1 = 16
+        self.filters2 = 32
+        self.filters3 = 64
     
     
         self.env = env
@@ -71,13 +71,15 @@ class Network(object):
             
             # Initializes fully connected layers
             for i in range(num_layers):
-                fc_mul = num_layers - i
+                fc_mul = 1 #num_layers - i
                 x = tf.layers.dense(x, 
                                 units=(fc_mul * num_units), 
                                 activation=self.activation, 
                                 name="p_fc"+str(i), 
                                 trainable=self.trainable)
-                                
+            
+            
+            
             action = tf.layers.dense(x, 
                                 units=self.action_size, 
                                 activation=tf.nn.softmax,
@@ -85,94 +87,19 @@ class Network(object):
                                 trainable=self.trainable)
                 
                 
-                
-            ### select_p network #####################################
-            """
-            x = self.obs_place
-            
-            # Initializes convolutional layers
-            
-            x = tf.layers.conv2d(x,
-                filters=self.filters1,
-                kernel_size=[8, 8],
-                padding="same",
-                strides=(4, 4),
-                activation=self.activation)
-                
-            x = tf.layers.conv2d(x,
-                filters=self.filters2,
-                kernel_size=[4, 4],
-                padding="same",
-                strides=2,
-                activation=self.activation)
-            
-            """
-            select_p = tf.layers.conv2d(baseline_conv_output,
-                filters=self.filters3,
-                kernel_size=[3,3],
-                padding="same",
-                strides=1,
-                activation=self.activation)
-                
-            ### Maybe add more dense layers
-            select_p = tf.contrib.layers.flatten(select_p)
-            
-            ### FC layers for top left
-            select_p_tl = select_p
-            for i in range(num_layers):
-                fc_mul = num_layers - i
-                select_p_tl = tf.layers.dense(select_p_tl,
-                                        units= (fc_mul * num_units),
-                                        activation=self.activation,
-                                        name="select_p_fc" + str(i),
-                                        trainable=self.trainable)            
-            
-            ### Placeholders for top left probabilities
-            select_p_x1 = tf.layers.dense(select_p_tl, units=self.select_width, activation=tf.nn.softmax, name="select_p_x1_fc", trainable=self.trainable)
-            select_p_y1 = tf.layers.dense(select_p_tl, units=self.select_height, activation=tf.nn.softmax, name="select_p_y1_fc", trainable=self.trainable)
+            select_p_x1 = tf.layers.dense(x, units=self.select_width, activation=tf.nn.softmax, name="select_p_x1_fc", trainable=self.trainable)
+            select_p_y1 = tf.layers.dense(x, units=self.select_height, activation=tf.nn.softmax, name="select_p_y1_fc", trainable=self.trainable)
 
 
             ### FC layers for bot right
-            select_p_br = tf.concat([select_p, self.tl_plc], axis=-1)
-            for i in range(num_layers):
-                fc_mul = num_layers - i
-                select_p_br = tf.layers.dense(select_p_br,
-                                        units= (fc_mul * num_units),
-                                        activation=self.activation,
-                                        name="select_p_br_fc" + str(i),
-                                        trainable=self.trainable)
+            #select_p_br = tf.concat([x, self.tl_plc], axis=-1)
             
             ### Placeholders for bot right         
-            select_p_x2 = tf.layers.dense(select_p_br, units=self.select_width, activation=tf.nn.softmax, name="select_p_x2_fc", trainable=self.trainable)
-            select_p_y2 = tf.layers.dense(select_p_br, units=self.select_height, activation=tf.nn.softmax, name="select_p_y2_fc", trainable=self.trainable)
+            select_p_x2 = tf.layers.dense(x, units=self.select_width, activation=tf.nn.softmax, name="select_p_x2_fc", trainable=self.trainable)
+            select_p_y2 = tf.layers.dense(x, units=self.select_height, activation=tf.nn.softmax, name="select_p_y2_fc", trainable=self.trainable)
             
             
-                
             
-                                     
-            x = self.obs_place
-            """
-            x = tf.layers.conv2d(x,
-                                filters=self.filters1,
-                                kernel_size=[8,8],
-                                padding="same",
-                                strides=(4,4),
-                                activation=self.activation)
-                                
-            x = tf.layers.conv2d(x,
-                                filters=self.filters2,
-                                kernel_size=[4,4],
-                                padding="same",
-                                strides=(2,2),
-                                activation=self.activation)
-            """
-                          
-            x = tf.contrib.layers.flatten(baseline_conv_output)
-            
-            for i in range(num_layers):
-                fc_mul = num_layers - i
-                x = tf.layers.dense(x, units=(fc_mul * num_units), activation=self.activation, name="v_fc"+str(i), trainable=self.trainable)
-                
             value = tf.layers.dense(x, units=1, activation=None, name="v_fc"+str(num_layers), trainable=self.trainable)
 
             
@@ -216,13 +143,13 @@ class PPOAgent(object):
         ### Constant used for numerical stability in log and division operations
         self.epsilon = 1e-8
         
-        self.epochs = 5
+        self.epochs = 3
         self.step_size = 1024
         self.gamma = 0.99
         self.lam = 0.95
-        self.clip_param = 0.2
-        self.batch_size = 64
-        self.hidden_size = 512
+        self.clip_param = 0.1
+        self.batch_size = 32
+        self.hidden_size = 256
         self.averages = []
 
         ## placeholders
@@ -242,7 +169,7 @@ class PPOAgent(object):
         ## build network
         self.net = Network(env=self.env,
                            scope="pi",
-                           num_layers=2,
+                           num_layers=1,
                            num_units=self.hidden_size,
                            obs_plc=self.obs_place,
                            act_plc=self.acts_place,
@@ -251,7 +178,7 @@ class PPOAgent(object):
 
         self.old_net = Network(env=self.env,
                                scope="old_pi",
-                               num_layers=2,
+                               num_layers=1,
                                num_units=self.hidden_size,
                                obs_plc=self.obs_place,
                                act_plc=self.acts_place,
@@ -882,7 +809,7 @@ class PPOAgent(object):
         
         pol_surr = 0
         for i in range(len(self.net.select_p)):
-            ratio = tf.boolean_mask(self.net.select_p[i], self.select_acts_place[:,i,:]) / (tf.boolean_mask(self.old_net.select_p[i], self.select_acts_place[:,i,:]) + self.epsilon)
+            ratio = tf.exp(tf.log(tf.boolean_mask(self.net.select_p[i], self.select_acts_place[:,i,:])) - tf.log(tf.boolean_mask(self.old_net.select_p[i], self.select_acts_place[:,i,:]) + self.epsilon))
             surr1 = ratio * self.adv_place
             surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
             if i == 0:
@@ -904,7 +831,7 @@ class PPOAgent(object):
         
         ent = self.move_entropy(self.net, self.batch_size)
         #ratio = tf.exp(self.move_logp(self.net) - tf.stop_gradient(self.move_logp(self.old_net)))
-        ratio = tf.boolean_mask(self.net.p, self.acts_place) / (tf.boolean_mask(self.old_net.p, self.acts_place) + self.epsilon)
+        ratio = tf.exp(   tf.log(tf.boolean_mask(self.net.p, self.acts_place)) - tf.log(tf.boolean_mask(self.old_net.p, self.acts_place) + self.epsilon)   )
         #print(ratio.shape)
         surr1 = ratio * self.adv_place
         surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
