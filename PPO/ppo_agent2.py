@@ -132,7 +132,7 @@ class PPOAgent(object):
         
         
         ### hyperparameters - TODO: TUNE
-        self.learning_rate = 1e-4
+        self.learning_rate = 5e-5
         
         ### weight for vf_loss
         self.c1 = 1
@@ -141,14 +141,14 @@ class PPOAgent(object):
         self.c2 = 0
         
         ### Constant used for numerical stability in log and division operations
-        self.epsilon = 1e-8
+        self.epsilon = 1e-4
         
         self.epochs = 3
-        self.step_size = 1024
+        self.step_size = 2048
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.1
-        self.batch_size = 32
+        self.batch_size = 64
         self.hidden_size = 256
         self.averages = []
 

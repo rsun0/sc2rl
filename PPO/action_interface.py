@@ -20,7 +20,7 @@ class Action(Enum):
 
 class Actuator:
     _MOVE_MULTIPLIER = 10
-    _SELECT_SPACE = 10
+    _SELECT_SPACE = 20
 
     def __init__(self):
         self.reset()
@@ -160,8 +160,8 @@ class Actuator:
         for i in range(len(coords)):
             if coords[i] < 0:
                 coords[i] = 0
-            if coords[i] > screen_size - 1:
-                coords[i] = screen_size - 1
+            if coords[i] > screen_size-1:
+                coords[i] = screen_size-1
         return coords
 
     @staticmethod
@@ -173,6 +173,7 @@ class Actuator:
         
     @staticmethod
     def _select(topleft, botright, friendly_unit_density):
+        """
         topleft = np.array(topleft)
         botright = np.array(botright)
         x, y = friendly_unit_density.nonzero()
@@ -194,6 +195,15 @@ class Actuator:
         
         tl_transform = Actuator._screen_normalize((tl_map + topleft * interval), 84)
         br_transform = Actuator._screen_normalize((br_map + botright * interval), 84)
+        
+        return actions.FUNCTIONS.select_rect('select', tl_transform, br_transform)
+        """
+        
+        tl = np.array(topleft) * (84 / (Actuator._SELECT_SPACE-1))
+        br = np.array(botright) * (84 / (Actuator._SELECT_SPACE-1))
+        
+        tl_transform = Actuator._screen_normalize(tl, 84)
+        br_transform = Actuator._screen_normalize(tl, 84)
         
         return actions.FUNCTIONS.select_rect('select', tl_transform, br_transform)
         
