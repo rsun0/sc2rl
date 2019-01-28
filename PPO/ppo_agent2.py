@@ -17,6 +17,7 @@ from time import sleep
 import matplotlib
 import matplotlib.pyplot as plt
 import action_interface
+import copy
 
 np.set_printoptions(linewidth=200, precision=4)
 
@@ -330,11 +331,11 @@ class PPOAgent(object):
                 dones[i] = done
                 
                 
-                transformed_select = selection_nums
+                transformed_select = copy.deepcopy(selection_nums)
                 transformed_select[2:] -= transformed_select[:2]
-                if (transformed_select[2] == self.env.select_space - 1):
+                if (selection_nums[2] == self.env.select_space - 1):
                     transformed_select[2] = random.randint(transformed_select[2], self.env.select_space-1)
-                if (transformed_select[3] == self.env.select_space - 1):
+                if (selection_nums[3] == self.env.select_space - 1):
                     transformed_select[3] = random.randint(transformed_select[3], self.env.select_space-1)
                 
                 select_actions[i] = np.zeros((4, self.env.select_space,))
@@ -907,7 +908,7 @@ if __name__ == "__main__":
     sess = tf.Session(config=config)
     ppo = PPOAgent(env, session=sess)
     sess.run(tf.global_variables_initializer())
-    #ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
+    ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
     ppo.run()
 
     env.close()
