@@ -133,23 +133,23 @@ class PPOAgent(object):
         
         
         ### hyperparameters - TODO: TUNE
-        self.learning_rate = 5e-5
+        self.learning_rate = 1e-4
         
         ### weight for vf_loss
         self.c1 = 1
         
         ### weight for entropy
-        self.c2 = 0
+        self.c2 = 0.01
         
         ### Constant used for numerical stability in log and division operations
-        self.epsilon = 1e-4
+        self.epsilon = 1e-3
         
         self.epochs = 3
         self.step_size = 2048
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.1
-        self.batch_size = 64
+        self.batch_size = 128
         self.hidden_size = 256
         self.averages = []
 
@@ -711,6 +711,12 @@ class PPOAgent(object):
             traj = {}
             # normalize adv.
             
+            n = 1
+            # Save model every n iterations
+            if iteration % n == 0 and self.averages[-1] > max_avg:
+                max_avg = self.averages[-1]
+                print(" Model saved ")
+                self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
             
             len = int(super_traj["move_ob"].shape[0] / self.batch_size)
             
@@ -793,12 +799,7 @@ class PPOAgent(object):
                     
             super_traj = {}
             traj = {}  
-            n = 1
-            # Save model every n iterations
-            if iteration % n == 0 and self.averages[-1] > max_avg:
-                max_avg = self.averages[-1]
-                print(" Model saved ")
-                self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
+            
             self.plot_results()
     
             
