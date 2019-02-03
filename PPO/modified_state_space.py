@@ -64,6 +64,7 @@ class state_modifier():
 
     """
     def modified_state_space(obs):
+    
         scr = obs.observation.feature_screen
    
         ### Computes array of locations of selected marines
@@ -85,13 +86,7 @@ class state_modifier():
         hostile_density = np.multiply(unit_density, player_hostile) 
         
         
-        # Normalize friendly_hitpoints and hostile_hitpoints to between 0 and 1
-        #friendly_hitpoints = zero_one_norm(friendly_hitpoints)
-        #hostile_hitpoints = zero_one_norm(hostile_hitpoints)
-        
-        
         ### Stacks the previous arrays in the order given in the documentation. This will be the primary input to the neural network.
-        
         
         array = np.stack([friendly_selected, friendly_hitpoints, friendly_density, hostile_hitpoints, hostile_density], axis=0)
 
