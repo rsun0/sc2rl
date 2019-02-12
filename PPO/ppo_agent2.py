@@ -133,7 +133,7 @@ class PPOAgent(object):
         
         
         ### hyperparameters - TODO: TUNE
-        self.learning_rate = 1e-4
+        self.learning_rate = 5e-5
         
         ### weight for vf_loss
         self.c1 = 1
@@ -145,11 +145,11 @@ class PPOAgent(object):
         self.epsilon = 1e-3
         
         self.epochs = 3
-        self.step_size = 2048
+        self.step_size = 1024
         self.gamma = 0.99
         self.lam = 0.95
         self.clip_param = 0.1
-        self.batch_size = 128
+        self.batch_size = 64
         self.hidden_size = 256
         self.averages = []
 
@@ -909,7 +909,7 @@ if __name__ == "__main__":
     sess = tf.Session(config=config)
     ppo = PPOAgent(env, session=sess)
     sess.run(tf.global_variables_initializer())
-    ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
+    #ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
     ppo.run()
 
     env.close()
