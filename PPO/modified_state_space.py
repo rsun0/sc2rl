@@ -65,9 +65,11 @@ class state_modifier():
     """
     def modified_state_space(obs):
         
-        print(obs.observation.feature_minimap._index_names, obs.observation.feature_screen._index_names)
+        print(obs.observation.feature_minimap._index_names, obs.observation.feature_screen._index_names, obs.observation.feature_minimap.shape)
     
         scr = obs.observation.feature_screen
+
+        print(scr.shape)
    
         ### Computes array of locations of selected marines
         friendly_selected = np.array(scr.selected).astype(np.uint8)
