@@ -50,8 +50,8 @@ class state_modifier():
         mmap = obs.observation.feature_minimap
         player = obs.observation.player
         
-        proc_scr = state_modifier.preprocess_featuremap(scr, SCREEN_FEATURES)
-        proc_mmap = state_modifier.preprocess_featuremap(mmap, MINIMAP_FEATURES)
+        proc_scr = state_modifier.preprocess_featuremap(scr, SCREEN_FEATURES, DeepMind2017Config.screen_shape)
+        proc_mmap = state_modifier.preprocess_featuremap(mmap, MINIMAP_FEATURES, DeepMind2017Config.minimap_shape)
         player = state_modifier.preprocess_featuremap(player, None, False)
         
         print(proc_scr.shape, proc_mmap.shape, player.shape)
@@ -60,14 +60,14 @@ class state_modifier():
         
         
         
-    def preprocess_featuremap(x, features=None, has_features=True):
+    def preprocess_featuremap(x, features=None, out_shape=None):
     
-        if (not has_features):
+        if (type(features) == type(None)):
             return np.log(x.clip(0) + 1).reshape((1, len(x), 1, 1))
     
     
         (_,w,h) = x.shape
-        preprocessed_features = np.zeros((1,h,w))
+        preprocessed_features = np.zeros(out_shape)
         features_depth = 0
         
         for i in range(len(features)):
@@ -76,8 +76,10 @@ class state_modifier():
             if (featuretype == CATEGORICAL):
                 dim = scale
                 if (dim == 2):
+                    dim=1
                     addition = np.expand_dims(x[name], 0)
                 else:
+                    print(dim, len(x[name].nonzero()[0]))
                     addition = np.zeros((dim,h,w))
                     vals = x[name]
                     layer_idx = np.arange(h).reshape(h,1)
@@ -89,10 +91,9 @@ class state_modifier():
                 dim = 1
                 addition = np.expand_dims(np.log(x[name].clip(0) + 1), 0)
                 
-            if (i == 0):
-                preprocessed_features = addition
-            else:
-                preprocessed_features = np.concatenate([preprocessed_features, addition], 0)
+            preprocessed_features[features_depth:features_depth+dim] = addition
+            features_depth += dim
+            
                 
         #preprocessed_features = np.swapaxes(np.swapaxes(preprocessed_features, 0, 1), 1, 2)
                 

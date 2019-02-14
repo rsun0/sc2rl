@@ -7,6 +7,10 @@ from pysc2.lib.features import SCREEN_FEATURES, MINIMAP_FEATURES, FeatureType
 CATEGORICAL = FeatureType.CATEGORICAL
 SCALAR = FeatureType.SCALAR
 
+screen_shape = (1968,84,84)
+minimap_shape = (30,84,84)
+nonspatial_size = 11
+
 class DeepMind2017Config():
     screen_shape = (1968,84,84)
     minimap_shape = (30,84,84)
