@@ -5,6 +5,7 @@ from torchvision import models
 import torch.nn.functional as F
 from config import *
 import numpy as np
+import time
 
 class DeepMind2017Net(nn.Module):
 
@@ -106,11 +107,14 @@ class DeepMind2017Net(nn.Module):
             minimap: (n,7,84,84)
             nonspatial_in: (n,1,1,11)
         '''
+        t1 = time.time()
         screen = torch.from_numpy(screen).float().to(self.device)
         minimap = torch.from_numpy(minimap).float().to(self.device)
         nonspatial_in = torch.from_numpy(nonspatial_in).float().to(self.device)
-        
+        print("Data conversion time: %f" % (time.time() - t1))
+
         features = self.forward_features(screen, minimap, nonspatial_in)
+        
         spatial_policy = self.forward_spatial(features)
         nonspatial_policy, value = self.forward_nonspatial_value(features)
         

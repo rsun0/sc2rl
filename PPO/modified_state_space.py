@@ -97,7 +97,6 @@ class state_modifier():
             features_depth += dim
             
                 
-        #preprocessed_features = np.swapaxes(np.swapaxes(preprocessed_features, 0, 1), 1, 2)
                 
         return np.expand_dims(preprocessed_features, 0)
 
