@@ -18,7 +18,6 @@ from pysc2.lib import actions
 from pysc2.lib import features, units
 from pysc2.env import environment
 
-
 from config import *
 
 
@@ -77,21 +76,24 @@ class state_modifier():
                 dim = scale
                 if (dim == 2):
                     dim=1
-                    addition = np.expand_dims(x[name], 0)
+                    #addition = np.expand_dims(x[name], 0)
+                    preprocessed_features[features_depth:features_depth+dim] = x[name]
                 else:
-                    print(dim, len(x[name].nonzero()[0]))
-                    addition = np.zeros((dim,h,w))
-                    vals = x[name]
-                    layer_idx = np.arange(h).reshape(h,1)
-                    col_idx = np.tile(np.arange(w), (h,1))
-                    #print(addition.shape, vals.max(), vals.min(), dim)
-                    addition[vals, layer_idx, col_idx] = 1
-                    #addition = (np.arange(dim) == (x[name])[...,None]).astype(int)
+                    addition = preprocessed_features[features_depth:features_depth+dim]
+                    
+                    vals = np.array(x[name])
+                    nonzero_indices = vals.nonzero()
+                    val_list = vals[nonzero_indices]
+                    indices = list(nonzero_indices)
+                    indices.insert(0, list(val_list))
+                    addition[tuple(indices)] = 1
+                    
             else:
                 dim = 1
+                preprocessed_features[features_depth:features_depth+dim]
                 addition = np.expand_dims(np.log(x[name].clip(0) + 1), 0)
                 
-            preprocessed_features[features_depth:features_depth+dim] = addition
+            #preprocessed_features[features_depth:features_depth+dim] = addition
             features_depth += dim
             
                 

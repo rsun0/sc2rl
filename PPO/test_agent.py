@@ -4,7 +4,7 @@ from modified_state_space import state_modifier
 import argparse
 from models import DeepMind2017Net
 import torch
-
+import time
 
 
 def default_test():
@@ -45,14 +45,16 @@ def DeepMind2017Test():
     print("loop beginning")
     while True:
         
-        print(screen.shape, minimap.shape, nonspatial_in.shape)
-        
+        t1 = time.time()
         spatial_pol, nonspatial_pol, value = agent(screen, minimap, nonspatial_in)
         spatial_action, nonspatial_action = agent.choose(spatial_pol, nonspatial_pol)
+        print("Action time: %f" % (time.time() - t1))
         
         print("Action successfully chosen")
         
+        t1 = time.time()
         state, reward, done, _ = env.step(nonspatial_action, spatial_action[0], spatial_action[1])
+        print("Env time: %f" % (time.time() - t1))
         if done:
             state, reward, done, _ = env.reset()
             
