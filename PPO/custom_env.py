@@ -13,10 +13,12 @@ class MinigameEnvironment:
         :param render: Whether to render the game
         :param step_multiplier: Step multiplier for pysc2 environment
         '''
+        
         import sys
         from absl import flags
         FLAGS = flags.FLAGS
         FLAGS(sys.argv)
+        
         self.map = map_name_
         self.state_modifier_func = state_modifier_func
 
@@ -39,6 +41,7 @@ class MinigameEnvironment:
         FACTOR = 9 # TODO
         self.observation_space = [84, 84, FACTOR] # 
         self.select_space = Actuator._SELECT_SPACE
+        self.action_space = Actuator._ACTION_SPACE
 
     def reset(self):
         '''
@@ -50,7 +53,8 @@ class MinigameEnvironment:
 
         self._run_to_next(topleft=[0,0], botright=[self.select_space-1, self.select_space-1])
         self._terminal = self._curr_frame.last()
-        agent_obs = self._combine_frames()
+        #agent_obs = self._combine_frames()
+        agent_obs = self.state_modifier_func(self._curr_frame)
         return agent_obs, self._curr_frame.reward, self._curr_frame.last(), None # exclude selected
 
     def step(self, action, topleft=None, botright=None):
@@ -79,7 +83,8 @@ class MinigameEnvironment:
         
         self._run_to_next(step_act, topleft=topleft, botright=botright)
         self._terminal = self._curr_frame.last()
-        agent_obs = self._combine_frames()
+        #agent_obs = self._combine_frames()
+        agent_obs = self.state_modifier_func(self._curr_frame)
         return agent_obs, self._curr_frame.reward, self._curr_frame.last(), None # exclude selected
     
     def _run_to_next(self, start_action=None, topleft=None, botright=None):
