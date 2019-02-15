@@ -22,7 +22,7 @@ class Actuator:
         self.units_selected = False
         self._select_index = 0
 
-    def compute_action(self, action, custom_obs, raw_obs, topleft=None, botright=None):
+    def compute_action(self, action, raw_obs, topleft=None, botright=None):
         '''
         Computes the raw action corresponding to the chosen abstract action
         :param action: The chosen abstract action (NO_OP, SELECT, RETREAT, or ATTACK)

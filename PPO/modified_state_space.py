@@ -45,6 +45,8 @@ class state_modifier():
         
         #print(obs.observation.feature_screen.shape, obs.observation.feature_minimap.shape, len(obs.observation.player))
     
+        #print(obs.observation.available_actions)
+    
         scr = obs.observation.feature_screen
         mmap = obs.observation.feature_minimap
         player = obs.observation.player

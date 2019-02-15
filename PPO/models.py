@@ -23,6 +23,9 @@ class DeepMind2017Net(nn.Module):
         FC2SIZE = self.config.FC2SIZE
         self.latent_size = self.config.latent_size
         
+        self.where_yes = torch.ones(1).to(self.device)
+        self.where_no = torch.zeros(1).to(self.device)
+        
         _, self.h, self.w = self.config.screen_shape
     
         self.screen_shape = self.config.screen_shape
@@ -109,7 +112,6 @@ class DeepMind2017Net(nn.Module):
             minimap: (n,7,84,84)
             nonspatial_in: (n,1,1,11)
         '''
-        t1 = time.time()
         n = nonspatial_in.shape[0]
         
         screen_indices, screen_vals = screen
@@ -124,14 +126,10 @@ class DeepMind2017Net(nn.Module):
         
         nonspatial_in = torch.from_numpy(nonspatial_in).float().to(self.device)
 
-        print("Data conversion time: %f" % (time.time() - t1))
-
-        t1 = time.time()
         features = self.forward_features(screen, minimap, nonspatial_in)
         
         spatial_policy = self.forward_spatial(features)
         nonspatial_policy, value = self.forward_nonspatial_value(features)
-        print("Forward time: %f" % (time.time() - t1))
         
         return spatial_policy, nonspatial_policy, value
         
@@ -177,30 +175,37 @@ class DeepMind2017Net(nn.Module):
                 spatial_probs: (1,h,w,self.spatial_act_size)
                 nonspatial_probs: (1,self.nonspatial_act_size)
         '''
-        t1 = time.time()
-        spatial_probs = spatial_probs.reshape((spatial_probs.shape[1], self.h*self.w)).cpu().data.numpy()
         spatials = []
-        for i in range(spatial_probs.shape[0]):
-            #print(time.time() - t1)
-            probs = spatial_probs[i]
-            choice = self.choose_action(probs)
+        for i in range(spatial_probs.shape[1]):
+            probs = spatial_probs[0,i,:,:]
+            [y,x] = choice = self.choose_action(probs)
+            spatials.append([x,y])
             
-            x = choice % self.w
-            y = np.floor(choice / self.h)
-            
-            spatials.append([int(x),int(y)])
-            #print(time.time() - t1)
        
         probs = nonspatial_probs.flatten().cpu().data.numpy()
         nonspatial = self.choose_action(probs)
-        #print(time.time() - t1)
         return spatials, nonspatial
         
     def choose_action(self, probs):
         choice = random.random()
+        if (len(probs.shape) == 2):
+            
+            probs = self.cumsum2D(probs, choice)            
+            probmap = torch.where(probs <= choice, self.where_yes, self.where_no)
+            return probmap.nonzero()[-1]
+            
         cumsum = np.cumsum(probs)
         output = bisect.bisect(cumsum, choice)
         return output
+        
+    def cumsum2D(self, probs, choice):
+        rowsums = torch.cumsum(torch.sum(probs, 1), 0).reshape((self.h,1))[:-1]
+        cumsums = torch.cumsum(probs, 1)
+        cumsums[1:, :] += rowsums
+        probs[-1,-1] = 1.0
+        return cumsums
+        
+        
         
         
             

@@ -50,8 +50,6 @@ def DeepMind2017Test():
         spatial_action, nonspatial_action = agent.choose(spatial_pol, nonspatial_pol)
         print("Action time: %f" % (time.time() - t1))
         
-        print("Action successfully chosen")
-        
         t1 = time.time()
         state, reward, done, _ = env.step(nonspatial_action, spatial_action[0], spatial_action[1])
         print("Env time: %f" % (time.time() - t1))

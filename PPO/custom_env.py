@@ -95,9 +95,8 @@ class MinigameEnvironment:
         if self._curr_frame.last():
             return
             
-        custom_obs = self.state_modifier_func(self._curr_frame)
         
-        raw_action = self._actuator.compute_action(start_action, custom_obs, self._curr_frame, topleft=topleft, botright=botright)
+        raw_action = self._actuator.compute_action(start_action, self._curr_frame, topleft=topleft, botright=botright)
         self._step_env(raw_action)
             
         """
