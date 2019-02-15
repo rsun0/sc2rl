@@ -33,7 +33,7 @@ def DeepMind2017Test():
     
     env = custom_env.MinigameEnvironment(state_modifier.modified_state_space,
                                             map_name_="DefeatRoaches",
-                                            render=True,
+                                            render=False,
                                             step_multiplier=8)
                                  
     nonspatial_act_size, spatial_act_depth = env.action_space

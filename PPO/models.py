@@ -6,6 +6,8 @@ import torch.nn.functional as F
 from config import *
 import numpy as np
 import time
+import bisect
+import random
 
 class DeepMind2017Net(nn.Module):
 
@@ -111,12 +113,12 @@ class DeepMind2017Net(nn.Module):
         n = nonspatial_in.shape[0]
         
         screen_indices, screen_vals = screen
-        screen_indices = torch.from_numpy(np.array(screen_indices)).long().to(self.device)
+        screen_indices = torch.from_numpy(screen_indices).long().to(self.device)
         screen_vals = torch.from_numpy(screen_vals).float().to(self.device)
         screen = torch.cuda.sparse.FloatTensor(screen_indices, screen_vals, torch.Size([n, self.d1, self.h, self.w])).to_dense()
         
         minimap_indices, minimap_vals = minimap
-        minimap_indices = torch.from_numpy(np.array(minimap_indices)).long().to(self.device)
+        minimap_indices = torch.from_numpy(minimap_indices).long().to(self.device)
         minimap_vals = torch.from_numpy(minimap_vals).float().to(self.device)
         minimap = torch.cuda.sparse.FloatTensor(minimap_indices, minimap_vals, torch.Size([n, self.d2, self.h, self.w])).to_dense()
         
@@ -124,10 +126,12 @@ class DeepMind2017Net(nn.Module):
 
         print("Data conversion time: %f" % (time.time() - t1))
 
+        t1 = time.time()
         features = self.forward_features(screen, minimap, nonspatial_in)
         
         spatial_policy = self.forward_spatial(features)
         nonspatial_policy, value = self.forward_nonspatial_value(features)
+        print("Forward time: %f" % (time.time() - t1))
         
         return spatial_policy, nonspatial_policy, value
         
@@ -173,19 +177,30 @@ class DeepMind2017Net(nn.Module):
                 spatial_probs: (1,h,w,self.spatial_act_size)
                 nonspatial_probs: (1,self.nonspatial_act_size)
         '''
+        t1 = time.time()
+        spatial_probs = spatial_probs.reshape((spatial_probs.shape[1], self.h*self.w)).cpu().data.numpy()
         spatials = []
-        for i in range(spatial_probs.shape[1]):
-            probs = spatial_probs[:,i,:,:].reshape((self.h*self.w))
-            choice = torch.multinomial(probs, 1).item()
+        for i in range(spatial_probs.shape[0]):
+            #print(time.time() - t1)
+            probs = spatial_probs[i]
+            choice = self.choose_action(probs)
             
             x = choice % self.w
             y = np.floor(choice / self.h)
             
             spatials.append([int(x),int(y)])
-            
-        nonspatial = int(torch.multinomial(nonspatial_probs, 1).item())
-        
+            #print(time.time() - t1)
+       
+        probs = nonspatial_probs.flatten().cpu().data.numpy()
+        nonspatial = self.choose_action(probs)
+        #print(time.time() - t1)
         return spatials, nonspatial
+        
+    def choose_action(self, probs):
+        choice = random.random()
+        cumsum = np.cumsum(probs)
+        output = bisect.bisect(cumsum, choice)
+        return output
         
         
             
