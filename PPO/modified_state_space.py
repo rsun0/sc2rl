@@ -53,7 +53,7 @@ class state_modifier():
         proc_mmap = state_modifier.preprocess_featuremap(mmap, MINIMAP_FEATURES, DeepMind2017Config.minimap_shape)
         player = state_modifier.preprocess_featuremap(player, None, False)
         
-        print(proc_scr.shape, proc_mmap.shape, player.shape)
+
         
         return proc_scr, proc_mmap, player
         
@@ -61,17 +61,60 @@ class state_modifier():
         
     def preprocess_featuremap(x, features=None, out_shape=None):
     
+        '''
+        
+        if features is None, return numpy array
+        else return coo format indices, values
+        
+        '''
+    
         if (type(features) == type(None)):
             return np.log(x.clip(0) + 1).reshape((1, len(x), 1, 1))
     
     
         (_,w,h) = x.shape
-        preprocessed_features = np.zeros(out_shape)
+        
+        #indices = [np.array([]) for i in range(4)]
+        indices = np.zeros((4,1))
+        values = np.array([])
+        
+        #preprocessed_features = np.zeros(out_shape)
         features_depth = 0
         
         for i in range(len(features)):
+        
+            
             name, scale, featuretype = (features[i].name, features[i].scale, features[i].type)
             
+            vals = np.array(x[name])
+            y_coords,x_coords = nonzero_indices = vals.nonzero()
+            val_list = vals[nonzero_indices]
+            
+            n_curr = len(y_coords)
+            zeros = np.zeros(n_curr)
+            
+            dim = scale
+            if (featuretype == SCALAR or (featuretype == CATEGORICAL and dim == 2)):
+                val_list = np.log(val_list.clip(0) + 1)
+                dim = 1
+                depths = features_depth * np.ones(n_curr)
+            else:
+                
+                depths = val_list + features_depth
+                val_list = np.ones(n_curr)                
+            
+            addition = np.stack([zeros, depths, x_coords, y_coords])
+            if (i == 0):
+                indices = addition
+            else:
+                indices = np.concatenate([indices, addition],1)
+            
+            values = np.append(values, val_list)
+            
+            features_depth += dim
+            
+            
+            """
             if (featuretype == CATEGORICAL):
                 dim = scale
                 if (dim == 2):
@@ -95,10 +138,10 @@ class state_modifier():
                 
             #preprocessed_features[features_depth:features_depth+dim] = addition
             features_depth += dim
+            """
             
                 
-                
-        return np.expand_dims(preprocessed_features, 0)
+        return indices, values.astype(np.float32)
 
 
 

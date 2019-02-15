@@ -30,11 +30,11 @@ class DeepMind2017Net(nn.Module):
         self.spatial_act_size = spatial_act_size
         
         
-        d1 = self.screen_shape[0]
-        d2 = self.minimap_shape[0]
-        d3 = self.nonspatial_size
+        self.d1 = self.screen_shape[0]
+        self.d2 = self.minimap_shape[0]
+        self.d3 = self.nonspatial_size
         
-        self.screen_embed = nn.Sequential(nn.Conv2d(in_channels=d1,
+        self.screen_embed = nn.Sequential(nn.Conv2d(in_channels=self.d1,
                                                 out_channels=self.latent_size,
                                                 kernel_size=1,
                                                 stride=1,
@@ -42,7 +42,7 @@ class DeepMind2017Net(nn.Module):
                                                 
                                             nn.Tanh())
                                           
-        self.minimap_embed = nn.Sequential(nn.Conv2d(in_channels=d2,
+        self.minimap_embed = nn.Sequential(nn.Conv2d(in_channels=self.d2,
                                                 out_channels=self.latent_size,
                                                 kernel_size=1,
                                                 stride=1,
@@ -84,7 +84,7 @@ class DeepMind2017Net(nn.Module):
                                                 
                                             nn.ReLU())
                                             
-        self.spatial_conv = nn.Sequential(nn.Conv2d(in_channels=2*FILTERS2+d3,
+        self.spatial_conv = nn.Sequential(nn.Conv2d(in_channels=2*FILTERS2+self.d3,
                                                 out_channels=self.spatial_act_size,
                                                 kernel_size=1,
                                                 stride=1,
@@ -108,9 +108,20 @@ class DeepMind2017Net(nn.Module):
             nonspatial_in: (n,1,1,11)
         '''
         t1 = time.time()
-        screen = torch.from_numpy(screen).float().to(self.device)
-        minimap = torch.from_numpy(minimap).float().to(self.device)
+        n = nonspatial_in.shape[0]
+        
+        screen_indices, screen_vals = screen
+        screen_indices = torch.from_numpy(np.array(screen_indices)).long().to(self.device)
+        screen_vals = torch.from_numpy(screen_vals).float().to(self.device)
+        screen = torch.cuda.sparse.FloatTensor(screen_indices, screen_vals, torch.Size([n, self.d1, self.h, self.w])).to_dense()
+        
+        minimap_indices, minimap_vals = minimap
+        minimap_indices = torch.from_numpy(np.array(minimap_indices)).long().to(self.device)
+        minimap_vals = torch.from_numpy(minimap_vals).float().to(self.device)
+        minimap = torch.cuda.sparse.FloatTensor(minimap_indices, minimap_vals, torch.Size([n, self.d2, self.h, self.w])).to_dense()
+        
         nonspatial_in = torch.from_numpy(nonspatial_in).float().to(self.device)
+
         print("Data conversion time: %f" % (time.time() - t1))
 
         features = self.forward_features(screen, minimap, nonspatial_in)
