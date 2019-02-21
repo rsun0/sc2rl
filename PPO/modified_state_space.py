@@ -32,6 +32,11 @@ def zero_one_norm(array):
 
 class state_modifier():        
 
+    def graph_conv_modifier(obs):
+        
+        print(obs.observation.feature_units, dir(obs.observation.feature_units))
+        return obs
+
 
     def modified_state_space(obs):
         
@@ -55,10 +60,18 @@ class state_modifier():
         proc_mmap = state_modifier.preprocess_featuremap(mmap, MINIMAP_FEATURES, DeepMind2017Config.minimap_shape)
         player = state_modifier.preprocess_featuremap(player, None, False)
         
+        avail_actions = state_modifier.preprocess_actions(obs.observation.available_actions)
 
         
-        return proc_scr, proc_mmap, player
+        return np.array([proc_scr, proc_mmap, player, avail_actions])
         
+    
+    def preprocess_actions(actions):
+        available = np.zeros((1,DeepMind2017Config.action_space))
+        for i in actions:
+            if i in DeepMind2017Config.env_agent_action_mapper.keys():
+                available[0,DeepMind2017Config.env_agent_action_mapper[i]] = 1
+        return available
         
         
     def preprocess_featuremap(x, features=None, out_shape=None):
@@ -143,7 +156,7 @@ class state_modifier():
             """
             
                 
-        return indices, values.astype(np.float32)
+        return [indices, values.astype(np.float32)]
 
 
 

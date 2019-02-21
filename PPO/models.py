@@ -100,21 +100,23 @@ class DeepMind2017Net(nn.Module):
                                             nn.Linear(FC1SIZE, FC2SIZE),
                                             nn.ReLU())
                                             
-        self.nonspatial_action_layer = nn.Sequential(nn.Linear(FC2SIZE, self.nonspatial_act_size),
-                                                       nn.Softmax())
+        self.nonspatial_action_layer = nn.Linear(FC2SIZE, self.nonspatial_act_size)
                                                        
         self.value_layer = nn.Linear(FC2SIZE, 1)
         
     
-    def forward(self, screen, minimap, nonspatial_in):
+    def forward(self, screen, minimap, nonspatial_in, avail_actions, history=[], choosing=False):
         '''
-            screen: (n,17,84,84)
-            minimap: (n,7,84,84)
-            nonspatial_in: (n,1,1,11)
+            screen: (n,1968,84,84) in coo format
+            minimap: (n,?,84,84) in coo format
+            nonspatial_in: (n,11, 1, 1)
+            avail_actions: (n,5)
+            history: list of hist_size previous frames (ignore until LSTM implemented)
         '''
         n = nonspatial_in.shape[0]
         
         screen_indices, screen_vals = screen
+        #print(screen_indices.shape)
         screen_indices = torch.from_numpy(screen_indices).long().to(self.device)
         screen_vals = torch.from_numpy(screen_vals).float().to(self.device)
         screen = torch.cuda.sparse.FloatTensor(screen_indices, screen_vals, torch.Size([n, self.d1, self.h, self.w])).to_dense()
@@ -125,13 +127,17 @@ class DeepMind2017Net(nn.Module):
         minimap = torch.cuda.sparse.FloatTensor(minimap_indices, minimap_vals, torch.Size([n, self.d2, self.h, self.w])).to_dense()
         
         nonspatial_in = torch.from_numpy(nonspatial_in).float().to(self.device)
-
+        available_actions = torch.from_numpy(avail_actions).byte().to(self.device)
         features = self.forward_features(screen, minimap, nonspatial_in)
         
         spatial_policy = self.forward_spatial(features)
-        nonspatial_policy, value = self.forward_nonspatial_value(features)
+        nonspatial_policy, value = self.forward_nonspatial_value(features, available_actions)
+        choice = None
+        if (choosing):
+            choices = self.choose(spatial_policy, nonspatial_policy)
         
-        return spatial_policy, nonspatial_policy, value
+        
+        return spatial_policy, nonspatial_policy, value, choices
         
         
     def forward_features(self, screen, minimap, nonspatial_in):
@@ -159,10 +165,13 @@ class DeepMind2017Net(nn.Module):
         
         return x
         
-    def forward_nonspatial_value(self, features):
+    def forward_nonspatial_value(self, features, avail_actions):
         x = features.view(features.size(0), -1)
         x = self.nonspatial_layers(x)
+        
         nonspatial = self.nonspatial_action_layer(x)
+        nonspatial.masked_fill_(1-avail_actions, float('-inf'))
+        nonspatial = F.softmax(nonspatial, dim=1)
         value = self.value_layer(x)
         return nonspatial, value
         
@@ -192,7 +201,11 @@ class DeepMind2017Net(nn.Module):
             
             probs = self.cumsum2D(probs, choice)            
             probmap = torch.where(probs <= choice, self.where_yes, self.where_no)
-            return probmap.nonzero()[-1]
+            try:
+                coords = probmap.nonzero()[-1]
+            except: 
+                coords = [0,0]
+            return coords
             
         cumsum = np.cumsum(probs)
         output = bisect.bisect(cumsum, choice)
