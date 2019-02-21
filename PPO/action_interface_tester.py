@@ -12,10 +12,12 @@ class Agent(base_agent.BaseAgent):
     def __init__(self):
         super().__init__()
         self.actuator = Actuator()
+        self.reset()
 
     def reset(self):
         super().reset()
         self.actuator.reset()
+        self._select_next = True
 
     def step(self, obs):
         super().step(obs)
@@ -26,11 +28,12 @@ class Agent(base_agent.BaseAgent):
         enemy_unit_density = features[4]
         if np.all(friendly_unit_density == 0):
             return 4,
-        if np.all(selected == 0):
-            return 0, (0, 0), (83, 83)
+        if self._select_next or np.all(selected == 0):
+            self._select_next = False
+            return 0,
         else:
+            self._select_next = True
             target = self._compute_attack_closest(selected, enemy_unit_density)
-            print(target)
             return 1, target
 
     @staticmethod
@@ -92,12 +95,11 @@ if __name__ == "__main__":
     env = MinigameEnvironment(state_modifier.modified_state_space,
                               map_name_="DefeatRoaches",
                               render=True,
-                              step_multiplier=8)
+                              step_multiplier=1)
     r = True
     while True:
         if r:
             env.reset()
             agent.reset()
         action = agent.step(env._curr_frame)
-        print(action)
         _, _, r, _ = env.step(*action)

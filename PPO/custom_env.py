@@ -13,12 +13,12 @@ class MinigameEnvironment:
         :param render: Whether to render the game
         :param step_multiplier: Step multiplier for pysc2 environment
         '''
-        
+
         import sys
         from absl import flags
         FLAGS = flags.FLAGS
         FLAGS(sys.argv)
-        
+
         self.map = map_name_
         self.state_modifier_func = state_modifier_func
 
@@ -38,8 +38,8 @@ class MinigameEnvironment:
         self._terminal = True
 
         self.action_space = 10
-        FACTOR = 9 # TODO
-        self.observation_space = [84, 84, FACTOR] # 
+        FACTOR = 9  # TODO
+        self.observation_space = [84, 84, FACTOR]
         self.select_space = Actuator._SELECT_SPACE
         self.action_space = Actuator._ACTION_SPACE
 
@@ -51,11 +51,11 @@ class MinigameEnvironment:
         self._actuator.reset()
         self._terminal = False
 
-        self._run_to_next(topleft=[0,0], botright=[self.select_space-1, self.select_space-1])
+        self._run_to_next()
         self._terminal = self._curr_frame.last()
         #agent_obs = self._combine_frames()
         agent_obs = self.state_modifier_func(self._curr_frame)
-        return agent_obs, self._curr_frame.reward, self._curr_frame.last(), None # exclude selected
+        return agent_obs, self._curr_frame.reward, self._curr_frame.last(), None  # exclude selected
 
     def step(self, action, topleft=None, botright=None):
         '''
@@ -63,11 +63,10 @@ class MinigameEnvironment:
         :param action: 0 for Action.RETREAT or 1 for Action.ATTACK
         :returns: Observations, reward, terminal, None
         '''
-        
+
         assert not self._terminal, 'Environment must be reset after init or terminal'
         assert action in range(5), 'Agent action must be 0-10'
 
-        
         if action == 0:
             step_act = Action.SELECT.value
         elif action == 1:
@@ -80,25 +79,26 @@ class MinigameEnvironment:
             step_act = Action.NO_OP.value
         else:
             step_act = 0
-        
+
         self._run_to_next(step_act, topleft=topleft, botright=botright)
         self._terminal = self._curr_frame.last()
         #agent_obs = self._combine_frames()
         agent_obs = self.state_modifier_func(self._curr_frame)
-        return agent_obs, self._curr_frame.reward, self._curr_frame.last(), None # exclude selected
-    
+        return agent_obs, self._curr_frame.reward, self._curr_frame.last(), None  # exclude selected
+
     def _run_to_next(self, start_action=None, topleft=None, botright=None):
-        
+
         if start_action is None:
             self._reset_env()
-        
+            start_action = Action.SELECT.value
+
         if self._curr_frame.last():
             return
-            
-        
-        raw_action = self._actuator.compute_action(start_action, self._curr_frame, topleft=topleft, botright=botright)
+
+        raw_action = self._actuator.compute_action(
+            start_action, self._curr_frame, topleft=topleft, botright=botright)
         self._step_env(raw_action)
-            
+
         """
         # Select action
         if (topleft is not None):
@@ -117,7 +117,7 @@ class MinigameEnvironment:
                 
             #assert self._actuator.units_selected and np.any(selected > 0), 'Units not selected after select action'
         """
-        
+
         """
         # Move action
         if (start_action is not None):
@@ -135,17 +135,19 @@ class MinigameEnvironment:
 
         custom_prev = self.state_modifier_func(self._prev_frame)[1:]
         custom_curr = self.state_modifier_func(self._curr_frame)
-        custom_curr = custom_curr[np.r_[1:len(custom_curr),0]] # move selected frame to end
+        # move selected frame to end
+        custom_curr = custom_curr[np.r_[1:len(custom_curr), 0]]
         custom_frames = np.append(custom_prev, custom_curr, axis=0)
         return custom_frames
 
     def _reset_env(self):
         self._prev_frame = self._curr_frame
-        self._curr_frame = self._env.reset()[0] # get obs for 1st agent
-        
+        self._curr_frame = self._env.reset()[0]  # get obs for 1st agent
+
     def _step_env(self, raw_action):
         self._prev_frame = self._curr_frame
         try:
-            self._curr_frame = self._env.step([raw_action])[0] # get obs for 1st agent
+            self._curr_frame = self._env.step(
+                [raw_action])[0]  # get obs for 1st agent
         except protocol.ConnectionError:
             self._curr_frame = self._env.reset()[0]
