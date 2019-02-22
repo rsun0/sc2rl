@@ -38,8 +38,9 @@ class state_modifier():
         units = np.array(obs.observation.feature_units)
         G = state_modifier.to_graph(units)
         X = state_modifier.preprocess_units(units)
+        avail_actions = state_modifier.preprocess_actions(obs.observation.available_actions, GraphConvConfigMinigames)
         
-        return obs
+        return [G, X, avail_actions]
 
 
     def modified_state_space(obs):
@@ -59,7 +60,7 @@ class state_modifier():
         proc_mmap = state_modifier.preprocess_featuremap(mmap, MINIMAP_FEATURES, DeepMind2017Config.minimap_shape)
         player = state_modifier.preprocess_featuremap(player, None, False)
         
-        avail_actions = state_modifier.preprocess_actions(obs.observation.available_actions)
+        avail_actions = state_modifier.preprocess_actions(obs.observation.available_actions, DeepMind2017Config)
 
         
         return np.array([proc_scr, proc_mmap, player, avail_actions])
@@ -123,15 +124,20 @@ class state_modifier():
         
         return output
         
-        
-    
+    def preprocess_actions(actions, my_config):
+        available = np.zeros((my_config.action_space))
+        for i in actions:
+            if i in my_config.env_agent_action_mapper.keys():
+                available[my_config.env_agent_action_mapper[i]] = 1
+        return available
+    """
     def preprocess_actions(actions):
         available = np.zeros((1,DeepMind2017Config.action_space))
         for i in actions:
             if i in DeepMind2017Config.env_agent_action_mapper.keys():
                 available[0,DeepMind2017Config.env_agent_action_mapper[i]] = 1
         return available
-        
+    """    
         
     def preprocess_featuremap(x, features=None, out_shape=None):
     

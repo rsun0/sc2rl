@@ -62,4 +62,13 @@ class GraphConvConfigMinigames():
     # Uniform for all 
     graph_n = 15
     
+    # env configs
+    action_space = 5
+    
+    env_agent_action_mapper = {0:4,
+                                3:0,
+                                12:1,
+                                331:2,
+                                453:3}
+    
 

@@ -32,6 +32,7 @@ class Actuator:
         :returns: The raw action to return to environment
         '''
         selected = raw_obs.observation.feature_screen.selected
+        print(raw_obs.observation.feature_units)
 
         if action == Action.SELECT.value:
             assert topleft is None and botright is None, 'Coordinates no longer accepted for select'
@@ -73,7 +74,7 @@ class Actuator:
             self._select_index = 0
         idx = int((self._select_index / num_units) * len(possible_points))
         selection = np.flip(possible_points[idx], 0)
-        self._select_index += 1
+        self._select_index += 1.5
         return actions.FUNCTIONS.select_point('select', selection)
 
     # @staticmethod

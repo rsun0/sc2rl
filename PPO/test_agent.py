@@ -24,10 +24,16 @@ def default_test():
     state, reward, done, _ = env.reset()
     
     while True:
-        topleft = [random.randint(0,83), random.randint(0,83)]
-        botright = [random.randint(0,83), random.randint(0,83)]
-        action = random.randint(0, 4)
-        state, reward, done, _ = env.step(action, topleft=topleft, botright=botright)
+        topleft = None
+        #topleft = [random.randint(0,83), random.randint(0,83)]
+        #botright = [random.randint(0,83), random.randint(0,83)]
+        action_ind = random.randint(0,len(state[2].nonzero()[0])-1)
+        action = state[2].nonzero()[0][action_ind]
+        if (action == 1 or action == 2):
+            topleft = [random.randint(0,83), random.randint(0,83)]
+            state, reward, done, _ = env.step(action, topleft=topleft) #, topleft=topleft, botright=botright)
+        else:
+            state, reward, done, _ = env.step(action)
         if done:
             state, reward, done, _ = env.reset()    
 
