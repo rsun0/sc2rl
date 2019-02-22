@@ -19,6 +19,7 @@ from pysc2.lib import features, units
 from pysc2.env import environment
 
 from config import *
+from scipy.spatial.distance import cdist
 
 
 import numpy as np
@@ -34,7 +35,10 @@ class state_modifier():
 
     def graph_conv_modifier(obs):
         
-        print(obs.observation.feature_units, dir(obs.observation.feature_units))
+        units = np.array(obs.observation.feature_units)
+        G = state_modifier.to_graph(units)
+        X = state_modifier.preprocess_units(units)
+        
         return obs
 
 
@@ -46,12 +50,7 @@ class state_modifier():
                 screen (84 x 84 x 17)
                 minimap (84 x 84 x 7)    
         '''
-        #print(obs.observation.feature_minimap._index_names, obs.observation.feature_screen._index_names, obs.observation.feature_minimap.shape)
         
-        #print(obs.observation.feature_screen.shape, obs.observation.feature_minimap.shape, len(obs.observation.player))
-    
-        #print(obs.observation.available_actions)
-    
         scr = obs.observation.feature_screen
         mmap = obs.observation.feature_minimap
         player = obs.observation.player
@@ -64,6 +63,66 @@ class state_modifier():
 
         
         return np.array([proc_scr, proc_mmap, player, avail_actions])
+        
+    def preprocess_units(units):
+    
+        (n,d) = units.shape
+        output = np.zeros((n, GraphConvConfigMinigames.unit_vec_width))
+        key_check = GraphConvConfigMinigames.categorical_size_dict.keys()
+        idx = 0
+        for j in range(d):
+            # Does j correspond to categorical feature?
+            if j in key_check:
+                # Is j a unit id index?
+                if j == 0:
+                    units[:,j+idx] = np.vectorize(GraphConvConfigMinigames.index_dict.get)(units[:,j])
+                width = GraphConvConfigMinigames.categorical_size_dict[j]
+                one_hot_mat = np.zeros((n,width))
+                one_hot_mat[range(n), units[:,j]] = 1
+                output[:,j+idx:j+idx+width] = one_hot_mat
+                idx += (width-1)
+            else:
+                # Does j correpsond to an x or y coordinate?
+                if (j == GraphConvConfigMinigames.x_ind or j == GraphConvConfigMinigames.y_ind):
+                    output[:,j+idx] = (units[:,j] - mid_screen) / screen_size
+                else:
+                    output[:,j+idx] = np.log(units[:,j]+1)
+        return output
+                
+        
+    def to_graph(units):
+        (n, d) = units.shape
+        
+        output = np.zeros((GraphConvConfigMinigames.graph_n,GraphConvConfigMinigames.graph_n))
+        friendly = (units[:,1] == GraphConvConfigMinigames.friendly).astype(np.int).nonzero()[0]
+        enemy = (units[:,1] == GraphConvConfigMinigames.enemy).astype(np.int).nonzero()[0]
+        
+        k1 = min(GraphConvConfigMinigames.k_player, max(0,len(friendly)-1))
+        k2 = min(GraphConvConfigMinigames.k_opponent, max(0,len(enemy)-1))
+        
+        locs = units[:,GraphConvConfigMinigames.loc_idx]
+        dist_array = cdist(locs, locs)
+        
+        m1 = dist_array[friendly]
+        m2 = dist_array[enemy]
+        friendly_player = m1[:,friendly]
+        friendly_opponent = m1[:,enemy]
+        enemy_player = m2[:,enemy]
+        enemy_opponent = m2[:,friendly]
+        
+        fp_idx = friendly[np.argpartition(friendly_player, k1-1, axis=1)[:,:k1]]
+        fo_idx = enemy[np.argpartition(friendly_opponent, k2-1, axis=1)[:,:k2]]
+        ep_idx = enemy[np.argpartition(enemy_player, k2-1, axis=1)[:,:k2]]
+        eo_idx = friendly[np.argpartition(enemy_opponent, k1-1, axis=1)[:,:k1]]
+        
+        
+        output[np.expand_dims(friendly,1), fp_idx] = 1.0
+        output[np.expand_dims(friendly,1), fo_idx] = 1.0
+        output[np.expand_dims(enemy, 1), ep_idx] = 1.0
+        output[np.expand_dims(enemy, 1), eo_idx] = 1.0
+        
+        return output
+        
         
     
     def preprocess_actions(actions):
