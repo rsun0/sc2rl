@@ -34,7 +34,7 @@ class state_modifier():
 
     def graph_conv_modifier(obs):
         
-        print(obs.observation.feature_units, dir(obs.observation.feature_units))
+        #print(obs.observation.feature_units, dir(obs.observation.feature_units))
         return obs
 
 
