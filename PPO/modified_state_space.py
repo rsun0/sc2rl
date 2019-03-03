@@ -68,7 +68,8 @@ class state_modifier():
     def preprocess_units(units):
     
         (n,d) = units.shape
-        output = np.zeros((n, GraphConvConfigMinigames.unit_vec_width))
+        graph_n = GraphConvConfigMinigames.graph_n
+        output = np.zeros((GraphConvConfigMinigames.graph_n, GraphConvConfigMinigames.unit_vec_width))
         key_check = GraphConvConfigMinigames.categorical_size_dict.keys()
         idx = 0
         for j in range(d):
@@ -80,14 +81,14 @@ class state_modifier():
                 width = GraphConvConfigMinigames.categorical_size_dict[j]
                 one_hot_mat = np.zeros((n,width))
                 one_hot_mat[range(n), units[:,j]] = 1
-                output[:,j+idx:j+idx+width] = one_hot_mat
+                output[:n,j+idx:j+idx+width] = one_hot_mat
                 idx += (width-1)
             else:
                 # Does j correpsond to an x or y coordinate?
                 if (j == GraphConvConfigMinigames.x_ind or j == GraphConvConfigMinigames.y_ind):
-                    output[:,j+idx] = (units[:,j] - mid_screen) / screen_size
+                    output[:n,j+idx] = (units[:,j] - mid_screen) / screen_size
                 else:
-                    output[:,j+idx] = np.log(units[:,j]+1)
+                    output[:n,j+idx] = np.log(units[:,j]+1)
         return output
                 
         

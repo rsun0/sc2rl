@@ -9,6 +9,164 @@ import time
 import bisect
 import random
 
+
+class GraphConvNet(nn.Module):
+
+    def __init__(self, nonspatial_act_size, spatial_act_size, device):
+        super(GraphConvNet, self).__init__()
+        self.device = device
+        self.nonspatial_act_size = nonspatial_act_size
+        self.spatial_act_size = spatial_act_size
+        
+        self.config = GraphConvConfigMinigames
+        self.fc1_size = self.fc2_size = 100
+        self.fc3_size = 50
+        
+        FILTERS1 = 16
+        FILTERS2 = 32
+        FILTERS3 = 32
+        
+        self.W1 = nn.Linear(self.config.unit_vec_width, self.fc1_size)
+        self.W2 = nn.Linear(self.fc1_size, self.fc2_size)
+        self.W3 = nn.Linear(self.fc2_size, self.fc3_size)
+        
+        self.action_choice = nn.Linear(self.fc3_size, nonspatial_act_size)
+        
+        self.value_layer = nn.Linear(self.fc3_size, 1)
+        
+        """
+        
+        self.tconv1 = torch.nn.ConvTranspose2d(self.fc3_size, 
+                                                    FILTERS1,
+                                                    kernel_size=4,
+                                                    padding=0,
+                                                    stride=2)
+                                                    
+        self.tconv2 = torch.nn.ConvTranspose2d(FILTERS1,
+                                                    FILTERS2,
+                                                    kernel_size=4,
+                                                    padding=1,
+                                                    stride=2)
+        
+        self.tconv3 = torch.nn.ConvTranspose2d(FILTERS2,
+                                                    FILTERS3,
+                                                    kernel_size=4,
+                                                    padding=1,
+                                                    stride=2)
+                                                    
+        self.tconv4 = torch.nn.ConvTranspose2d(FILTERS3,
+                                                    self.spatial_act_size,
+                                                    kernel_size=4,
+                                                    padding=1,
+                                                    stride=2)
+        
+        """
+                                                    
+        self.activation = nn.ReLU()
+        
+        
+    """
+        G: (N, graph_n, graph_n)
+        X: (N, graph_n, unit_vec_width)
+        avail_actions: (N, action_space)
+    """
+    def forward(self, G, X, avail_actions, choosing=False):
+    
+        (N, graph_n, _) = G.shape
+        
+        G = torch.from_numpy(G).to(self.device).float()
+        X = torch.from_numpy(X).to(self.device).float()
+        avail_actions = torch.from_numpy(avail_actions).float().to(self.device)
+        
+        A = G + torch.eye(self.config.graph_n).to(self.device).unsqueeze(0)
+        D = torch.zeros(A.shape).to(self.device)
+        D[:,range(self.config.graph_n), range(self.config.graph_n)] = torch.sum(A, 2)
+        
+        D_inv_sqrt = D ** -0.5
+        A_agg = torch.matmul(torch.matmul(D_inv_sqrt, A), D_inv_sqrt)
+        
+        h1 = self.activation(torch.matmul(A_agg, self.W1(X)))
+        h2 = self.activation(torch.matmul(A_agg, self.W2(h1)))
+        h3 = self.activation(torch.matmul(A_agg, self.W3(h2)))
+        
+        nonspatial_policy = F.softmax(avail_actions * self.action_choice(h3))
+        
+        value_in = torch.mean(h3, dim=1)
+        value = self.value_layer(h3)
+        """
+        stacked_h3 = h3.reshape((N*graph_n, self.fc3_size, 1, 1))
+        
+        s1 = self.activation(self.tconv1(stacked_h3))
+        s2 = self.activation(self.tconv2(s1))
+        s3 = self.activation(self.tconv3(s2))
+        spatial_policy = F.softmax(self.tconv4(s3).reshape((N*graph_n, self.spatial_act_size, -1)), dim=2).reshape((N, graph_n, self.spatial_act_size, 32, 32))
+        """
+        choice = None
+        if (choosing):
+            assert(N==1)
+            #choices = self.choose(spatial_policy, nonspatial_policy)
+            choice = self.multi_agent_choose_action(nonspatial_policy.detach().cpu().reshape((graph_n, self.nonspatial_act_size)))
+        
+        return spatial_policy, nonspatial_policy, value, choice
+        
+    def choose(self, spatial_probs, nonspatial_probs):
+        '''
+            Chooses a random action for spatial1, spatial2, and nonspatial based on probs.
+            
+            params:
+                spatial_probs: (1,h,w,self.spatial_act_size)
+                nonspatial_probs: (1,self.nonspatial_act_size)
+        '''
+        spatials = []
+        for i in range(spatial_probs.shape[1]):
+            probs = spatial_probs[0,i,:,:]
+            [y,x] = choice = self.choose_action(probs)
+            spatials.append([x,y])
+            
+       
+        probs = nonspatial_probs.flatten().cpu().data.numpy()
+        nonspatial = self.choose_action(probs)
+        return spatials, nonspatial
+        
+    def choose_action(self, probs):
+        choice = random.random()
+        if (len(probs.shape) == 2):
+            
+            probs = self.cumsum2D(probs, choice)            
+            probmap = torch.where(probs <= choice, self.where_yes, self.where_no)
+            try:
+                coords = probmap.nonzero()[-1]
+            except: 
+                coords = [0,0]
+            return coords
+            
+        cumsum = np.cumsum(probs)
+        output = bisect.bisect(cumsum, choice)
+        return output
+        
+    def cumsum2D(self, probs, choice):
+        rowsums = torch.cumsum(torch.sum(probs, 1), 0).reshape((self.h,1))[:-1]
+        cumsums = torch.cumsum(probs, 1)
+        cumsums[1:, :] += rowsums
+        probs[-1,-1] = 1.0
+        return cumsums
+        
+    """
+        probs: (graph_n, self.spatial_act_size)
+    """
+    def multi_agent_choose_action(self, probs):
+        (prob_n, _) = probs.shape
+        cums = np.cumsum(probs, 1)
+        vals = np.random.random()
+        choices = []
+        for i in range(prob_n):
+            row = choices[i]
+            choices.append(bisect.bisect(row, vals[i]))
+        return choices
+            
+    
+            
+
 class DeepMind2017Net(nn.Module):
 
     # Assume all shapes are 3d. The input to the forward functions will be 4d stacks.
