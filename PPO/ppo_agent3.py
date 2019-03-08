@@ -87,9 +87,19 @@ class PPOAgent(object):
             step = 0
             
             state, reward, done, _ = self.env.reset()
+            info = state[3]
             screen, minimap, nonspatial_in, avail_actions = state
             
             while not done:
+                # Handle selection, edge cases
+                if not info['friendly_units_present']:
+                    state, reward, done, info = self.env.step(4)
+                    continue
+                if self._select_next or not info['units_selected']:
+                    self._select_next = False
+                    state, reward, done, info = self.env.step(0)
+                    continue
+            
                 step += 1
                 frame += 1
                 
@@ -103,7 +113,7 @@ class PPOAgent(object):
                 spatial_action, nonspatial_action = action
                 
                 ### Env step
-                state, reward, done, _ = self.env.step(nonspatial_action, spatial_action[0], spatial_action[1])
+                state, reward, done, info = self.env.step(nonspatial_action, spatial_action[0], spatial_action[1])
                 score += reward
                 ### Append state to history
                 history.append(state)

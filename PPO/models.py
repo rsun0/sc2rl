@@ -107,7 +107,7 @@ class GraphConvNet(nn.Module):
             #choices = self.choose(spatial_policy, nonspatial_policy)
             choice = self.multi_agent_choose_action(nonspatial_policy.detach().cpu().reshape((graph_n, self.nonspatial_act_size)))
         
-        return spatial_policy, nonspatial_policy, value, choice
+        return nonspatial_policy, value, choice
         
     def choose(self, spatial_probs, nonspatial_probs):
         '''
@@ -166,6 +166,60 @@ class GraphConvNet(nn.Module):
             
     
             
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class DeepMind2017Net(nn.Module):
 

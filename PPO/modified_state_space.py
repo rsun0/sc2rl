@@ -34,13 +34,33 @@ def zero_one_norm(array):
 class state_modifier():        
 
     def graph_conv_modifier(obs):
+    
+        _PLAYER_FRIENDLY = 1
+        _PLAYER_HOSTILE = 4
         
         units = np.array(obs.observation.feature_units)
         G = state_modifier.to_graph(units)
         X = state_modifier.preprocess_units(units)
         avail_actions = state_modifier.preprocess_actions(obs.observation.available_actions, GraphConvConfigMinigames)
         
-        return [G, X, avail_actions]
+        ### Collecting for info
+        scr = obs.observation.feature_screen
+        player_relative = np.array(scr.player_relative)
+        player_friendly = (player_relative == _PLAYER_FRIENDLY).astype(int)
+        unit_density = np.array(scr.unit_density)
+        friendly_density = np.multiply(unit_density, player_friendly)
+        selected = scr.selected        
+                
+        """ info will contain 
+                'friendly_units_present', a boolean indicating 
+                    if any friendly units remain alive.
+                'units_selected', a boolean indicating if any friendly units are selected
+        """
+        info = {}
+        info['friendly_units_present'] = np.any(friendly_unit_density > 0)
+        info['units_selected'] = np.any(selected > 0)
+        
+        return [G, X, avail_actions, info]
 
 
     def modified_state_space(obs):
