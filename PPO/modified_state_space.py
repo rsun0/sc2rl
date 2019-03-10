@@ -48,7 +48,7 @@ class state_modifier():
         player_relative = np.array(scr.player_relative)
         player_friendly = (player_relative == _PLAYER_FRIENDLY).astype(int)
         unit_density = np.array(scr.unit_density)
-        friendly_density = np.multiply(unit_density, player_friendly)
+        friendly_unit_density = np.multiply(unit_density, player_friendly)
         selected = scr.selected        
                 
         """ info will contain 
@@ -60,7 +60,7 @@ class state_modifier():
         info['friendly_units_present'] = np.any(friendly_unit_density > 0)
         info['units_selected'] = np.any(selected > 0)
         
-        return [G, X, avail_actions, info]
+        return [np.expand_dims(G,0), np.expand_dims(X,0), avail_actions, info]
 
 
     def modified_state_space(obs):
@@ -149,7 +149,10 @@ class state_modifier():
         available = np.zeros((my_config.action_space))
         for i in actions:
             if i in my_config.env_agent_action_mapper.keys():
-                available[my_config.env_agent_action_mapper[i]] = 1
+                ind = my_config.env_agent_action_mapper[i]
+                available[ind] = 1
+        available[0] = 0                
+                
         return available
     """
     def preprocess_actions(actions):

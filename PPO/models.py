@@ -19,6 +19,7 @@ class GraphConvNet(nn.Module):
         self.spatial_act_size = spatial_act_size
         
         self.config = GraphConvConfigMinigames
+        self.spatial_width = self.config.spatial_width
         self.fc1_size = self.fc2_size = 100
         self.fc3_size = 50
         
@@ -34,7 +35,7 @@ class GraphConvNet(nn.Module):
         
         self.value_layer = nn.Linear(self.fc3_size, 1)
         
-        """
+        
         
         self.tconv1 = torch.nn.ConvTranspose2d(self.fc3_size, 
                                                     FILTERS1,
@@ -60,7 +61,7 @@ class GraphConvNet(nn.Module):
                                                     padding=1,
                                                     stride=2)
         
-        """
+        
                                                     
         self.activation = nn.ReLU()
         
@@ -93,21 +94,31 @@ class GraphConvNet(nn.Module):
         
         value_in = torch.mean(h3, dim=1)
         value = self.value_layer(h3)
-        """
+        
         stacked_h3 = h3.reshape((N*graph_n, self.fc3_size, 1, 1))
         
         s1 = self.activation(self.tconv1(stacked_h3))
         s2 = self.activation(self.tconv2(s1))
         s3 = self.activation(self.tconv3(s2))
-        spatial_policy = F.softmax(self.tconv4(s3).reshape((N*graph_n, self.spatial_act_size, -1)), dim=2).reshape((N, graph_n, self.spatial_act_size, 32, 32))
-        """
+        spatial_policy = F.softmax(self.tconv4(s3).reshape((N*graph_n, self.spatial_act_size, -1)), dim=2).reshape((N, graph_n, self.spatial_act_size, self.spatial_width, self.spatial_width))
+        
         choice = None
         if (choosing):
             assert(N==1)
             #choices = self.choose(spatial_policy, nonspatial_policy)
-            choice = self.multi_agent_choose_action(nonspatial_policy.detach().cpu().reshape((graph_n, self.nonspatial_act_size)))
+            nonspatial_choice = self.multi_agent_choose_action(nonspatial_policy.detach().cpu().reshape((graph_n, self.nonspatial_act_size)).numpy())
+            
+            spatial_choice = self.multi_agent_choose_action(spatial_policy.detach().cpu().reshape((graph_n, self.spatial_act_size * self.spatial_width ** 2)))
+            spatial_choice = spatial_choice.reshape((graph_n, self.spatial_act_size))
+            
+            spatial_out = np.zeros((graph_n, 2*self.spatial_act_size))
+            for i in range(self.spatial_act_size):
+                spatial_out[:,2*i] = int(spatial_choice / self.spatial_width)
+                spatial_out[:,2*i+1] = spatial_choice % self.spatial_width
+            
+
         
-        return nonspatial_policy, value, choice
+        return spatial_policy, nonspatial_policy, value, choice
         
     def choose(self, spatial_probs, nonspatial_probs):
         '''
@@ -157,10 +168,10 @@ class GraphConvNet(nn.Module):
     def multi_agent_choose_action(self, probs):
         (prob_n, _) = probs.shape
         cums = np.cumsum(probs, 1)
-        vals = np.random.random()
+        vals = np.random.random(prob_n)
         choices = []
         for i in range(prob_n):
-            row = choices[i]
+            row = probs[i]
             choices.append(bisect.bisect(row, vals[i]))
         return choices
             

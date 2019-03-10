@@ -55,7 +55,14 @@ class MinigameEnvironment:
         self._terminal = self._curr_frame.last()
         #agent_obs = self._combine_frames()
         agent_obs = self.state_modifier_func(self._curr_frame)
-        return agent_obs, self._curr_frame.reward, self._curr_frame.last(), None  # exclude selected
+
+        size = len(agent_obs)
+        if (size == 4):
+            info = agent_obs[-1]
+            agent_obs = agent_obs[:-1]
+        else:
+            info = None
+        return agent_obs, self._curr_frame.reward, self._curr_frame.last(), info  # exclude selected
 
     def step(self, action, topleft=None, botright=None):
         '''

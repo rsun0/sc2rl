@@ -56,8 +56,8 @@ class PPOAgent(object):
         nonspatial_act_size, spatial_act_depth = env.action_space
         self.nonspatial_act_size, self.spatial_act_depth = env.action_space
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        self.net = models.DeepMind2017Net(nonspatial_act_size, spatial_act_depth, self.device).to(self.device)
-        self.target_net = models.DeepMind2017Net(nonspatial_act_size, spatial_act_depth, self.device).to(self.device)
+        self.net = models.GraphConvNet(nonspatial_act_size, spatial_act_depth, self.device).to(self.device)
+        self.target_net = models.GraphConvNet(nonspatial_act_size, spatial_act_depth, self.device).to(self.device)
         
         self.memory = ReplayMemory(self.train_step, self.hist_size, self.batch_size)
         self.optimizer = optim.Adam(params = self.net.parameters(), lr=self.lr)
@@ -86,20 +86,21 @@ class PPOAgent(object):
             ### Keeps track of length of current game
             step = 0
             
-            state, reward, done, _ = self.env.reset()
-            info = state[3]
-            screen, minimap, nonspatial_in, avail_actions = state
-            
+            state, reward, done, info = self.env.reset()
+            G, X, avail_actions = state
+            _select_next = True
+
             while not done:
                 # Handle selection, edge cases
                 if not info['friendly_units_present']:
                     state, reward, done, info = self.env.step(4)
                     continue
-                if self._select_next or not info['units_selected']:
-                    self._select_next = False
+                if _select_next or not info['units_selected']:
+                    _select_next = False
                     state, reward, done, info = self.env.step(0)
                     continue
             
+                _select_next = True
                 step += 1
                 frame += 1
                 
@@ -107,7 +108,7 @@ class PPOAgent(object):
                 recent_hist = self.get_recent_hist(history)
                 
                 ### Select action, value
-                _, _, value, action = self.net(screen, minimap, nonspatial_in, avail_actions, history=recent_hist, choosing=True)
+                _, _, value, action = self.net(G, X, avail_actions, choosing=True)
                 value = value.cpu().data.numpy().item()
                 
                 spatial_action, nonspatial_action = action
@@ -145,7 +146,7 @@ class PPOAgent(object):
                     print("episode:", e, "  score:", score, "  steps:", step, "  evaluation reward:", np.mean(evaluation_reward))
                     state, reward, done, _ = self.env.reset()
                     
-                screen, minimap, nonspatial_in, avail_actions = state
+                G, X, avail_actions = state
                     
     ### Main training logic            
     def train_policy_net_ppo(self, frame, frame_next_val):
@@ -192,7 +193,7 @@ class PPOAgent(object):
         
 
 def main():
-    env = custom_env.MinigameEnvironment(state_modifier.modified_state_space,
+    env = custom_env.MinigameEnvironment(state_modifier.graph_conv_modifier,
                                             map_name_="DefeatRoaches",
                                             render=False,
                                             step_multiplier=8)
