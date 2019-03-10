@@ -109,6 +109,7 @@ class PPOAgent(object):
                 
                 ### Select action, value
                 _, _, value, action = self.net(G, X, avail_actions, choosing=True)
+                print(value)
                 value = value.cpu().data.numpy().item()
                 
                 spatial_action, nonspatial_action = action

@@ -108,15 +108,15 @@ class GraphConvNet(nn.Module):
             #choices = self.choose(spatial_policy, nonspatial_policy)
             nonspatial_choice = self.multi_agent_choose_action(nonspatial_policy.detach().cpu().reshape((graph_n, self.nonspatial_act_size)).numpy())
             
-            spatial_choice = self.multi_agent_choose_action(spatial_policy.detach().cpu().reshape((graph_n, self.spatial_act_size * self.spatial_width ** 2)))
+            spatial_choice = self.multi_agent_choose_action(spatial_policy.detach().cpu().reshape((graph_n * self.spatial_act_size, self.spatial_width ** 2)).numpy())
             spatial_choice = spatial_choice.reshape((graph_n, self.spatial_act_size))
             
             spatial_out = np.zeros((graph_n, 2*self.spatial_act_size))
             for i in range(self.spatial_act_size):
-                spatial_out[:,2*i] = int(spatial_choice / self.spatial_width)
-                spatial_out[:,2*i+1] = spatial_choice % self.spatial_width
+                spatial_out[:,2*i] = (spatial_choice[:,i] / self.spatial_width).astype(np.int)
+                spatial_out[:,2*i+1] = spatial_choice[:,i] % self.spatial_width
             
-
+            choice = [spatial_out, nonspatial_choice]
         
         return spatial_policy, nonspatial_policy, value, choice
         
@@ -173,7 +173,7 @@ class GraphConvNet(nn.Module):
         for i in range(prob_n):
             row = probs[i]
             choices.append(bisect.bisect(row, vals[i]))
-        return choices
+        return np.array(choices)
             
     
             
