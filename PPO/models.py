@@ -23,9 +23,13 @@ class GraphConvNet(nn.Module):
         self.fc1_size = self.fc2_size = 100
         self.fc3_size = 50
         
+        
         FILTERS1 = 16
         FILTERS2 = 32
         FILTERS3 = 32
+        
+        self.where_yes = torch.ones(1).to(self.device)
+        self.where_no = torch.zeros(1).to(self.device)
         
         self.W1 = nn.Linear(self.config.unit_vec_width, self.fc1_size)
         self.W2 = nn.Linear(self.fc1_size, self.fc2_size)
@@ -81,32 +85,37 @@ class GraphConvNet(nn.Module):
         
         A = G + torch.eye(self.config.graph_n).to(self.device).unsqueeze(0)
         D = torch.zeros(A.shape).to(self.device)
-        D[:,range(self.config.graph_n), range(self.config.graph_n)] = torch.sum(A, 2)
+        D[:,range(self.config.graph_n), range(self.config.graph_n)] = torch.max(torch.sum(A, 2), self.where_yes)
         
-        D_inv_sqrt = D ** -0.5
+        D_inv_sqrt = D
+        D_inv_sqrt[:,range(self.config.graph_n), range(self.config.graph_n)] = 1 / (D[:,range(self.config.graph_n), range(self.config.graph_n)] ** 0.5)
+        
         A_agg = torch.matmul(torch.matmul(D_inv_sqrt, A), D_inv_sqrt)
         
         h1 = self.activation(torch.matmul(A_agg, self.W1(X)))
         h2 = self.activation(torch.matmul(A_agg, self.W2(h1)))
         h3 = self.activation(torch.matmul(A_agg, self.W3(h2)))
+        value_action_in = torch.mean(h3, dim=1)
         
-        nonspatial_policy = F.softmax(avail_actions * self.action_choice(h3))
+        nonspatial_policy = F.softmax(avail_actions * self.action_choice(value_action_in))
         
-        value_in = torch.mean(h3, dim=1)
-        value = self.value_layer(h3)
         
-        stacked_h3 = h3.reshape((N*graph_n, self.fc3_size, 1, 1))
+        value = self.value_layer(value_action_in)
+        
+        stacked_h3 = value_action_in.reshape((N, self.fc3_size, 1, 1))
         
         s1 = self.activation(self.tconv1(stacked_h3))
         s2 = self.activation(self.tconv2(s1))
         s3 = self.activation(self.tconv3(s2))
-        spatial_policy = F.softmax(self.tconv4(s3).reshape((N*graph_n, self.spatial_act_size, -1)), dim=2).reshape((N, graph_n, self.spatial_act_size, self.spatial_width, self.spatial_width))
+        spatial_policy = F.softmax(self.tconv4(s3).reshape((N, self.spatial_act_size, -1)), dim=2).reshape((N, self.spatial_act_size, self.spatial_width, self.spatial_width))
         
         choice = None
         if (choosing):
             assert(N==1)
+            choice = self.choose(spatial_policy, nonspatial_policy)
+            """
             #choices = self.choose(spatial_policy, nonspatial_policy)
-            nonspatial_choice = self.multi_agent_choose_action(nonspatial_policy.detach().cpu().reshape((graph_n, self.nonspatial_act_size)).numpy())
+            nonspatial_choice = self.choose_action(nonspatial_policy.detach().cpu().reshape((graph_n, self.nonspatial_act_size)).numpy())
             
             spatial_choice = self.multi_agent_choose_action(spatial_policy.detach().cpu().reshape((graph_n * self.spatial_act_size, self.spatial_width ** 2)).numpy())
             spatial_choice = spatial_choice.reshape((graph_n, self.spatial_act_size))
@@ -117,6 +126,7 @@ class GraphConvNet(nn.Module):
                 spatial_out[:,2*i+1] = spatial_choice[:,i] % self.spatial_width
             
             choice = [spatial_out, nonspatial_choice]
+            """
         
         return spatial_policy, nonspatial_policy, value, choice
         
@@ -156,14 +166,14 @@ class GraphConvNet(nn.Module):
         return output
         
     def cumsum2D(self, probs, choice):
-        rowsums = torch.cumsum(torch.sum(probs, 1), 0).reshape((self.h,1))[:-1]
+        rowsums = torch.cumsum(torch.sum(probs, 1), 0).reshape((self.spatial_width,1))[:-1]
         cumsums = torch.cumsum(probs, 1)
         cumsums[1:, :] += rowsums
         probs[-1,-1] = 1.0
         return cumsums
         
     """
-        probs: (graph_n, self.spatial_act_size)
+        probs: (graph_n, self.spatial_act_size) 
     """
     def multi_agent_choose_action(self, probs):
         (prob_n, _) = probs.shape

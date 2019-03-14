@@ -55,6 +55,8 @@ class PPOAgent(object):
         self.env = env
         nonspatial_act_size, spatial_act_depth = env.action_space
         self.nonspatial_act_size, self.spatial_act_depth = env.action_space
+        self.nonspatial_act_size -= 1
+        nonspatial_act_size -= 1
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.net = models.GraphConvNet(nonspatial_act_size, spatial_act_depth, self.device).to(self.device)
         self.target_net = models.GraphConvNet(nonspatial_act_size, spatial_act_depth, self.device).to(self.device)
@@ -114,8 +116,9 @@ class PPOAgent(object):
                 
                 spatial_action, nonspatial_action = action
                 
+                print(action)
                 ### Env step
-                state, reward, done, info = self.env.step(nonspatial_action, spatial_action[0], spatial_action[1])
+                state, reward, done, info = self.env.step(nonspatial_action+1, spatial_action[0], spatial_action[1])
                 score += reward
                 ### Append state to history
                 history.append(state)
@@ -196,7 +199,7 @@ class PPOAgent(object):
 def main():
     env = custom_env.MinigameEnvironment(state_modifier.graph_conv_modifier,
                                             map_name_="DefeatRoaches",
-                                            render=False,
+                                            render=True,
                                             step_multiplier=8)
     lr = 0.00025                       
     agent = PPOAgent(env, lr)
