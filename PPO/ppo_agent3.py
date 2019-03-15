@@ -93,19 +93,33 @@ class PPOAgent(object):
             step = 0
             
             state, reward, done, info = self.env.reset()
+            action = [np.array([[0,0],[0,0]]), 0]
+            value = 0
+            r = 0
             G, X, avail_actions = state
             _select_next = True
 
             while not done:
                 # Handle selection, edge cases
                 if not info['friendly_units_present']:
-                    state, reward, done, info = self.env.step(4)
+                    s, r, d, temp_info = self.env.step(4)
+                    self.memory.push(state, action, reward+r, done, value, 0, 0)
+                    state = s
+                    reward = r
+                    done = d
+                    info = temp_info
                     continue
                 if _select_next or not info['units_selected']:
                     _select_next = False
-                    state, reward, done, info = self.env.step(0)
+                    s, r, d, temp_info = self.env.step(0)
+                    self.memory.push(state, action, reward+r, done, value, 0, 0)
+                    state = s
+                    reward = r
+                    done = d
+                    info = temp_info
                     continue
             
+                
                 _select_next = True
                 step += 1
                 frame += 1
@@ -130,7 +144,7 @@ class PPOAgent(object):
                 history.append(state)
                 
                 ### Store transition in memory
-                self.memory.push(state, action, reward, done, value, 0, 0)
+                #self.memory.push(state, action, reward, done, value, 0, 0)
                 
                 ### Start training after random sample generation
                 
@@ -235,9 +249,9 @@ class PPOAgent(object):
                 
                 value_loss = self.loss(values.squeeze(1), v_returns.detach())
                 
-                #ent = self.entropy(spatial_probs, nonspatial_probs)
+                ent = self.entropy(spatial_probs[:,0,:,:], nonspatial_probs)
                 
-                total_loss = pol_avg + self.c1 * value_loss # - self.c2 * ent
+                total_loss = pol_avg + self.c1 * value_loss - self.c2 * ent
                 self.optimizer.zero_grad()
                 total_loss.backward()
                 self.optimizer.step()
@@ -264,11 +278,14 @@ class PPOAgent(object):
         else:
             return hist[-length:]
                         
+    def entropy(self, spatial_probs, nonspatial_probs):
+        ent = - (torch.sum(spatial_probs * torch.log(spatial_probs+self.eps_denom)).mean() + torch.sum(nonspatial_probs * torch.log(nonspatial_probs)).mean() )
+        return ent
 
 def main():
     env = custom_env.MinigameEnvironment(state_modifier.graph_conv_modifier,
                                             map_name_="DefeatRoaches",
-                                            render=True,
+                                            render=False,
                                             step_multiplier=1)
     lr = 0.00025                       
     agent = PPOAgent(env, lr)
