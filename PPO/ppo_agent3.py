@@ -27,12 +27,13 @@ import torch.nn as nn
 import torch.optim as optim
 from memory import ReplayMemory
 
+from config import *
 
 np.set_printoptions(linewidth=200, precision=4)
 
 
 class PPOAgent(object):
-    def __init__(self, env, lr, hist_size=2, train_step=256, trainable=True):
+    def __init__(self, env, lr, hist_size=1, train_step=128, trainable=True):
         
         self.filters1 = 16
         self.filters2 = 32
@@ -41,6 +42,7 @@ class PPOAgent(object):
         self.hist_size = hist_size
         self.train_step = train_step
         self.clip_param = 0.2
+        self.eps_denom = 1e-4
         self.episodes = 10000
         self.save_frame = 50000
         self.evaluation_reward_length = 100
@@ -49,8 +51,6 @@ class PPOAgent(object):
         self.discount_factor = 0.99
         self.lam = 0.95
         self.batch_size = 32
-        
-        
         
         self.env = env
         nonspatial_act_size, spatial_act_depth = env.action_space
@@ -111,14 +111,16 @@ class PPOAgent(object):
                 
                 ### Select action, value
                 _, _, value, action = self.net(G, X, avail_actions, choosing=True)
-                print(value)
                 value = value.cpu().data.numpy().item()
                 
                 spatial_action, nonspatial_action = action
+           
                 
-                print(action)
+                #print(action)
                 ### Env step
                 state, reward, done, info = self.env.step(nonspatial_action+1, spatial_action[0], spatial_action[1])
+                G, X, avail_actions = state
+                action = [np.array(spatial_action), nonspatial_action]
                 score += reward
                 ### Append state to history
                 history.append(state)
@@ -127,13 +129,16 @@ class PPOAgent(object):
                 self.memory.push(state, action, reward, done, value, 0, 0)
                 
                 ### Start training after random sample generation
+                
                 if (frame % self.train_step == 0):
+                    
                     for i in range(self.epochs):
-                        _, _, frame_next_val, _ = self.net(screen, minimap, nonspatial_in, avail_actions, history=self.get_recent_hist(history), choosing=True)
+                        _, _, frame_next_val, _ = self.net(G, X, avail_actions)
                         frame_next_val = frame_next_val.cpu().data.numpy().item()
                         self.train_policy_net_ppo(frame, frame_next_val)
                         
                         self.update_target_net()
+                
                 
                 ### Save model, print time, record information
                 if (frame % self.save_frame == 0):
@@ -164,7 +169,7 @@ class PPOAgent(object):
 
         ### number of iterations of batches of size self.batch_size. Should divide evenly
         num_iters = int(len(self.memory) / self.batch_size)
-
+        device = self.device
         ### Do multiple epochs
         for i in range(self.epochs):
             
@@ -179,14 +184,49 @@ class PPOAgent(object):
                 mini_batch = self.memory.sample_mini_batch(frame)
                 mini_batch = np.array(mini_batch).transpose()
                 
-                ### Shape: (batch_size, hist_size, 2)
                 states = np.stack(mini_batch[0], axis=0)
+                G_states = np.stack(states[:,0], axis=1).squeeze(0)
+                X_states = np.stack(states[:,1], axis=1).squeeze(0)
+                avail_states = np.stack(states[:,2], axis=0)
+                
+                actions = np.array(list(mini_batch[1]))
+                spatial_actions = np.stack(actions[:,0],0)
+                first_spatials = spatial_actions[:,0]
+                second_spatials = spatial_actions[:,1]
+                nonspatial_acts = np.array(actions[:,1]).astype(np.uint8)
+                print(nonspatial_acts, nonspatial_acts.dtype)
+                
+                print(first_spatials.shape, second_spatials.shape, nonspatial_acts.shape)
+                
+                
+                rewards = np.array(list(mini_batch[2]))
+                dones = mini_batch[3]
+                v_returns = mini_batch[5].astype(np.float32)
+                advantages = mini_batch[6].astype(np.float32)
+                
+                
+                #G_states = torch.from_numpy(G_states).to(device)
+                #X_states = torch.from_numpy(X_states).to(device)
+                #avail_states = torch.from_numpy(avail_states).to(device)
+                
+                first_spatials = torch.from_numpy(first_spatials).to(device)
+                second_spatials = torch.from_numpy(second_spatials).to(device)
+                nonspatial_acts = torch.from_numpy(nonspatial_acts).to(device)
+                
+                rewards = torch.from_numpy(rewards).to(device)
+                dones = torch.from_numpy(np.uint8(dones)).to(device)
+                v_returns = torch.from_numpy(v_returns).to(device)
+                advantages = torch.from_numpy(advantages).to(device)
+                
+                advantages = (advantages - advantages.mean()) / (torch.clamp(advantages.std(), self.eps_denom))
+                
+                spatial_probs, nonspatial_probs, values, _ = self.net(G_states, X_states, avail_states)
+                old_spatial_probs, old_nonspatial_probs, values, _ = self.target_net(G_states, X_states, avail_states)
+                
+                              
                 
                 
                 
-                
-    
-    
     def get_recent_hist(self, hist):
         length = min(len(hist), self.hist_size)
         if (length == 0):
@@ -194,13 +234,12 @@ class PPOAgent(object):
         else:
             return hist[-length:]
                         
-        
 
 def main():
     env = custom_env.MinigameEnvironment(state_modifier.graph_conv_modifier,
                                             map_name_="DefeatRoaches",
                                             render=True,
-                                            step_multiplier=8)
+                                            step_multiplier=1)
     lr = 0.00025                       
     agent = PPOAgent(env, lr)
     agent.train()

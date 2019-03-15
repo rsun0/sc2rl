@@ -7,6 +7,9 @@ from enum import Enum
 
 class MinigameEnvironment:
 
+    screen_width = 84
+    action_width = 32
+
     def __init__(self, state_modifier_func, map_name_="DefeatRoaches", render=False, step_multiplier=None):
         '''
         Initializes internal pysc2 environment
@@ -87,6 +90,8 @@ class MinigameEnvironment:
         else:
             step_act = 0
 
+        topleft = self.convert_spatial(topleft)
+        botright = self.convert_spatial(botright)
         self._run_to_next(step_act, topleft=topleft, botright=botright)
         self._terminal = self._curr_frame.last()
         #agent_obs = self._combine_frames()
@@ -163,3 +168,12 @@ class MinigameEnvironment:
                 [raw_action])[0]  # get obs for 1st agent
         except protocol.ConnectionError:
             self._curr_frame = self._env.reset()[0]
+            
+            
+    def convert_spatial(self, coords):
+        if (coords is None):
+            return None
+        new_coords = []
+        for i in coords:
+            new_coords.append((i / MinigameEnvironment.action_width) * MinigameEnvironment.screen_width)
+        return new_coords

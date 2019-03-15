@@ -39,6 +39,7 @@ class state_modifier():
         _PLAYER_HOSTILE = 4
         
         units = np.array(obs.observation.feature_units)
+        #print(units, dir(obs.observation.feature_units))
         G = state_modifier.to_graph(units)
         X = state_modifier.preprocess_units(units)
         avail_actions = state_modifier.preprocess_actions(obs.observation.available_actions, GraphConvConfigMinigames)
@@ -60,7 +61,7 @@ class state_modifier():
         info['friendly_units_present'] = np.any(friendly_unit_density > 0)
         info['units_selected'] = np.any(selected > 0)
         
-        return [np.expand_dims(G,0), np.expand_dims(X,0), avail_actions, info]
+        return np.array([np.expand_dims(G,0), np.expand_dims(X,0), avail_actions, info])
 
 
     def modified_state_space(obs):

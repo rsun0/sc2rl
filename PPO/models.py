@@ -153,10 +153,10 @@ class GraphConvNet(nn.Module):
         choice = random.random()
         if (len(probs.shape) == 2):
             
-            probs = self.cumsum2D(probs, choice)            
+            probs = self.cumsum2D(probs, choice)
             probmap = torch.where(probs <= choice, self.where_yes, self.where_no)
             try:
-                coords = probmap.nonzero()[-1]
+                coords = probmap.nonzero()[-1].cpu().data.numpy()
             except: 
                 coords = [0,0]
             return coords

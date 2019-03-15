@@ -47,17 +47,23 @@ class ReplayMemory(object):
         idx_sample = self.indices[lower:upper]
         for i in idx_sample:
             sample = []
+            G_samp = []
+            X_samp = []
+            avail_samp = []
             for j in range(self.history_size):
                 sample.append(self.memory[i + j])
+                #print("\n", self.memory[i+j], "\n")
+                G_samp.append(self.memory[i+j][0][0])
+                X_samp.append(self.memory[i+j][0][1])
+                avail_samp.append(self.memory[i+j][0][2])
 
             #sample = np.array(sample)
             row = sample[self.history_size-1]
-            for i in range(len(sample)):
-                print(len(sample), len(sample[i]), len(sample[i][0]))
-                print(sample[i][0].shape)
+            #print(row)
             #print(sample.shape, row.shape, sample[:,0].shape, sample[0,:].shape, sample[:,0][0].shape, sample[0].shape, type(sample[:,0]), type(sample[:,0][0]))
-            row[0] = np.array(sample[:,0])
-            mini_batch.append(np.array(row))
+            row[0] = np.array([G_samp[-1], X_samp[-1], avail_samp[-1]])
+            mini_batch.append(row)
+
 
         self.access_num = (self.access_num + 1) % self.reset_num
         if (self.access_num == 0):
