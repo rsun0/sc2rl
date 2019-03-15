@@ -70,6 +70,7 @@ class GraphConvConfigMinigames():
                                 12:0,
                                 331:1,
                                 453:2}
+                                
 
     spatial_width = 32    
 

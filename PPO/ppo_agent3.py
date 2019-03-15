@@ -33,7 +33,7 @@ np.set_printoptions(linewidth=200, precision=4)
 
 
 class PPOAgent(object):
-    def __init__(self, env, lr, hist_size=1, train_step=128, trainable=True):
+    def __init__(self, env, lr, hist_size=1, train_step=1024, trainable=True):
         
         self.filters1 = 16
         self.filters2 = 32
@@ -63,6 +63,10 @@ class PPOAgent(object):
         
         self.memory = ReplayMemory(self.train_step, self.hist_size, self.batch_size)
         self.optimizer = optim.Adam(params = self.net.parameters(), lr=self.lr)
+        self.loss = nn.MSELoss()
+        
+        self.c1 = 1.0
+        self.c2 = 0.01
         
     def update_target_net(self):
         self.target_net.load_state_dict(self.net.state_dict())
@@ -131,13 +135,11 @@ class PPOAgent(object):
                 ### Start training after random sample generation
                 
                 if (frame % self.train_step == 0):
-                    
-                    for i in range(self.epochs):
-                        _, _, frame_next_val, _ = self.net(G, X, avail_actions)
-                        frame_next_val = frame_next_val.cpu().data.numpy().item()
-                        self.train_policy_net_ppo(frame, frame_next_val)
+                    _, _, frame_next_val, _ = self.net(G, X, avail_actions)
+                    frame_next_val = frame_next_val.cpu().data.numpy().item()
+                    self.train_policy_net_ppo(frame, frame_next_val)
                         
-                        self.update_target_net()
+                    self.update_target_net()
                 
                 
                 ### Save model, print time, record information
@@ -189,14 +191,13 @@ class PPOAgent(object):
                 X_states = np.stack(states[:,1], axis=1).squeeze(0)
                 avail_states = np.stack(states[:,2], axis=0)
                 
+                n = states.shape[0]
+                
                 actions = np.array(list(mini_batch[1]))
                 spatial_actions = np.stack(actions[:,0],0)
                 first_spatials = spatial_actions[:,0]
                 second_spatials = spatial_actions[:,1]
-                nonspatial_acts = np.array(actions[:,1]).astype(np.uint8)
-                print(nonspatial_acts, nonspatial_acts.dtype)
-                
-                print(first_spatials.shape, second_spatials.shape, nonspatial_acts.shape)
+                nonspatial_acts = np.array(actions[:,1]).astype(np.int64)
                 
                 
                 rewards = np.array(list(mini_batch[2]))
@@ -204,14 +205,10 @@ class PPOAgent(object):
                 v_returns = mini_batch[5].astype(np.float32)
                 advantages = mini_batch[6].astype(np.float32)
                 
-                
-                #G_states = torch.from_numpy(G_states).to(device)
-                #X_states = torch.from_numpy(X_states).to(device)
-                #avail_states = torch.from_numpy(avail_states).to(device)
-                
                 first_spatials = torch.from_numpy(first_spatials).to(device)
                 second_spatials = torch.from_numpy(second_spatials).to(device)
                 nonspatial_acts = torch.from_numpy(nonspatial_acts).to(device)
+                nonspatial_acts = nonspatial_acts.unsqueeze(1)
                 
                 rewards = torch.from_numpy(rewards).to(device)
                 dones = torch.from_numpy(np.uint8(dones)).to(device)
@@ -221,11 +218,44 @@ class PPOAgent(object):
                 advantages = (advantages - advantages.mean()) / (torch.clamp(advantages.std(), self.eps_denom))
                 
                 spatial_probs, nonspatial_probs, values, _ = self.net(G_states, X_states, avail_states)
-                old_spatial_probs, old_nonspatial_probs, values, _ = self.target_net(G_states, X_states, avail_states)
+                old_spatial_probs, old_nonspatial_probs, old_values, _ = self.target_net(G_states, X_states, avail_states)
+                
+                #print(nonspatial_probs.shape, self.index_spatial_probs(spatial_probs[:,0,:,:], first_spatials).shape, (nonspatial_acts < 2).shape)
+                #print(nonspatial_probs.shape, nonspatial_acts.shape)
+                #print(nonspatial_probs[range(self.batch_size),nonspatial_acts].shape)
+                
+                numerator = torch.log(nonspatial_probs[range(n),nonspatial_acts]) + torch.log(self.index_spatial_probs(spatial_probs[:,0,:,:], first_spatials)) * (nonspatial_acts < 2).to(self.device).float()
+                denom = torch.log(old_nonspatial_probs)[range(n),nonspatial_acts] + torch.log(self.index_spatial_probs(old_spatial_probs[:,0,:,:], first_spatials)) * (nonspatial_acts < 2).to(self.device).float() + self.eps_denom
+                
+                ratio = torch.exp(numerator - denom)
+                ratio_adv = ratio * advantages.detach()
+                bounded_adv = torch.clamp(ratio, 1-self.clip_param, 1+self.clip_param) * advantages.detach()
+                
+                pol_avg = - ((torch.min(ratio_adv, bounded_adv)).mean())
+                
+                value_loss = self.loss(values.squeeze(1), v_returns.detach())
+                
+                #ent = self.entropy(spatial_probs, nonspatial_probs)
+                
+                total_loss = pol_avg + self.c1 * value_loss # - self.c2 * ent
+                self.optimizer.zero_grad()
+                total_loss.backward()
+                self.optimizer.step()
+                
+                pol_loss += pol_avg.detach().item()
+                vf_loss = value_loss.detach().item()
+                
+            pol_loss /= num_iters
+            vf_loss /= num_iters
+            #ent_total /= num_iters
+            print("Iteration %d: Policy loss: %f. Value loss: %f. Entropy: " % (self.num_epochs_trained, pol_loss, vf_loss)) #, ent_total))
                 
                               
-                
-                
+    def index_spatial_probs(self, spatial_probs, indices):
+        index_tuple = torch.meshgrid([torch.arange(x) for x in spatial_probs.size()[:-2]]) + (indices[:,0], indices[:,1],)
+        index_tuple = index_tuple
+        output = spatial_probs[index_tuple]
+        return output
                 
     def get_recent_hist(self, hist):
         length = min(len(hist), self.hist_size)
