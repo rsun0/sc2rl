@@ -41,7 +41,7 @@ class PPOAgent(object):
         self.lr = lr
         self.hist_size = hist_size
         self.train_step = train_step
-        self.clip_param = 0.2
+        self.clip_param = 0.1
         self.eps_denom = 1e-4
         self.episodes = 10000
         self.save_frame = 50000
@@ -63,7 +63,7 @@ class PPOAgent(object):
         
         self.memory = ReplayMemory(self.train_step, self.hist_size, self.batch_size)
         self.optimizer = optim.Adam(params = self.net.parameters(), lr=self.lr)
-        self.loss = nn.MSELoss()
+        self.loss = nn.SmoothL1Loss()
         
         self.c1 = 1.0
         self.c2 = 0.01
@@ -91,6 +91,7 @@ class PPOAgent(object):
             
             ### Keeps track of length of current game
             step = 0
+            score = 0
             
             state, reward, done, info = self.env.reset()
             action = [np.array([[0,0],[0,0]]), 0]
@@ -101,75 +102,71 @@ class PPOAgent(object):
 
             while not done:
                 # Handle selection, edge cases
-                if not info['friendly_units_present']:
-                    s, r, d, temp_info = self.env.step(4)
+                
+                if (not info['friendly_units_present'] or (_select_next or not info['units_selected'])):
+                    if (_select_next or not info['units_selected']):
+                        _select_next = False
+                        s, r, d, temp_info = self.env.step(0)
+                    else:
+                        s, r, d, temp_info = self.env.step(4)
                     self.memory.push(state, action, reward+r, done, value, 0, 0)
                     state = s
                     reward = r
                     done = d
                     info = temp_info
-                    continue
-                if _select_next or not info['units_selected']:
-                    _select_next = False
-                    s, r, d, temp_info = self.env.step(0)
-                    self.memory.push(state, action, reward+r, done, value, 0, 0)
-                    state = s
-                    reward = r
-                    done = d
-                    info = temp_info
-                    continue
-            
                 
-                _select_next = True
-                step += 1
-                frame += 1
+                else:
                 
-                ### stack history
-                recent_hist = self.get_recent_hist(history)
+                    _select_next = True
+                    step += 1
+                    frame += 1
+                    
+                    ### stack history
+                    recent_hist = self.get_recent_hist(history)
+                    
+                    ### Select action, value
+                    _, _, value, action = self.net(G, X, avail_actions, choosing=True)
+                    value = value.cpu().data.numpy().item()
+                    
+                    spatial_action, nonspatial_action = action
+               
+                    
+                    #print(action)
+                    ### Env step
+                    state, reward, done, info = self.env.step(nonspatial_action+1, spatial_action[0], spatial_action[1])
+                    G, X, avail_actions = state
+                    action = [np.array(spatial_action), nonspatial_action]
+                    score += reward
+                    ### Append state to history
+                    history.append(state)
+                    
+                    ### Store transition in memory
+                    #self.memory.push(state, action, reward, done, value, 0, 0)
                 
-                ### Select action, value
-                _, _, value, action = self.net(G, X, avail_actions, choosing=True)
-                value = value.cpu().data.numpy().item()
-                
-                spatial_action, nonspatial_action = action
-           
-                
-                #print(action)
-                ### Env step
-                state, reward, done, info = self.env.step(nonspatial_action+1, spatial_action[0], spatial_action[1])
-                G, X, avail_actions = state
-                action = [np.array(spatial_action), nonspatial_action]
-                score += reward
-                ### Append state to history
-                history.append(state)
-                
-                ### Store transition in memory
-                #self.memory.push(state, action, reward, done, value, 0, 0)
-                
-                ### Start training after random sample generation
-                
-                if (frame % self.train_step == 0):
-                    _, _, frame_next_val, _ = self.net(G, X, avail_actions)
-                    frame_next_val = frame_next_val.cpu().data.numpy().item()
-                    self.train_policy_net_ppo(frame, frame_next_val)
-                        
-                    self.update_target_net()
-                
-                
-                ### Save model, print time, record information
-                if (frame % self.save_frame == 0):
-                    print('now time : ', datetime.now())
-                    rewards.append(np.mean(evaluation_reward))
-                    episodes.append(e)
-                    plt.plot(episodes, rewards, 'r')
-                    plt.save_fig("save_model/Starcraft2" + self.env.map + "PPOgraph.png")
-                    torch.save(self.net.state_dict(), "save_model/Starcraft2" + self.env.map + "PPO")
+                    ### Start training after random sample generation
+                    
+                    if (frame % self.train_step == 0 and frame != 0):
+                        _, _, frame_next_val, _ = self.net(G, X, avail_actions)
+                        frame_next_val = frame_next_val.cpu().data.numpy().item()
+                        self.train_policy_net_ppo(frame, frame_next_val)
+                            
+                        self.update_target_net()
+                    
+                    
+                    ### Save model, print time, record information
+                    if (frame % self.save_frame == 0):
+                        #print('now time : ', datetime.now())
+                        rewards.append(np.mean(evaluation_reward))
+                        episodes.append(e)
+                        plt.plot(episodes, rewards, 'r')
+                        plt.savefig("save_model/Starcraft2" + self.env.map + "PPOgraph.png")
+                        torch.save(self.net.state_dict(), "save_model/Starcraft2" + self.env.map + "PPO")
                 
                 ### Handle end of game logic    
                 if done:
                     evaluation_reward.append(score)
                     print("episode:", e, "  score:", score, "  steps:", step, "  evaluation reward:", np.mean(evaluation_reward))
-                    state, reward, done, _ = self.env.reset()
+                    #state, reward, done, _ = self.env.reset()
                     
                 G, X, avail_actions = state
                     
@@ -185,6 +182,7 @@ class PPOAgent(object):
 
         ### number of iterations of batches of size self.batch_size. Should divide evenly
         num_iters = int(len(self.memory) / self.batch_size)
+        print(len(self.memory), self.batch_size, num_iters)
         device = self.device
         ### Do multiple epochs
         for i in range(self.epochs):
@@ -195,7 +193,7 @@ class PPOAgent(object):
             
             self.num_epochs_trained += 1
             
-            for i in range(num_iters):
+            for j in range(num_iters):
                 
                 mini_batch = self.memory.sample_mini_batch(frame)
                 mini_batch = np.array(mini_batch).transpose()
@@ -234,6 +232,7 @@ class PPOAgent(object):
                 spatial_probs, nonspatial_probs, values, _ = self.net(G_states, X_states, avail_states)
                 old_spatial_probs, old_nonspatial_probs, old_values, _ = self.target_net(G_states, X_states, avail_states)
                 
+                
                 #print(nonspatial_probs.shape, self.index_spatial_probs(spatial_probs[:,0,:,:], first_spatials).shape, (nonspatial_acts < 2).shape)
                 #print(nonspatial_probs.shape, nonspatial_acts.shape)
                 #print(nonspatial_probs[range(self.batch_size),nonspatial_acts].shape)
@@ -257,12 +256,13 @@ class PPOAgent(object):
                 self.optimizer.step()
                 
                 pol_loss += pol_avg.detach().item()
-                vf_loss = value_loss.detach().item()
+                vf_loss += value_loss.detach().item()
+                ent_total += ent.detach().item() 
                 
             pol_loss /= num_iters
             vf_loss /= num_iters
-            #ent_total /= num_iters
-            print("Iteration %d: Policy loss: %f. Value loss: %f. Entropy: " % (self.num_epochs_trained, pol_loss, vf_loss)) #, ent_total))
+            ent_total /= num_iters
+            print("Iteration %d: Policy loss: %f. Value loss: %f. Entropy: %f" % (self.num_epochs_trained, pol_loss, vf_loss, ent_total))
                 
                               
     def index_spatial_probs(self, spatial_probs, indices):
@@ -279,14 +279,14 @@ class PPOAgent(object):
             return hist[-length:]
                         
     def entropy(self, spatial_probs, nonspatial_probs):
-        ent = - (torch.sum(spatial_probs * torch.log(spatial_probs+self.eps_denom)).mean() + torch.sum(nonspatial_probs * torch.log(nonspatial_probs)).mean() )
+        ent = - (torch.mean(torch.sum(spatial_probs * torch.log(spatial_probs+self.eps_denom), dim=(1,2))) + torch.mean(torch.sum(nonspatial_probs * torch.log(nonspatial_probs), dim=1) ) )
         return ent
 
 def main():
     env = custom_env.MinigameEnvironment(state_modifier.graph_conv_modifier,
                                             map_name_="DefeatRoaches",
                                             render=False,
-                                            step_multiplier=1)
+                                            step_multiplier=2)
     lr = 0.00025                       
     agent = PPOAgent(env, lr)
     agent.train()
