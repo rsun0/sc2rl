@@ -55,8 +55,6 @@ class PPOAgent(object):
         self.env = env
         nonspatial_act_size, spatial_act_depth = env.action_space
         self.nonspatial_act_size, self.spatial_act_depth = env.action_space
-        self.nonspatial_act_size -= 1
-        nonspatial_act_size -= 1
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.net = models.GraphConvNet(nonspatial_act_size, spatial_act_depth, self.device).to(self.device)
         self.target_net = models.GraphConvNet(nonspatial_act_size, spatial_act_depth, self.device).to(self.device)
@@ -103,64 +101,54 @@ class PPOAgent(object):
             while not done:
                 # Handle selection, edge cases
                 
-                if (not info['friendly_units_present'] or (_select_next or not info['units_selected'])):
-                    if (_select_next or not info['units_selected']):
-                        _select_next = False
-                        s, r, d, temp_info = self.env.step(0)
-                    else:
-                        s, r, d, temp_info = self.env.step(4)
-                    self.memory.push(state, action, reward+r, done, value, 0, 0)
-                    state = s
-                    reward = r
-                    done = d
-                    info = temp_info
+                if (not info['friendly_units_present']):
+                    print("hello")
+                    state, reward, done, info = self.env.step(0)
+                    continue
                 
-                else:
                 
-                    _select_next = True
-                    step += 1
-                    frame += 1
-                    
-                    ### stack history
-                    recent_hist = self.get_recent_hist(history)
-                    
-                    ### Select action, value
-                    _, _, value, action = self.net(G, X, avail_actions, choosing=True)
-                    value = value.cpu().data.numpy().item()
-                    
-                    spatial_action, nonspatial_action = action
-               
-                    
-                    #print(action)
-                    ### Env step
-                    state, reward, done, info = self.env.step(nonspatial_action+1, spatial_action[0], spatial_action[1])
-                    G, X, avail_actions = state
-                    action = [np.array(spatial_action), nonspatial_action]
-                    score += reward
-                    ### Append state to history
-                    history.append(state)
-                    
-                    ### Store transition in memory
-                    #self.memory.push(state, action, reward, done, value, 0, 0)
+                step += 1
+                frame += 1
                 
-                    ### Start training after random sample generation
+                ### stack history
+                recent_hist = self.get_recent_hist(history)
+                
+                ### Select action, value
+                _, _, value, action = self.net(G, X, avail_actions, choosing=True)
+                value = value.cpu().data.numpy().item()
+                
+                spatial_action, nonspatial_action = action
+                                
+                #print(action)
+                ### Env step
+                state, reward, done, info = self.env.step(nonspatial_action, spatial_action[0], spatial_action[1])
+                G, X, avail_actions = state
+                action = [np.array(spatial_action), nonspatial_action]
+                score += reward
+                ### Append state to history
+                history.append(state)
                     
-                    if (frame % self.train_step == 0 and frame != 0):
-                        _, _, frame_next_val, _ = self.net(G, X, avail_actions)
-                        frame_next_val = frame_next_val.cpu().data.numpy().item()
-                        self.train_policy_net_ppo(frame, frame_next_val)
+                ### Store transition in memory
+                self.memory.push(state, action, reward, done, value, 0, 0)
+                
+                ### Start training after random sample generation
+                    
+                if (frame % self.train_step == 0 and frame != 0):
+                    _, _, frame_next_val, _ = self.net(G, X, avail_actions)
+                    frame_next_val = frame_next_val.cpu().data.numpy().item()
+                    self.train_policy_net_ppo(frame, frame_next_val)
                             
-                        self.update_target_net()
+                    self.update_target_net()
                     
                     
-                    ### Save model, print time, record information
-                    if (frame % self.save_frame == 0):
-                        #print('now time : ', datetime.now())
-                        rewards.append(np.mean(evaluation_reward))
-                        episodes.append(e)
-                        plt.plot(episodes, rewards, 'r')
-                        plt.savefig("save_model/Starcraft2" + self.env.map + "PPOgraph.png")
-                        torch.save(self.net.state_dict(), "save_model/Starcraft2" + self.env.map + "PPO")
+                ### Save model, print time, record information
+                if (frame % self.save_frame == 0):
+                    #print('now time : ', datetime.now())
+                    rewards.append(np.mean(evaluation_reward))
+                    episodes.append(e)
+                    plt.plot(episodes, rewards, 'r')
+                    plt.savefig("save_model/Starcraft2" + self.env.map + "PPOgraph.png")
+                    torch.save(self.net.state_dict(), "save_model/Starcraft2" + self.env.map + "PPO")
                 
                 ### Handle end of game logic    
                 if done:
@@ -237,8 +225,8 @@ class PPOAgent(object):
                 #print(nonspatial_probs.shape, nonspatial_acts.shape)
                 #print(nonspatial_probs[range(self.batch_size),nonspatial_acts].shape)
                 
-                numerator = torch.log(nonspatial_probs[range(n),nonspatial_acts]) + torch.log(self.index_spatial_probs(spatial_probs[:,0,:,:], first_spatials)) * (nonspatial_acts < 2).to(self.device).float()
-                denom = torch.log(old_nonspatial_probs)[range(n),nonspatial_acts] + torch.log(self.index_spatial_probs(old_spatial_probs[:,0,:,:], first_spatials)) * (nonspatial_acts < 2).to(self.device).float() + self.eps_denom
+                numerator = torch.log(nonspatial_probs[range(n),nonspatial_acts]) + torch.log(self.index_spatial_probs(spatial_probs[:,0,:,:], first_spatials)) * (nonspatial_acts < 3).to(self.device).float() + (torch.log(self.index_spatial_probs(spatial_probs[:,1,:,:], second_spatials)) * (nonspatial_acts == 0).to(self.device).float())
+                denom = torch.log(old_nonspatial_probs)[range(n),nonspatial_acts] + torch.log(self.index_spatial_probs(old_spatial_probs[:,0,:,:], first_spatials)) * (nonspatial_acts < 3).to(self.device).float() + (torch.log(self.index_spatial_probs(old_spatial_probs[:,1,:,:], second_spatials)) * (nonspatial_acts == 0).to(self.device).float())
                 
                 ratio = torch.exp(numerator - denom)
                 ratio_adv = ratio * advantages.detach()

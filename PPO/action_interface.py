@@ -14,7 +14,7 @@ class Action(Enum):
 class Actuator:
 
     _ACTION_SPACE = (5, 2)
-    _SELECT_SPACE = 84
+    _SELECT_SPACE = 32
     _SCREEN = 84
 
     def __init__(self):
@@ -34,14 +34,20 @@ class Actuator:
         selected = raw_obs.observation.feature_screen.selected
 
         if action == Action.SELECT.value:
-            assert topleft is None and botright is None, 'Coordinates no longer accepted for select'
-
+            #assert topleft is None and botright is None, 'Coordinates no longer accepted for select'
+            """
             _PLAYER_FRIENDLY = 1
             player_relative = np.array(
                 raw_obs.observation.feature_screen.player_relative)
             player_friendly = (player_relative == _PLAYER_FRIENDLY).astype(int)
             num_units = len(raw_obs.observation.feature_units)
             return self._compute_select(player_friendly, num_units)
+            """
+            if (topleft is None):
+                topleft = [0,0]
+            if (botright is None):
+                botright = [0,0]
+            return Actuator._select(topleft, botright)
 
         if action == Action.ATTACK.value:
             assert not np.all(
@@ -74,21 +80,20 @@ class Actuator:
         self._select_index += 1.5
         return actions.FUNCTIONS.select_point('select', selection)
 
-    # @staticmethod
-    # def _screen_normalize(coords):
-    #     coords = coords.reshape((2,))
-    #     coords = np.clip(coords, 0, Actuator._SCREEN - 1)
-    #     return coords
+    @staticmethod
+    def _screen_normalize(coords):
+        coords = coords.reshape((2,))
+        coords = np.clip(coords, 0, Actuator._SCREEN - 1)
+        return coords
 
-    # @staticmethod
-    # def _select(topleft, botright):
+    @staticmethod
+    def _select(topleft, botright):
 
-    #     tl = np.array(topleft) * (Actuator._SCREEN /
-    #                               (Actuator._SELECT_SPACE-1))
-    #     br = np.array(botright) * (Actuator._SCREEN /
-    #                                (Actuator._SELECT_SPACE-1))
+        tl = np.array(topleft) * (Actuator._SCREEN /
+                                  (Actuator._SELECT_SPACE-1))
+        br = np.array(botright) * (Actuator._SCREEN /
+                                   (Actuator._SELECT_SPACE-1))
+        tl_transform = Actuator._screen_normalize(tl)
+        br_transform = Actuator._screen_normalize(br)
 
-    #     tl_transform = Actuator._screen_normalize(tl)
-    #     br_transform = Actuator._screen_normalize(br)
-
-    #     return actions.FUNCTIONS.select_rect('select', tl_transform, br_transform)
+        return actions.FUNCTIONS.select_rect('select', tl_transform, br_transform)

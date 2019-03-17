@@ -63,13 +63,13 @@ class GraphConvConfigMinigames():
     graph_n = 20
     
     # env configs
-    action_space = 4
+    action_space = 5
     
-    env_agent_action_mapper = {0:3,
-                                #3:0,
-                                12:0,
-                                331:1,
-                                453:2}
+    env_agent_action_mapper = {0:4,
+                                3:0,
+                                12:1,
+                                331:2,
+                                453:3}
                                 
 
     spatial_width = 32    
