@@ -17,15 +17,16 @@ from time import sleep
 import matplotlib
 import matplotlib.pyplot as plt
 import action_interface
+import copy
 
 np.set_printoptions(linewidth=200, precision=4)
 
 class Network(object):
     def __init__(self, env, scope, num_layers, num_units, obs_plc, act_plc, select_act_plc, tl_plc, trainable=True):
         
-        self.filters1 = 64
-        self.filters2 = 128
-        self.filters3 = 128
+        self.filters1 = 16
+        self.filters2 = 32
+        self.filters3 = 64
     
     
         self.env = env
@@ -71,13 +72,15 @@ class Network(object):
             
             # Initializes fully connected layers
             for i in range(num_layers):
-                fc_mul = num_layers - i
+                fc_mul = 1 #num_layers - i
                 x = tf.layers.dense(x, 
                                 units=(fc_mul * num_units), 
                                 activation=self.activation, 
                                 name="p_fc"+str(i), 
                                 trainable=self.trainable)
-                                
+            
+            
+            
             action = tf.layers.dense(x, 
                                 units=self.action_size, 
                                 activation=tf.nn.softmax,
@@ -85,94 +88,19 @@ class Network(object):
                                 trainable=self.trainable)
                 
                 
-                
-            ### select_p network #####################################
-            """
-            x = self.obs_place
-            
-            # Initializes convolutional layers
-            
-            x = tf.layers.conv2d(x,
-                filters=self.filters1,
-                kernel_size=[8, 8],
-                padding="same",
-                strides=(4, 4),
-                activation=self.activation)
-                
-            x = tf.layers.conv2d(x,
-                filters=self.filters2,
-                kernel_size=[4, 4],
-                padding="same",
-                strides=2,
-                activation=self.activation)
-            
-            """
-            select_p = tf.layers.conv2d(baseline_conv_output,
-                filters=self.filters3,
-                kernel_size=[3,3],
-                padding="same",
-                strides=1,
-                activation=self.activation)
-                
-            ### Maybe add more dense layers
-            select_p = tf.contrib.layers.flatten(select_p)
-            
-            ### FC layers for top left
-            select_p_tl = select_p
-            for i in range(num_layers):
-                fc_mul = num_layers - i
-                select_p_tl = tf.layers.dense(select_p_tl,
-                                        units= (fc_mul * num_units),
-                                        activation=self.activation,
-                                        name="select_p_fc" + str(i),
-                                        trainable=self.trainable)            
-            
-            ### Placeholders for top left probabilities
-            select_p_x1 = tf.layers.dense(select_p_tl, units=self.select_width, activation=tf.nn.softmax, name="select_p_x1_fc", trainable=self.trainable)
-            select_p_y1 = tf.layers.dense(select_p_tl, units=self.select_height, activation=tf.nn.softmax, name="select_p_y1_fc", trainable=self.trainable)
+            select_p_x1 = tf.layers.dense(x, units=self.select_width, activation=tf.nn.softmax, name="select_p_x1_fc", trainable=self.trainable)
+            select_p_y1 = tf.layers.dense(x, units=self.select_height, activation=tf.nn.softmax, name="select_p_y1_fc", trainable=self.trainable)
 
 
             ### FC layers for bot right
-            select_p_br = tf.concat([select_p, self.tl_plc], axis=-1)
-            for i in range(num_layers):
-                fc_mul = num_layers - i
-                select_p_br = tf.layers.dense(select_p_br,
-                                        units= (fc_mul * num_units),
-                                        activation=self.activation,
-                                        name="select_p_br_fc" + str(i),
-                                        trainable=self.trainable)
+            #select_p_br = tf.concat([x, self.tl_plc], axis=-1)
             
             ### Placeholders for bot right         
-            select_p_x2 = tf.layers.dense(select_p_br, units=self.select_width, activation=tf.nn.softmax, name="select_p_x2_fc", trainable=self.trainable)
-            select_p_y2 = tf.layers.dense(select_p_br, units=self.select_height, activation=tf.nn.softmax, name="select_p_y2_fc", trainable=self.trainable)
+            select_p_x2 = tf.layers.dense(x, units=self.select_width, activation=tf.nn.softmax, name="select_p_x2_fc", trainable=self.trainable)
+            select_p_y2 = tf.layers.dense(x, units=self.select_height, activation=tf.nn.softmax, name="select_p_y2_fc", trainable=self.trainable)
             
             
-                
             
-                                     
-            x = self.obs_place
-            """
-            x = tf.layers.conv2d(x,
-                                filters=self.filters1,
-                                kernel_size=[8,8],
-                                padding="same",
-                                strides=(4,4),
-                                activation=self.activation)
-                                
-            x = tf.layers.conv2d(x,
-                                filters=self.filters2,
-                                kernel_size=[4,4],
-                                padding="same",
-                                strides=(2,2),
-                                activation=self.activation)
-            """
-                          
-            x = tf.contrib.layers.flatten(baseline_conv_output)
-            
-            for i in range(num_layers):
-                fc_mul = num_layers - i
-                x = tf.layers.dense(x, units=(fc_mul * num_units), activation=self.activation, name="v_fc"+str(i), trainable=self.trainable)
-                
             value = tf.layers.dense(x, units=1, activation=None, name="v_fc"+str(num_layers), trainable=self.trainable)
 
             
@@ -211,18 +139,18 @@ class PPOAgent(object):
         self.c1 = 1
         
         ### weight for entropy
-        self.c2 = 2e-3
+        self.c2 = 0.01
         
         ### Constant used for numerical stability in log and division operations
-        self.epsilon = 1e-8
+        self.epsilon = 1e-3
         
-        self.epochs = 5
-        self.step_size = 5120
+        self.epochs = 3
+        self.step_size = 2048
         self.gamma = 0.99
         self.lam = 0.95
-        self.clip_param = 0.2
+        self.clip_param = 0.1
         self.batch_size = 128
-        self.hidden_size = 1024
+        self.hidden_size = 256
         self.averages = []
 
         ## placeholders
@@ -242,7 +170,7 @@ class PPOAgent(object):
         ## build network
         self.net = Network(env=self.env,
                            scope="pi",
-                           num_layers=2,
+                           num_layers=1,
                            num_units=self.hidden_size,
                            obs_plc=self.obs_place,
                            act_plc=self.acts_place,
@@ -251,7 +179,7 @@ class PPOAgent(object):
 
         self.old_net = Network(env=self.env,
                                scope="old_pi",
-                               num_layers=2,
+                               num_layers=1,
                                num_units=self.hidden_size,
                                obs_plc=self.obs_place,
                                act_plc=self.acts_place,
@@ -352,6 +280,7 @@ class PPOAgent(object):
         
         ep_returns = []
         ep_lengths = []
+        value = 0
         
         while True:
         
@@ -402,11 +331,11 @@ class PPOAgent(object):
                 dones[i] = done
                 
                 
-                transformed_select = selection_nums
+                transformed_select = copy.deepcopy(selection_nums)
                 transformed_select[2:] -= transformed_select[:2]
-                if (transformed_select[2] == self.env.select_space - 1):
+                if (selection_nums[2] == self.env.select_space - 1):
                     transformed_select[2] = random.randint(transformed_select[2], self.env.select_space-1)
-                if (transformed_select[3] == self.env.select_space - 1):
+                if (selection_nums[3] == self.env.select_space - 1):
                     transformed_select[3] = random.randint(transformed_select[3], self.env.select_space-1)
                 
                 select_actions[i] = np.zeros((4, self.env.select_space,))
@@ -758,7 +687,7 @@ class PPOAgent(object):
         ### Stores previous iterations training data to augment current iteration data.
         ### May be useful, may be counterproductive. 
         previous_traj = {}
-        max_avg = 0
+        max_avg = -10
         for i in range(100000):
         
             ### 0 if training selector, 1 if training mover
@@ -782,6 +711,12 @@ class PPOAgent(object):
             traj = {}
             # normalize adv.
             
+            n = 1
+            # Save model every n iterations
+            if iteration % n == 0 and self.averages[-1] > max_avg:
+                max_avg = self.averages[-1]
+                print(" Model saved ")
+                self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
             
             len = int(super_traj["move_ob"].shape[0] / self.batch_size)
             
@@ -864,12 +799,7 @@ class PPOAgent(object):
                     
             super_traj = {}
             traj = {}  
-            n = 1
-            # Save model every n iterations
-            if iteration % n == 0 and self.averages[-1] > max_avg:
-                max_avg = self.averages[-1]
-                print(" Model saved ")
-                self.save_model("./model_" + self.env.map + "/ppo_" + self.env.map)
+            
             self.plot_results()
     
             
@@ -881,7 +811,7 @@ class PPOAgent(object):
         
         pol_surr = 0
         for i in range(len(self.net.select_p)):
-            ratio = tf.boolean_mask(self.net.select_p[i], self.select_acts_place[:,i,:]) / (tf.boolean_mask(self.old_net.select_p[i], self.select_acts_place[:,i,:]) + self.epsilon)
+            ratio = tf.exp(tf.log(tf.boolean_mask(self.net.select_p[i], self.select_acts_place[:,i,:])) - tf.log(tf.boolean_mask(self.old_net.select_p[i], self.select_acts_place[:,i,:]) + self.epsilon))
             surr1 = ratio * self.adv_place
             surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
             if i == 0:
@@ -903,7 +833,7 @@ class PPOAgent(object):
         
         ent = self.move_entropy(self.net, self.batch_size)
         #ratio = tf.exp(self.move_logp(self.net) - tf.stop_gradient(self.move_logp(self.old_net)))
-        ratio = tf.boolean_mask(self.net.p, self.acts_place) / (tf.boolean_mask(self.old_net.p, self.acts_place) + self.epsilon)
+        ratio = tf.exp(   tf.log(tf.boolean_mask(self.net.p, self.acts_place)) - tf.log(tf.boolean_mask(self.old_net.p, self.acts_place) + self.epsilon)   )
         #print(ratio.shape)
         surr1 = ratio * self.adv_place
         surr2 = tf.clip_by_value(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * self.adv_place
@@ -979,7 +909,7 @@ if __name__ == "__main__":
     sess = tf.Session(config=config)
     ppo = PPOAgent(env, session=sess)
     sess.run(tf.global_variables_initializer())
-    #ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
+    ppo.restore_model("./model_" + env.map + "/ppo_" + env.map)
     ppo.run()
 
     env.close()
