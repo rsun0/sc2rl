@@ -60,7 +60,7 @@ class state_modifier():
         info = {}
         info['friendly_units_present'] = np.any(friendly_unit_density > 0)
         info['units_selected'] = np.any(selected > 0)
-        
+
         return np.array([np.expand_dims(G,0), np.expand_dims(X,0), avail_actions, info])
 
 
@@ -152,7 +152,7 @@ class state_modifier():
             if i in my_config.env_agent_action_mapper.keys():
                 ind = my_config.env_agent_action_mapper[i]
                 available[ind] = 1
-        available[0] = 0                
+
                 
         return available
     """

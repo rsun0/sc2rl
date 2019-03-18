@@ -59,8 +59,8 @@ class GraphConvConfigMinigames():
     
     unit_vec_width = 27 + (num_unit_types-1) + (num_alliances - 1) + (num_directions - 1)
     
-    # Uniform for all 
-    graph_n = 20
+    # Uniform for all - must be able to handle the largest number of units 
+    graph_n = 30
     
     # env configs
     action_space = 5

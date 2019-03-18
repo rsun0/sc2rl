@@ -20,18 +20,20 @@ class GraphConvNet(nn.Module):
         
         self.config = GraphConvConfigMinigames
         self.spatial_width = self.config.spatial_width
-        self.fc1_size = self.fc2_size = 50
-        self.fc3_size = 50
+        self.embed_size = 50
+        self.fc1_size = self.fc2_size = 75
+        self.fc3_size = 150
         
         
-        FILTERS1 = 16
-        FILTERS2 = 32
-        FILTERS3 = 32
+        FILTERS1 = 32
+        FILTERS2 = 64
+        FILTERS3 = 64
         
         self.where_yes = torch.ones(1).to(self.device)
         self.where_no = torch.zeros(1).to(self.device)
         
-        self.W1 = nn.Linear(self.config.unit_vec_width, self.fc1_size)
+        self.unit_emedding = nn.Linear(self.config.unit_vec_width, self.embed_size)
+        self.W1 = nn.Linear(self.embed_size, self.fc1_size)
         self.W2 = nn.Linear(self.fc1_size, self.fc2_size)
         self.W3 = nn.Linear(self.fc2_size, self.fc3_size)
         
@@ -67,7 +69,7 @@ class GraphConvNet(nn.Module):
         
         
                                                     
-        self.activation = nn.ReLU()
+        self.activation = nn.Tanh()
         
         
     """
@@ -81,7 +83,7 @@ class GraphConvNet(nn.Module):
         
         G = torch.from_numpy(G).to(self.device).float()
         X = torch.from_numpy(X).to(self.device).float()
-        avail_actions = torch.from_numpy(avail_actions).float().to(self.device)
+        avail_actions = torch.from_numpy(avail_actions).byte().to(self.device)
         
         A = G + torch.eye(self.config.graph_n).to(self.device).unsqueeze(0)
         D = torch.zeros(A.shape).to(self.device)
@@ -92,12 +94,15 @@ class GraphConvNet(nn.Module):
         
         A_agg = torch.matmul(torch.matmul(D_inv_sqrt, A), D_inv_sqrt)
         
-        h1 = self.activation(torch.matmul(A_agg, self.W1(X)))
+        embedding = self.activation(self.unit_embedding(X))
+        h1 = self.activation(torch.matmul(A_agg, self.W1(embedding)))
         h2 = self.activation(torch.matmul(A_agg, self.W2(h1)))
         h3 = self.activation(torch.matmul(A_agg, self.W3(h2)))
         value_action_in = torch.mean(h3, dim=1)
         
-        nonspatial_policy = F.softmax(avail_actions * self.action_choice(value_action_in))
+        nonspatial = self.action_choice(value_action_in)
+        nonspatial.masked_fill_(1-avail_actions, float('-inf'))
+        nonspatial_policy = F.softmax(nonspatial)
         
         
         value = self.value_layer(value_action_in)

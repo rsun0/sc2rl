@@ -50,18 +50,18 @@ class Actuator:
             return Actuator._select(topleft, botright)
 
         if action == Action.ATTACK.value:
-            assert not np.all(
-                selected == 0), 'Tried to attack when no units selected'
+            #assert not np.all(
+            #    selected == 0), 'Tried to attack when no units selected'
             return actions.FUNCTIONS.Attack_screen('now', topleft)
 
         if action == Action.MOVE.value:
-            assert not np.all(
-                selected == 0), 'Tried to move when no units selected'
+            #assert not np.all(
+            #    selected == 0), 'Tried to move when no units selected'
             return actions.FUNCTIONS.Move_screen('now', topleft)
 
         if action == Action.STOP.value:
-            assert not np.all(
-                selected == 0), 'Tried to stop when no units selected'
+            #assert not np.all(
+            #    selected == 0), 'Tried to stop when no units selected'
             return actions.FUNCTIONS.Stop_quick('now')
 
         if action == Action.NO_OP.value:
