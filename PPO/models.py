@@ -32,7 +32,7 @@ class GraphConvNet(nn.Module):
         self.where_yes = torch.ones(1).to(self.device)
         self.where_no = torch.zeros(1).to(self.device)
         
-        self.unit_emedding = nn.Linear(self.config.unit_vec_width, self.embed_size)
+        self.unit_embedding = nn.Linear(self.config.unit_vec_width, self.embed_size)
         self.W1 = nn.Linear(self.embed_size, self.fc1_size)
         self.W2 = nn.Linear(self.fc1_size, self.fc2_size)
         self.W3 = nn.Linear(self.fc2_size, self.fc3_size)
