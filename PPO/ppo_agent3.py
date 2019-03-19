@@ -15,6 +15,7 @@ from modified_state_space import state_modifier
 import random
 from time import sleep
 import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import action_interface
 import copy
@@ -325,7 +326,7 @@ def main():
     env = custom_env.MinigameEnvironment(state_modifier.graph_conv_modifier,
                                             map_name_="DefeatRoaches",
                                             render=False,
-                                            step_multiplier=2)
+                                            step_multiplier=4)
     lr = 0.00025                       
     agent = PPOAgent(env, lr)
     agent.train()

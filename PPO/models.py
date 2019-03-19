@@ -21,8 +21,8 @@ class GraphConvNet(nn.Module):
         self.config = GraphConvConfigMinigames
         self.spatial_width = self.config.spatial_width
         self.embed_size = 50
-        self.fc1_size = self.fc2_size = 75
-        self.fc3_size = 150
+        self.fc1_size = self.fc2_size = 150
+        self.fc3_size = 200
         
         
         FILTERS1 = 32
