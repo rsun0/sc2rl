@@ -72,6 +72,10 @@ class PPOAgent(object):
     def update_target_net(self):
         self.target_net.load_state_dict(self.net.state_dict())
         
+    def load_saved_model(self):
+        self.net.load_state_dict(torch.load("save_model/Starcraft2" + self.env.map + "PPO"))
+        self.update_target_net()
+        
     def train(self):
     
         evaluation_reward = deque(maxlen=self.evaluation_reward_length)
@@ -329,6 +333,7 @@ def main():
                                             step_multiplier=4)
     lr = 0.00025                       
     agent = PPOAgent(env, lr)
+    agent.load_saved_model()
     agent.train()
 
 
