@@ -23,6 +23,8 @@ class GraphConvNet(nn.Module):
         self.embed_size = 50
         self.fc1_size = self.fc2_size = 150
         self.fc3_size = 200
+        self.action_size = nonspatial_act_size + 4*self.config.spatial_width
+        self.hidden_size = 100
         
         
         FILTERS1 = 32
@@ -72,38 +74,34 @@ class GraphConvNet(nn.Module):
         self.activation = nn.Tanh()
         
         
+        self.LSTM_embed_in = nn.Linear(self.fc3_size+self.action_size, self.hidden_size)
+        
+        self.hidden_layer = nn.LSTM(input_size=self.hidden_size,
+                                        hidden_size=self.hidden_size,
+                                        num_layers=1)
+        
+        
     """
-        G: (N, graph_n, graph_n)
-        X: (N, graph_n, unit_vec_width)
+        G: (N, D, graph_n, graph_n)
+        X: (N, D, graph_n, unit_vec_width)
         avail_actions: (N, action_space)
+        LSTM_hidden: (N, hidden_size)
     """
-    def forward(self, G, X, avail_actions, choosing=False):
+    def forward(self, G, X, avail_actions, LSTM_hidden, prev_actions, choosing=False):
     
-        (N, graph_n, _) = G.shape
+        (N, _, graph_n, _) = G.shape
         
         G = torch.from_numpy(G).to(self.device).float()
         X = torch.from_numpy(X).to(self.device).float()
         avail_actions = torch.from_numpy(avail_actions).byte().to(self.device)
+        LSTM_hidden = torch.from_numpy(LSTM_hidden).to(self.device).float()
+        prev_actions = torch.from_numpy(prev_actions).to(self.device).float()
         
-        A = G + torch.eye(self.config.graph_n).to(self.device).unsqueeze(0)
-        D = torch.zeros(A.shape).to(self.device)
-        D[:,range(self.config.graph_n), range(self.config.graph_n)] = torch.max(torch.sum(A, 2), self.where_yes)
+        graph_conv_out = self.graph_LSTM_forward(G, X, LSTM_hidden, prev_actions)
         
-        D_inv_sqrt = D
-        D_inv_sqrt[:,range(self.config.graph_n), range(self.config.graph_n)] = 1 / (D[:,range(self.config.graph_n), range(self.config.graph_n)] ** 0.5)
-        
-        A_agg = torch.matmul(torch.matmul(D_inv_sqrt, A), D_inv_sqrt)
-        
-        embedding = self.activation(self.unit_embedding(X))
-        h1 = self.activation(torch.matmul(A_agg, self.W1(embedding)))
-        h2 = self.activation(torch.matmul(A_agg, self.W2(h1)))
-        h3 = self.activation(torch.matmul(A_agg, self.W3(h2)))
-        value_action_in = torch.mean(h3, dim=1)
-        
-        nonspatial = self.action_choice(value_action_in)
+        nonspatial = self.action_choice(graph_conv_out)
         nonspatial.masked_fill_(1-avail_actions, float('-inf'))
         nonspatial_policy = F.softmax(nonspatial)
-        
         
         value = self.value_layer(value_action_in)
         
@@ -133,7 +131,56 @@ class GraphConvNet(nn.Module):
             choice = [spatial_out, nonspatial_choice]
             """
         
-        return spatial_policy, nonspatial_policy, value, choice
+        return spatial_policy, nonspatial_policy, value, LSTM_hidden, choice
+        
+    """
+        Input:
+            G: (N, D, graph_n, graph_n) tensor
+            X: (N, D, graph_n, graph_n) tensor
+            prev_actions: (N, action_size) tensor
+    """
+    def graph_LSTM_forward(self, G, X, LSTM_hidden, prev_actions):
+        
+        batch_size, D = G.shape[0], G.shape[1]
+        for i in range(D):
+            G_curr = G[:,i,:,:]
+            X_curr = X[:,i,:,:]
+            
+            graph_out = self.graph_forward(G_curr, X_curr)
+            graph_out_actions = torch.cat([graph_out, prev_actions], dim=1)
+
+            embedded_graph = self.activation(self.LSTM_embed_in(graph_out_actions).reshape((1, batch_size, self.hidden_size)))
+            
+            output, LSTM_hidden = self.hidden_layer(embedded_graph, LSTM_hidden.unsqueeze(0).unsqueeze(1))
+            
+        return output
+            
+        
+        
+    """
+        Input:
+            G: (N, graph_n, graph_n) tensor
+            X: (N, graph_n, unit_vec_width) tensor
+    """
+    def graph_forward(self, G, X):
+    
+        A = G + torch.eye(self.config.graph_n).to(self.device).unsqueeze(0)
+        D = torch.zeros(A.shape).to(self.device)
+        D[:,range(self.config.graph_n), range(self.config.graph_n)] = torch.max(torch.sum(A, 2), self.where_yes)
+        
+        D_inv_sqrt = D
+        D_inv_sqrt[:,range(self.config.graph_n), range(self.config.graph_n)] = 1 / (D[:,range(self.config.graph_n), range(self.config.graph_n)] ** 0.5)
+        
+        A_agg = torch.matmul(torch.matmul(D_inv_sqrt, A), D_inv_sqrt)
+        
+        embedding = self.activation(self.unit_embedding(X))
+        h1 = self.activation(torch.matmul(A_agg, self.W1(embedding)))
+        h2 = self.activation(torch.matmul(A_agg, self.W2(h1)))
+        h3 = self.activation(torch.matmul(A_agg, self.W3(h2)))
+        graph_conv_out = torch.mean(h3, dim=1)
+        
+        return graph_conv_out
+        
         
     def choose(self, spatial_probs, nonspatial_probs):
         '''
@@ -189,8 +236,16 @@ class GraphConvNet(nn.Module):
             row = probs[i]
             choices.append(bisect.bisect(row, vals[i]))
         return np.array(choices)
-            
+        
+    def init_hidden(self, batch_size, device=None, use_torch=True):
+        if (not use_torch):
+            return np.zeros((batch_size, self.hidden_size))
+        return torch.zeros((batch_size, self.hidden_size)).float().to(device)
     
+    def null_actions(self, batch_size, use_torch=True):
+        if (not use_torch):
+            return np.zeros((batch_size, self.action_size))
+        return torch.zeros((batch_size, self.action_size)).float().to(device)
             
 
 

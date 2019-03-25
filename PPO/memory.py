@@ -1,5 +1,6 @@
 from config import *
 from collections import deque
+import utils
 import numpy as np
 import random
 
@@ -7,6 +8,8 @@ import random
 class ReplayMemory(object):
     def __init__(self, mem_cap, hist_size, batch_size):
         self.memory = deque(maxlen=mem_cap)
+        self.nonspatial_action_space = GraphConvConfigMinigames.action_space
+        self.spatial_action_width = GraphConvConfigMinigames.spatial_width
         self.access_num = 0
         self.batch_size = batch_size
         self.reset_num = int(mem_cap / batch_size)
@@ -15,18 +18,16 @@ class ReplayMemory(object):
         self.history_size = hist_size
         self.update_indices()
     
-    def push(self, history, action, reward, done, vtarg, ret, adv):
+    def push(self, history, action, reward, done, vtarg, ret, adv, step):
         # history, action, reward, done, vtarg, adv
-        self.memory.append([history, action, reward, done, vtarg, ret, adv])
+        self.memory.append([history, action, reward, done, vtarg, ret, adv, step])
         
         
     def update_indices(self):
-        self.indices = list(range(self.Memory_capacity - (self.history_size)))
+        self.indices = list(range(1, self.Memory_capacity - (self.history_size-1)))
         random.shuffle(self.indices)
 
-    def sample_mini_batch(self, frame):
-        
-        
+    def sample_mini_batch(self, frame, hist_size):
         
         
         mini_batch = []
@@ -39,29 +40,53 @@ class ReplayMemory(object):
             
 
         # history size
-        sample_range -= (self.history_size-1)
         
         lower = self.batch_size*self.access_num
         upper = min((self.batch_size*(self.access_num+1)), sample_range)
 
         idx_sample = self.indices[lower:upper]
+        states = []
         for i in idx_sample:
             sample = []
             G_samp = []
             X_samp = []
             avail_samp = []
+            hidden_samp = []
+            prev_action_samp = []
+            
+            
             for j in range(self.history_size):
                 sample.append(self.memory[i + j])
                 #print("\n", self.memory[i+j], "\n")
+                if (self.memory[i+j][-1] == 0):
+                    for k in range(j):
+                    
+                        G_samp[i+k] = np.zeros(G_samp[i+k].shape)
+                        X_samp[i+k] = np.zeros(X_samp[i+k].shape)
+                        avail_samp[i+k] = np.zeros(avail_samp[i+k].shape)
+                        hidden_samp[i+k] = np.zeros(hidden_samp[i+k].shape)
+                    
                 G_samp.append(self.memory[i+j][0][0])
                 X_samp.append(self.memory[i+j][0][1])
                 avail_samp.append(self.memory[i+j][0][2])
+                hidden_samp.append(self.memory[i+j][0][3])
+                
+                action_arr = utils.action_to_onehot(self.memory[i+j][1], self.nonspatial_action_space, self.spatial_action_width)
+                        
+                prev_action_samp.append(action_arr)
+                
+                
+            G_samp = np.array(G_samp)
+            X_samp = np.array(X_samp)
+            avail_samp = np.array(avail_samp)
+            hidden_samp = np.array(hidden_samp)
+            prev_action_samp = np.array(prev_action_samp)
 
             #sample = np.array(sample)
             row = sample[self.history_size-1]
             #print(row)
             #print(sample.shape, row.shape, sample[:,0].shape, sample[0,:].shape, sample[:,0][0].shape, sample[0].shape, type(sample[:,0]), type(sample[:,0][0]))
-            row[0] = np.array([G_samp[-1], X_samp[-1], avail_samp[-1]])
+            row[0] = np.array([G_samp, X_samp, avail_samp, hidden_samp, prev_action_samp])
             mini_batch.append(row)
 
 

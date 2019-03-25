@@ -27,6 +27,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from memory import ReplayMemory
+import utils
 
 from config import *
 
@@ -34,7 +35,7 @@ np.set_printoptions(linewidth=200, precision=4)
 
 
 class PPOAgent(object):
-    def __init__(self, env, lr, hist_size=1, train_step=1024, trainable=True):
+    def __init__(self, env, lr, hist_size=8, train_step=1024, trainable=True):
         
         self.filters1 = 16
         self.filters2 = 32
@@ -44,7 +45,7 @@ class PPOAgent(object):
         self.train_step = train_step
         self.clip_param = 0.1
         self.eps_denom = 1e-6
-        self.episodes = 10000
+        self.episodes = 10000000
         self.save_frame = 50000
         self.evaluation_reward_length = 100
         self.epochs = 3
@@ -91,8 +92,8 @@ class PPOAgent(object):
             done = False
             score = 0
 
-            ### Stores previous outputs of convolutional map (useless until LSTM implemented)            
-            history = []
+            ### Stores previous output of LSTM
+            LSTM_hidden = self.net.init_hidden(1, device=self.device).cpu().data.numpy()
             
             ### Keeps track of length of current game
             step = 0
@@ -117,12 +118,14 @@ class PPOAgent(object):
                 step += 1
                 frame += 1
                 
-                ### stack history
-                recent_hist = self.get_recent_hist(history)
+                prev_LSTM = LSTM_hidden
+                prev_action = utils.action_to_onehot(action, GraphConvConfigMinigames.action_space, GraphConvConfigMinigames.spatial_width)
                 
                 ### Select action, value
-                _, _, value, action = self.net(G, X, avail_actions, choosing=True)
+                
+                _, _, value, LSTM_hidden, action, = self.net(np.expand_dims(G, 1), np.expand_dims(X, 1), avail_actions, LSTM_hidden, prev_action, choosing=True)
                 value = value.cpu().data.numpy().item()
+                LSTM_hidden = LSTM_hidden.cpu().data.numpy()
                 
                 spatial_action, nonspatial_action = action
                                 
@@ -135,16 +138,18 @@ class PPOAgent(object):
                 score += reward
                 ### Append state to history
                 history.append(state)
+                
+                push_state = [G, X, avail_actions, prev_LSTM]
                     
                 ### Store transition in memory
-                self.memory.push(state, action, reward, done, value, 0, 0)
+                self.memory.push(push_state, action, reward, done, value, 0, 0, step)
                 
                 ### Start training after random sample generation
                     
                 if (frame % self.train_step == 0 and frame != 0):
                     _, _, frame_next_val, _ = self.net(G, X, avail_actions)
                     frame_next_val = frame_next_val.cpu().data.numpy().item()
-                    self.train_policy_net_ppo(frame, frame_next_val)
+                    #self.train_policy_net_ppo(frame, frame_next_val)
                             
                     self.update_target_net()
                     
@@ -193,13 +198,15 @@ class PPOAgent(object):
             
             for j in range(num_iters):
                 
-                mini_batch = self.memory.sample_mini_batch(frame)
+                mini_batch = self.memory.sample_mini_batch(frame, self.hist_size)
                 mini_batch = np.array(mini_batch).transpose()
                 
                 states = np.stack(mini_batch[0], axis=0)
-                G_states = np.stack(states[:,0], axis=1).squeeze(0)
-                X_states = np.stack(states[:,1], axis=1).squeeze(0)
+                G_states = np.stack(states[:,0], axis)
+                X_states = np.stack(states[:,1], axis)
                 avail_states = np.stack(states[:,2], axis=0)
+                hidden_states = np.stack(states[:,3], axis=0)[:,0,:]
+                prev_actions = np.stack(stats[:,4], axis=0)
                 
                 n = states.shape[0]
                 
@@ -227,8 +234,8 @@ class PPOAgent(object):
                 
                 advantages = (advantages - advantages.mean()) / (torch.clamp(advantages.std(), self.eps_denom))
                 
-                spatial_probs, nonspatial_probs, values, _ = self.net(G_states, X_states, avail_states)
-                old_spatial_probs, old_nonspatial_probs, old_values, _ = self.target_net(G_states, X_states, avail_states)
+                spatial_probs, nonspatial_probs, values, _, _ = self.net(G_states, X_states, avail_states, hidden_states, prev_actions)
+                old_spatial_probs, old_nonspatial_probs, old_values, _, _ = self.target_net(G_states, X_states, avail_states, hidden_states, prev_actions)
                 
                 
                 #print(nonspatial_probs.shape, self.index_spatial_probs(spatial_probs[:,0,:,:], first_spatials).shape, (nonspatial_acts < 2).shape)
@@ -333,7 +340,7 @@ def main():
                                             step_multiplier=8)
     lr = 0.00025                       
     agent = PPOAgent(env, lr)
-    agent.load_saved_model()
+    #agent.load_saved_model()
     agent.train()
 
 
