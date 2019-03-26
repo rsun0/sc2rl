@@ -3,7 +3,7 @@ from collections import deque
 import utils
 import numpy as np
 import random
-
+import copy
 
 class ReplayMemory(object):
     def __init__(self, mem_cap, hist_size, batch_size):
@@ -65,13 +65,17 @@ class ReplayMemory(object):
                         X_samp[i+k] = np.zeros(X_samp[i+k].shape)
                         avail_samp[i+k] = np.zeros(avail_samp[i+k].shape)
                         hidden_samp[i+k] = np.zeros(hidden_samp[i+k].shape)
+                        action_arr[i+k] = np.zeros(action_arr[i+k].shape)
+                        
                     
-                G_samp.append(self.memory[i+j][0][0])
-                X_samp.append(self.memory[i+j][0][1])
+                G_samp.append(self.memory[i+j][0][0][0])
+                X_samp.append(self.memory[i+j][0][1][0])
                 avail_samp.append(self.memory[i+j][0][2])
                 hidden_samp.append(self.memory[i+j][0][3])
                 
-                action_arr = utils.action_to_onehot(self.memory[i+j][1], self.nonspatial_action_space, self.spatial_action_width)
+                #print("avail_actions here: ", self.memory[i+j][0][2].shape)
+                
+                action_arr = utils.action_to_onehot(self.memory[i+j][1], self.nonspatial_action_space, self.spatial_action_width)[0]
                         
                 prev_action_samp.append(action_arr)
                 
@@ -83,10 +87,11 @@ class ReplayMemory(object):
             prev_action_samp = np.array(prev_action_samp)
 
             #sample = np.array(sample)
-            row = sample[self.history_size-1]
+            row = copy.deepcopy(sample[self.history_size-1])
             #print(row)
             #print(sample.shape, row.shape, sample[:,0].shape, sample[0,:].shape, sample[:,0][0].shape, sample[0].shape, type(sample[:,0]), type(sample[:,0][0]))
-            row[0] = np.array([G_samp, X_samp, avail_samp, hidden_samp, prev_action_samp])
+            #print(avail_samp.shape)
+            row[0] = np.array([G_samp, X_samp, avail_samp[-1]   , hidden_samp[0], prev_action_samp])
             mini_batch.append(row)
 
 

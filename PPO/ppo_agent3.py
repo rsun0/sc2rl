@@ -93,7 +93,8 @@ class PPOAgent(object):
             score = 0
 
             ### Stores previous output of LSTM
-            LSTM_hidden = self.net.init_hidden(1, device=self.device).cpu().data.numpy()
+            LSTM_hidden = self.net.init_hidden(1, use_torch=False)
+            
             
             ### Keeps track of length of current game
             step = 0
@@ -122,8 +123,8 @@ class PPOAgent(object):
                 prev_action = utils.action_to_onehot(action, GraphConvConfigMinigames.action_space, GraphConvConfigMinigames.spatial_width)
                 
                 ### Select action, value
-                
-                _, _, value, LSTM_hidden, action, = self.net(np.expand_dims(G, 1), np.expand_dims(X, 1), avail_actions, LSTM_hidden, prev_action, choosing=True)
+
+                _, _, value, LSTM_hidden, action, = self.net(np.expand_dims(G, 1), np.expand_dims(X, 1), avail_actions, LSTM_hidden, np.expand_dims(prev_action, 1), choosing=True)
                 value = value.cpu().data.numpy().item()
                 LSTM_hidden = LSTM_hidden.cpu().data.numpy()
                 
@@ -137,7 +138,7 @@ class PPOAgent(object):
                 action = [np.array(spatial_action), nonspatial_action]
                 score += reward
                 ### Append state to history
-                history.append(state)
+                #history.append(state)
                 
                 push_state = [G, X, avail_actions, prev_LSTM]
                     
@@ -147,9 +148,10 @@ class PPOAgent(object):
                 ### Start training after random sample generation
                     
                 if (frame % self.train_step == 0 and frame != 0):
-                    _, _, frame_next_val, _ = self.net(G, X, avail_actions)
+                    prev_action = utils.action_to_onehot(action, GraphConvConfigMinigames.action_space, GraphConvConfigMinigames.spatial_width)
+                    _, _, frame_next_val, _, _ = self.net(np.expand_dims(G, 1), np.expand_dims(X, 1), avail_actions, LSTM_hidden, np.expand_dims(prev_action,1))
                     frame_next_val = frame_next_val.cpu().data.numpy().item()
-                    #self.train_policy_net_ppo(frame, frame_next_val)
+                    self.train_policy_net_ppo(frame, frame_next_val)
                             
                     self.update_target_net()
                     
@@ -202,11 +204,13 @@ class PPOAgent(object):
                 mini_batch = np.array(mini_batch).transpose()
                 
                 states = np.stack(mini_batch[0], axis=0)
-                G_states = np.stack(states[:,0], axis)
-                X_states = np.stack(states[:,1], axis)
+                G_states = np.stack(states[:,0], axis=0)
+                X_states = np.stack(states[:,1], axis=0)
                 avail_states = np.stack(states[:,2], axis=0)
-                hidden_states = np.stack(states[:,3], axis=0)[:,0,:]
-                prev_actions = np.stack(stats[:,4], axis=0)
+                hidden_states = np.concatenate(states[:,3], axis=2)
+                prev_actions = np.stack(states[:,4], axis=0)
+                
+                #print(states.shape, G_states.shape, X_states.shape, avail_states.shape, hidden_states.shape, prev_actions.shape)
                 
                 n = states.shape[0]
                 
@@ -241,6 +245,7 @@ class PPOAgent(object):
                 #print(nonspatial_probs.shape, self.index_spatial_probs(spatial_probs[:,0,:,:], first_spatials).shape, (nonspatial_acts < 2).shape)
                 #print(nonspatial_probs.shape, nonspatial_acts.shape)
                 #print(nonspatial_probs[range(self.batch_size),nonspatial_acts].shape)
+                
                 
                 gathered_nonspatials = nonspatial_probs.gather(1, nonspatial_acts).squeeze(1)
                 old_gathered_nonspatials = old_nonspatial_probs.gather(1, nonspatial_acts).squeeze(1)
