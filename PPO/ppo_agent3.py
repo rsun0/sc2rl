@@ -15,7 +15,6 @@ from modified_state_space import state_modifier
 import random
 from time import sleep
 import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import action_interface
 import copy
@@ -35,7 +34,7 @@ np.set_printoptions(linewidth=200, precision=4)
 
 
 class PPOAgent(object):
-    def __init__(self, env, lr, hist_size=8, train_step=1024, trainable=True):
+    def __init__(self, env, lr, hist_size=10, train_step=1024, trainable=True):
         
         self.filters1 = 16
         self.filters2 = 32
@@ -67,6 +66,10 @@ class PPOAgent(object):
         
         self.c1 = 1.0
         self.c2 = 0.01
+        
+        ### scaling constants for spatial and nonspatial entropy
+        self.c3 = 0.5
+        self.c4 = 1.0
         
         self.averages = []
         
@@ -171,7 +174,7 @@ class PPOAgent(object):
                     print("episode:", e, "  score:", score, "  steps:", step, "  evaluation reward:", np.mean(evaluation_reward))
                     #state, reward, done, _ = self.env.reset()
                     self.averages.append(np.mean(evaluation_reward))
-                    #self.plot_results()
+                    self.plot_results()
 
                     
                 G, X, avail_actions = state
@@ -209,8 +212,8 @@ class PPOAgent(object):
                 avail_states = np.stack(states[:,2], axis=0)
                 hidden_states = np.concatenate(states[:,3], axis=2)
                 prev_actions = np.stack(states[:,4], axis=0)
+                relevant_states = np.stack(states[:,5], axis=0)
                 
-                #print(states.shape, G_states.shape, X_states.shape, avail_states.shape, hidden_states.shape, prev_actions.shape)
                 
                 n = states.shape[0]
                 
@@ -238,8 +241,8 @@ class PPOAgent(object):
                 
                 advantages = (advantages - advantages.mean()) / (torch.clamp(advantages.std(), self.eps_denom))
                 
-                spatial_probs, nonspatial_probs, values, _, _ = self.net(G_states, X_states, avail_states, hidden_states, prev_actions)
-                old_spatial_probs, old_nonspatial_probs, old_values, _, _ = self.target_net(G_states, X_states, avail_states, hidden_states, prev_actions)
+                spatial_probs, nonspatial_probs, values, _, _ = self.net(G_states, X_states, avail_states, hidden_states, prev_actions, relevant_frames=relevant_states)
+                old_spatial_probs, old_nonspatial_probs, old_values, _, _ = self.target_net(G_states, X_states, avail_states, hidden_states, prev_actions, relevant_frames=relevant_states)
                 
                 
                 #print(nonspatial_probs.shape, self.index_spatial_probs(spatial_probs[:,0,:,:], first_spatials).shape, (nonspatial_acts < 2).shape)
@@ -316,7 +319,7 @@ class PPOAgent(object):
             return hist[-length:]
                         
     def entropy(self, spatial_probs, nonspatial_probs):
-        ent = - (torch.mean(torch.sum(spatial_probs[:,0,:,:] * torch.log(spatial_probs[:,0,:,:]+self.eps_denom), dim=(1,2))) + torch.mean(torch.sum(nonspatial_probs * torch.log(nonspatial_probs+self.eps_denom), dim=1) ) )
+        ent = - self.c3 * (torch.mean(torch.sum(spatial_probs[:,0,:,:] * torch.log(spatial_probs[:,0,:,:]+self.eps_denom), dim=(1,2))) + self.c4 * torch.mean(torch.sum(nonspatial_probs * torch.log(nonspatial_probs+self.eps_denom), dim=1) ) )
         return ent
         
     def clip_gradients(self, clip):

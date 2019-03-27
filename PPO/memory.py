@@ -54,18 +54,22 @@ class ReplayMemory(object):
             hidden_samp = []
             prev_action_samp = []
             
+            # Boolean array, corresponds to 1 if frame is valid, 0 if frame is from previous episode that ends between i and i+self.history_size
+            relevant_frame = []
+            
             
             for j in range(self.history_size):
                 sample.append(self.memory[i + j])
                 #print("\n", self.memory[i+j], "\n")
-                if (self.memory[i+j][-1] == 0):
+                if (self.memory[i+j][-1] == 1):
                     for k in range(j):
                     
-                        G_samp[i+k] = np.zeros(G_samp[i+k].shape)
-                        X_samp[i+k] = np.zeros(X_samp[i+k].shape)
-                        avail_samp[i+k] = np.zeros(avail_samp[i+k].shape)
-                        hidden_samp[i+k] = np.zeros(hidden_samp[i+k].shape)
-                        action_arr[i+k] = np.zeros(action_arr[i+k].shape)
+                        G_samp[k] = np.zeros(G_samp[k].shape)
+                        X_samp[k] = np.zeros(X_samp[k].shape)
+                        avail_samp[k] = np.zeros(avail_samp[k].shape)
+                        hidden_samp[k] = np.zeros(hidden_samp[k].shape)
+                        action_arr[k] = np.zeros(action_arr[k].shape)
+                        relevant_frame[k] = 0
                         
                     
                 G_samp.append(self.memory[i+j][0][0][0])
@@ -79,19 +83,22 @@ class ReplayMemory(object):
                         
                 prev_action_samp.append(action_arr)
                 
+                relevant_frame.append(1)
+                
                 
             G_samp = np.array(G_samp)
             X_samp = np.array(X_samp)
             avail_samp = np.array(avail_samp)
             hidden_samp = np.array(hidden_samp)
             prev_action_samp = np.array(prev_action_samp)
-
+            relevant_frame = np.array(relevant_frame)
+            
             #sample = np.array(sample)
             row = copy.deepcopy(sample[self.history_size-1])
             #print(row)
             #print(sample.shape, row.shape, sample[:,0].shape, sample[0,:].shape, sample[:,0][0].shape, sample[0].shape, type(sample[:,0]), type(sample[:,0][0]))
             #print(avail_samp.shape)
-            row[0] = np.array([G_samp, X_samp, avail_samp[-1]   , hidden_samp[0], prev_action_samp])
+            row[0] = np.array([G_samp, X_samp, avail_samp[-1], hidden_samp[0], prev_action_samp, relevant_frame])
             mini_batch.append(row)
 
 

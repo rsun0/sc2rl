@@ -20,16 +20,18 @@ class GraphConvNet(nn.Module):
         
         self.config = GraphConvConfigMinigames
         self.spatial_width = self.config.spatial_width
-        self.embed_size = 50
-        self.fc1_size = self.fc2_size = 150
-        self.fc3_size = 200
-        self.action_size = nonspatial_act_size + 4*self.config.spatial_width
-        self.hidden_size = 100
+        self.embed_size = 150
+        self.fc1_size = self.fc2_size = 200
+        self.fc3_size = 400
+        self.action_size = nonspatial_act_size + 4
+        self.hidden_size = 512
+        self.action_fcsize = 200
         
         
-        FILTERS1 = 32
+        FILTERS1 = 128
         FILTERS2 = 64
         FILTERS3 = 64
+        FILTERS4 = 64
         
         self.where_yes = torch.ones(1).to(self.device)
         self.where_no = torch.zeros(1).to(self.device)
@@ -39,9 +41,10 @@ class GraphConvNet(nn.Module):
         self.W2 = nn.Linear(self.fc1_size, self.fc2_size)
         self.W3 = nn.Linear(self.fc2_size, self.fc3_size)
         
-        self.action_choice = nn.Linear(self.hidden_size, nonspatial_act_size)
+        self.fc1 = nn.Linear(self.hidden_size, self.action_fcsize)
+        self.action_choice = nn.Linear(self.action_fcsize, nonspatial_act_size)
         
-        self.value_layer = nn.Linear(self.hidden_size, 1)
+        self.value_layer = nn.Linear(self.action_fcsize, 1)
         
         
         
@@ -64,6 +67,12 @@ class GraphConvNet(nn.Module):
                                                     stride=2)
                                                     
         self.tconv4 = torch.nn.ConvTranspose2d(FILTERS3,
+                                                    FILTERS4,
+                                                    kernel_size=4,
+                                                    padding=1,
+                                                    stride=2)
+                                                    
+        self.tconv5 = torch.nn.ConvTranspose2d(FILTERS4,
                                                     self.spatial_act_size,
                                                     kernel_size=4,
                                                     padding=1,
@@ -85,10 +94,10 @@ class GraphConvNet(nn.Module):
         G: (N, D, graph_n, graph_n)
         X: (N, D, graph_n, unit_vec_width)
         avail_actions: (N, action_space)
-        LSTM_hidden: (N, hidden_size)
+        LSTM_hidden: (2, 1, N, hidden_size)
         prev_actions: (N, D, action_size)
     """
-    def forward(self, G, X, avail_actions, LSTM_hidden, prev_actions, choosing=False):
+    def forward(self, G, X, avail_actions, LSTM_hidden, prev_actions, relevant_frames=np.array([[1]]), choosing=False):
     
         (N, _, graph_n, _) = G.shape
         
@@ -97,21 +106,25 @@ class GraphConvNet(nn.Module):
         avail_actions = torch.from_numpy(avail_actions).byte().to(self.device)
         LSTM_hidden = torch.from_numpy(LSTM_hidden).to(self.device).float()
         prev_actions = torch.from_numpy(prev_actions).to(self.device).float()
+        relevant_frames = torch.from_numpy(relevant_frames).to(self.device).float()
         
-        graph_conv_out = self.graph_LSTM_forward(G, X, LSTM_hidden, prev_actions).squeeze(0)
+        graph_conv_out = self.graph_LSTM_forward(G, X, LSTM_hidden, prev_actions, relevant_frames).squeeze(0)
         
-        nonspatial = self.action_choice(graph_conv_out)
+        action_val_fc = F.relu(self.fc1(graph_conv_out))
+        
+        nonspatial = self.action_choice(action_val_fc)
         nonspatial.masked_fill_(1-avail_actions, float('-inf'))
         nonspatial_policy = F.softmax(nonspatial)
         
-        value = self.value_layer(graph_conv_out)
+        value = self.value_layer(action_val_fc)
         
         stacked_h3 = graph_conv_out.reshape((N, self.hidden_size, 1, 1))
         
-        s1 = self.activation(self.tconv1(stacked_h3))
-        s2 = self.activation(self.tconv2(s1))
-        s3 = self.activation(self.tconv3(s2))
-        spatial_policy = F.softmax(self.tconv4(s3).reshape((N, self.spatial_act_size, -1)), dim=2).reshape((N, self.spatial_act_size, self.spatial_width, self.spatial_width))
+        s1 = F.relu(self.tconv1(stacked_h3))
+        s2 = F.relu(self.tconv2(s1))
+        s3 = F.relu(self.tconv3(s2))
+        s4 = F.relu(self.tconv4(s3))
+        spatial_policy = F.softmax(self.tconv5(s4).reshape((N, self.spatial_act_size, -1)), dim=2).reshape((N, self.spatial_act_size, self.spatial_width, self.spatial_width))
         
         choice = None
         if (choosing):
@@ -138,14 +151,16 @@ class GraphConvNet(nn.Module):
         Input:
             G: (N, D, graph_n, graph_n) tensor
             X: (N, D, graph_n, graph_n) tensor
+            LSTM_hidden: (2, 1, N, hidden_size)
             prev_actions: (N, D, action_size) tensor
     """
-    def graph_LSTM_forward(self, G, X, LSTM_hidden, prev_actions):
+    def graph_LSTM_forward(self, G, X, LSTM_hidden, prev_actions, relevant_frames):
         
         batch_size, D = G.shape[0], G.shape[1]
         for i in range(D):
             G_curr = G[:,i,:,:]
             X_curr = X[:,i,:,:]
+            relevance = relevant_frames[:,i]
             
             graph_out = self.graph_forward(G_curr, X_curr)
             graph_out_actions = torch.cat([graph_out, prev_actions[:,i,:]], dim=1)
@@ -155,6 +170,13 @@ class GraphConvNet(nn.Module):
 
             output, LSTM_hidden = self.hidden_layer(embedded_graph, tuple(LSTM_hidden))
             LSTM_hidden = torch.stack(LSTM_hidden)
+            
+            irrelevant_mask = relevance == 0
+            if (irrelevant_mask.size() != torch.Size([0]) and torch.sum(irrelevant_mask) > 0):
+
+                LSTM_hidden[:,:,irrelevant_mask,:] = self.init_hidden(torch.sum(irrelevant_mask), device=self.device)
+            
+            
         return output
             
         
@@ -242,7 +264,7 @@ class GraphConvNet(nn.Module):
     def init_hidden(self, batch_size, device=None, use_torch=True):
         if (not use_torch):
             return np.zeros((2, 1, batch_size, self.hidden_size))
-        return tuple([torch.zeros((1, batch_size, self.hidden_size)).float().to(device) for i in range(2)])
+        return torch.zeros((2, 1, batch_size, self.hidden_size)).float().to(device)
     
     def null_actions(self, batch_size, use_torch=True):
         if (not use_torch):

@@ -8,7 +8,7 @@ from enum import Enum
 class MinigameEnvironment:
 
     screen_width = 84
-    action_width = 32
+    action_width = 64
 
     def __init__(self, state_modifier_func, map_name_="DefeatRoaches", render=False, step_multiplier=None):
         '''

@@ -14,7 +14,7 @@ class Action(Enum):
 class Actuator:
 
     _ACTION_SPACE = (5, 2)
-    _SELECT_SPACE = 32
+    _SELECT_SPACE = 64
     _SCREEN = 84
 
     def __init__(self):
