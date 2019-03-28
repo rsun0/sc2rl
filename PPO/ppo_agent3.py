@@ -34,7 +34,7 @@ np.set_printoptions(linewidth=200, precision=4)
 
 
 class PPOAgent(object):
-    def __init__(self, env, lr, hist_size=10, train_step=1024, trainable=True):
+    def __init__(self, env, lr, hist_size=5, train_step=2048, trainable=True):
         
         self.filters1 = 16
         self.filters2 = 32
@@ -65,10 +65,10 @@ class PPOAgent(object):
         self.loss = nn.MSELoss()
         
         self.c1 = 1.0
-        self.c2 = 0.01
+        self.c2 = 0.03
         
         ### scaling constants for spatial and nonspatial entropy
-        self.c3 = 0.5
+        self.c3 = 0.3
         self.c4 = 1.0
         
         self.averages = []

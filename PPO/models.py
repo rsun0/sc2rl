@@ -20,18 +20,18 @@ class GraphConvNet(nn.Module):
         
         self.config = GraphConvConfigMinigames
         self.spatial_width = self.config.spatial_width
-        self.embed_size = 150
-        self.fc1_size = self.fc2_size = 200
-        self.fc3_size = 400
+        self.embed_size = 100
+        self.fc1_size = self.fc2_size = 100
+        self.fc3_size = 150
         self.action_size = nonspatial_act_size + 4
-        self.hidden_size = 512
-        self.action_fcsize = 200
+        self.hidden_size = 150
+        self.action_fcsize = 150
         
         
-        FILTERS1 = 128
-        FILTERS2 = 64
-        FILTERS3 = 64
-        FILTERS4 = 64
+        FILTERS1 = 64
+        FILTERS2 = 32
+        FILTERS3 = 32
+        FILTERS4 = 32
         
         self.where_yes = torch.ones(1).to(self.device)
         self.where_no = torch.zeros(1).to(self.device)
@@ -40,6 +40,8 @@ class GraphConvNet(nn.Module):
         self.W1 = nn.Linear(self.embed_size, self.fc1_size)
         self.W2 = nn.Linear(self.fc1_size, self.fc2_size)
         self.W3 = nn.Linear(self.fc2_size, self.fc3_size)
+        
+        
         
         self.fc1 = nn.Linear(self.hidden_size, self.action_fcsize)
         self.action_choice = nn.Linear(self.action_fcsize, nonspatial_act_size)
@@ -201,7 +203,8 @@ class GraphConvNet(nn.Module):
         h1 = self.activation(torch.matmul(A_agg, self.W1(embedding)))
         h2 = self.activation(torch.matmul(A_agg, self.W2(h1)))
         h3 = self.activation(torch.matmul(A_agg, self.W3(h2)))
-        graph_conv_out = torch.mean(h3, dim=1)
+        
+        graph_conv_out = torch.max(h3, dim=1)[0]
         
         return graph_conv_out
         
