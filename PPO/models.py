@@ -20,12 +20,12 @@ class GraphConvNet(nn.Module):
         
         self.config = GraphConvConfigMinigames
         self.spatial_width = self.config.spatial_width
-        self.embed_size = 100
-        self.fc1_size = self.fc2_size = 100
-        self.fc3_size = 150
+        self.embed_size = 128
+        self.fc1_size = self.fc2_size = 128
+        self.fc3_size = 128
         self.action_size = nonspatial_act_size + 4
-        self.hidden_size = 150
-        self.action_fcsize = 150
+        self.hidden_size = 128
+        self.action_fcsize = 128
         
         
         FILTERS1 = 64
@@ -99,7 +99,9 @@ class GraphConvNet(nn.Module):
         LSTM_hidden: (2, 1, N, hidden_size)
         prev_actions: (N, D, action_size)
     """
-    def forward(self, G, X, avail_actions, LSTM_hidden, prev_actions, relevant_frames=np.array([[1]]), choosing=False):
+    def forward(self, G, X, avail_actions, LSTM_hidden, prev_actions, relevant_frames=np.array([[1]]), epsilon=0.0, choosing=False):
+    
+        rand = random.random()
     
         (N, _, graph_n, _) = G.shape
         
@@ -131,21 +133,11 @@ class GraphConvNet(nn.Module):
         choice = None
         if (choosing):
             assert(N==1)
+            if (rand < epsilon):
+                spatial_policy = torch.ones(spatial_policy.shape).float().to(self.device) / (self.spatial_width ** 2)
+                nonspatial_policy = torch.ones(nonspatial_policy.shape).float().to(self.device) * avail_actions.float()
+                nonspatial_policy /= torch.sum(nonspatial_policy)
             choice = self.choose(spatial_policy, nonspatial_policy)
-            """
-            #choices = self.choose(spatial_policy, nonspatial_policy)
-            nonspatial_choice = self.choose_action(nonspatial_policy.detach().cpu().reshape((graph_n, self.nonspatial_act_size)).numpy())
-            
-            spatial_choice = self.multi_agent_choose_action(spatial_policy.detach().cpu().reshape((graph_n * self.spatial_act_size, self.spatial_width ** 2)).numpy())
-            spatial_choice = spatial_choice.reshape((graph_n, self.spatial_act_size))
-            
-            spatial_out = np.zeros((graph_n, 2*self.spatial_act_size))
-            for i in range(self.spatial_act_size):
-                spatial_out[:,2*i] = (spatial_choice[:,i] / self.spatial_width).astype(np.int)
-                spatial_out[:,2*i+1] = spatial_choice[:,i] % self.spatial_width
-            
-            choice = [spatial_out, nonspatial_choice]
-            """
         
         return spatial_policy, nonspatial_policy, value, LSTM_hidden, choice
         

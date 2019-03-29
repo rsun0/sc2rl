@@ -34,7 +34,7 @@ np.set_printoptions(linewidth=200, precision=4)
 
 
 class PPOAgent(object):
-    def __init__(self, env, lr, hist_size=5, train_step=2048, trainable=True):
+    def __init__(self, env, lr, hist_size=5, train_step=1024, trainable=True):
         
         self.filters1 = 16
         self.filters2 = 32
@@ -53,6 +53,10 @@ class PPOAgent(object):
         self.lam = 0.95
         self.batch_size = 32
         
+        self.epsilon_max = 1.0
+        self.epsilon_min = 0.05
+        self.epsilon_schedule = 2000000
+        
         self.env = env
         nonspatial_act_size, spatial_act_depth = env.action_space
         self.nonspatial_act_size, self.spatial_act_depth = env.action_space
@@ -68,7 +72,7 @@ class PPOAgent(object):
         self.c2 = 0.03
         
         ### scaling constants for spatial and nonspatial entropy
-        self.c3 = 0.3
+        self.c3 = 1.0
         self.c4 = 1.0
         
         self.averages = []
@@ -111,6 +115,7 @@ class PPOAgent(object):
             _select_next = True
             
             while not done:
+                epsilon = self.epsilon_min + (self.epsilon_max - self.epsilon_min) * (1 - (frame / self.epsilon_schedule))
                 # Handle selection, edge cases
                 
                 if (not info['friendly_units_present']):
@@ -127,7 +132,7 @@ class PPOAgent(object):
                 
                 ### Select action, value
 
-                _, _, value, LSTM_hidden, action, = self.net(np.expand_dims(G, 1), np.expand_dims(X, 1), avail_actions, LSTM_hidden, np.expand_dims(prev_action, 1), choosing=True)
+                _, _, value, LSTM_hidden, action, = self.net(np.expand_dims(G, 1), np.expand_dims(X, 1), avail_actions, LSTM_hidden, np.expand_dims(prev_action, 1), epsilon=epsilon, choosing=True)
                 value = value.cpu().data.numpy().item()
                 LSTM_hidden = LSTM_hidden.cpu().data.numpy()
                 
@@ -154,7 +159,7 @@ class PPOAgent(object):
                     prev_action = utils.action_to_onehot(action, GraphConvConfigMinigames.action_space, GraphConvConfigMinigames.spatial_width)
                     _, _, frame_next_val, _, _ = self.net(np.expand_dims(G, 1), np.expand_dims(X, 1), avail_actions, LSTM_hidden, np.expand_dims(prev_action,1))
                     frame_next_val = frame_next_val.cpu().data.numpy().item()
-                    self.train_policy_net_ppo(frame, frame_next_val)
+                    self.train_policy_net_ppo(frame, frame_next_val, epsilon)
                             
                     self.update_target_net()
                     
@@ -180,11 +185,11 @@ class PPOAgent(object):
                 G, X, avail_actions = state
                     
     ### Main training logic            
-    def train_policy_net_ppo(self, frame, frame_next_val):
+    def train_policy_net_ppo(self, frame, frame_next_val, epsilon):
         
         for param_group in self.optimizer.param_groups:
             curr_lr = param_group['lr']
-        print("\n\n ------- Training network. lr: %f. clip: %f ------- \n\n" % (curr_lr, self.clip_param))
+        print("\n\n ------- Training network. lr: %f. clip: %f. epsilon: %f ------- \n\n" % (curr_lr, self.clip_param, epsilon))
         
         ### Compute value targets and advantage for all frames
         self.memory.compute_vtargets_adv(self.discount_factor, self.lam, frame_next_val)
