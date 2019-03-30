@@ -43,6 +43,8 @@ class PPOAgent(object):
         self.hist_size = hist_size
         self.train_step = train_step
         self.clip_param = 0.1
+        self.clip_param_end = 0.3
+        self.clip_param_schedule = 1000000
         self.eps_denom = 1e-6
         self.episodes = 10000000
         self.save_frame = 50000
@@ -54,7 +56,7 @@ class PPOAgent(object):
         self.batch_size = 32
         
         self.epsilon_max = 1.0
-        self.epsilon_min = 0.05
+        self.epsilon_min = 0.1
         self.epsilon_schedule = 2000000
         
         self.env = env
@@ -115,7 +117,7 @@ class PPOAgent(object):
             _select_next = True
             
             while not done:
-                epsilon = self.epsilon_min + (self.epsilon_max - self.epsilon_min) * (1 - (frame / self.epsilon_schedule))
+                epsilon = self.epsilon_min + max( 0, (self.epsilon_max - self.epsilon_min) * (1 - (frame / self.epsilon_schedule)) )
                 # Handle selection, edge cases
                 
                 if (not info['friendly_units_present']):
@@ -159,7 +161,8 @@ class PPOAgent(object):
                     prev_action = utils.action_to_onehot(action, GraphConvConfigMinigames.action_space, GraphConvConfigMinigames.spatial_width)
                     _, _, frame_next_val, _, _ = self.net(np.expand_dims(G, 1), np.expand_dims(X, 1), avail_actions, LSTM_hidden, np.expand_dims(prev_action,1))
                     frame_next_val = frame_next_val.cpu().data.numpy().item()
-                    self.train_policy_net_ppo(frame, frame_next_val, epsilon)
+                    clip_param = self.clip_param_end + max( 0, (self.clip_param - self.clip_param_end) * (1-(frame / self.clip_param_schedule)) )
+                    self.train_policy_net_ppo(frame, frame_next_val, epsilon, clip_param)
                             
                     self.update_target_net()
                     
@@ -185,7 +188,7 @@ class PPOAgent(object):
                 G, X, avail_actions = state
                     
     ### Main training logic            
-    def train_policy_net_ppo(self, frame, frame_next_val, epsilon):
+    def train_policy_net_ppo(self, frame, frame_next_val, epsilon, clip_param):
         
         for param_group in self.optimizer.param_groups:
             curr_lr = param_group['lr']
