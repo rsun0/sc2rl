@@ -34,7 +34,7 @@ np.set_printoptions(linewidth=200, precision=4)
 
 
 class PPOAgent(object):
-    def __init__(self, env, lr, hist_size=5, train_step=1024, trainable=True):
+    def __init__(self, env, lr, hist_size=8, train_step=1024, trainable=True):
         
         self.filters1 = 16
         self.filters2 = 32
@@ -43,9 +43,9 @@ class PPOAgent(object):
         self.hist_size = hist_size
         self.train_step = train_step
         self.clip_param = 0.1
-        self.clip_param_end = 0.3
+        self.clip_param_end = 0.03
         self.clip_param_schedule = 1000000
-        self.eps_denom = 1e-6
+        self.eps_denom = 1e-8
         self.episodes = 10000000
         self.save_frame = 50000
         self.evaluation_reward_length = 100
@@ -55,8 +55,8 @@ class PPOAgent(object):
         self.lam = 0.95
         self.batch_size = 32
         
-        self.epsilon_max = 1.0
-        self.epsilon_min = 0.1
+        self.epsilon_max = 0.05
+        self.epsilon_min = 0.05
         self.epsilon_schedule = 2000000
         
         self.env = env
@@ -161,7 +161,7 @@ class PPOAgent(object):
                     prev_action = utils.action_to_onehot(action, GraphConvConfigMinigames.action_space, GraphConvConfigMinigames.spatial_width)
                     _, _, frame_next_val, _, _ = self.net(np.expand_dims(G, 1), np.expand_dims(X, 1), avail_actions, LSTM_hidden, np.expand_dims(prev_action,1))
                     frame_next_val = frame_next_val.cpu().data.numpy().item()
-                    clip_param = self.clip_param_end + max( 0, (self.clip_param - self.clip_param_end) * (1-(frame / self.clip_param_schedule)) )
+                    clip_param = self.clip_param_end + (self.clip_param - self.clip_param_end) * max(0, 1-(frame / self.clip_param_schedule))
                     self.train_policy_net_ppo(frame, frame_next_val, epsilon, clip_param)
                             
                     self.update_target_net()
@@ -192,7 +192,7 @@ class PPOAgent(object):
         
         for param_group in self.optimizer.param_groups:
             curr_lr = param_group['lr']
-        print("\n\n ------- Training network. lr: %f. clip: %f. epsilon: %f ------- \n\n" % (curr_lr, self.clip_param, epsilon))
+        print("\n\n ------- Training network. lr: %f. clip: %f. epsilon: %f ------- \n\n" % (curr_lr, clip_param, epsilon))
         
         ### Compute value targets and advantage for all frames
         self.memory.compute_vtargets_adv(self.discount_factor, self.lam, frame_next_val)
@@ -325,7 +325,7 @@ class PPOAgent(object):
             return []
         else:
             return hist[-length:]
-                        
+
     def entropy(self, spatial_probs, nonspatial_probs):
         ent = - self.c3 * (torch.mean(torch.sum(spatial_probs[:,0,:,:] * torch.log(spatial_probs[:,0,:,:]+self.eps_denom), dim=(1,2))) + self.c4 * torch.mean(torch.sum(nonspatial_probs * torch.log(nonspatial_probs+self.eps_denom), dim=1) ) )
         return ent
@@ -356,7 +356,7 @@ def main():
                                             step_multiplier=8)
     lr = 0.00025                       
     agent = PPOAgent(env, lr)
-    #agent.load_saved_model()
+    agent.load_saved_model()
     agent.train()
 
 

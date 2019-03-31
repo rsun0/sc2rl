@@ -43,10 +43,10 @@ class GraphConvNet(nn.Module):
         
         
         
-        self.fc1 = nn.Linear(self.hidden_size, self.action_fcsize)
-        self.action_choice = nn.Linear(self.action_fcsize, nonspatial_act_size)
+        #self.fc1 = nn.Linear(self.hidden_size, self.action_fcsize)
+        self.action_choice = nn.Linear(self.hidden_size, nonspatial_act_size)
         
-        self.value_layer = nn.Linear(self.action_fcsize, 1)
+        self.value_layer = nn.Linear(self.hidden_size, 1)
         
         
         
@@ -79,6 +79,11 @@ class GraphConvNet(nn.Module):
                                                     kernel_size=4,
                                                     padding=1,
                                                     stride=2)
+        
+        self.tconv1_bn = torch.nn.BatchNorm2d(FILTERS1)
+        self.tconv2_bn = torch.nn.BatchNorm2d(FILTERS2)
+        self.tconv3_bn = torch.nn.BatchNorm2d(FILTERS3)
+        self.tconv4_bn = torch.nn.BatchNorm2d(FILTERS4)
         
         
                                                     
@@ -114,20 +119,19 @@ class GraphConvNet(nn.Module):
         
         graph_conv_out = self.graph_LSTM_forward(G, X, LSTM_hidden, prev_actions, relevant_frames).squeeze(0)
         
-        action_val_fc = F.relu(self.fc1(graph_conv_out))
         
-        nonspatial = self.action_choice(action_val_fc)
+        nonspatial = self.action_choice(graph_conv_out)
         nonspatial.masked_fill_(1-avail_actions, float('-inf'))
         nonspatial_policy = F.softmax(nonspatial)
         
-        value = self.value_layer(action_val_fc)
+        value = self.value_layer(graph_conv_out)
         
         stacked_h3 = graph_conv_out.reshape((N, self.hidden_size, 1, 1))
         
-        s1 = F.relu(self.tconv1(stacked_h3))
-        s2 = F.relu(self.tconv2(s1))
-        s3 = F.relu(self.tconv3(s2))
-        s4 = F.relu(self.tconv4(s3))
+        s1 = F.leaky_relu(self.tconv1_bn(self.tconv1(stacked_h3)), 0.1)
+        s2 = F.relu(self.tconv2_bn(self.tconv2(s1)), 0.1)
+        s3 = F.relu(self.tconv3_bn(self.tconv3(s2)), 0.1)
+        s4 = F.relu(self.tconv4_bn(self.tconv4(s3)), 0.1)
         spatial_policy = F.softmax(self.tconv5(s4).reshape((N, self.spatial_act_size, -1)), dim=2).reshape((N, self.spatial_act_size, self.spatial_width, self.spatial_width))
         
         choice = None
@@ -144,7 +148,7 @@ class GraphConvNet(nn.Module):
     """
         Input:
             G: (N, D, graph_n, graph_n) tensor
-            X: (N, D, graph_n, graph_n) tensor
+            X: (N, D, graph_n, self.config.unit_vec_width) tensor
             LSTM_hidden: (2, 1, N, hidden_size)
             prev_actions: (N, D, action_size) tensor
     """
