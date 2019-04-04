@@ -63,9 +63,9 @@ class GraphConvConfigMinigames():
     graph_n = 30
     
     # env configs
-    action_space = 5
+    action_space = 4
     
-    env_agent_action_mapper = {0:4,
+    env_agent_action_mapper = {#0:4,
                                 3:0,
                                 12:1,
                                 331:2,

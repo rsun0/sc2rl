@@ -24,8 +24,9 @@ class GraphConvNet(nn.Module):
         self.fc1_size = self.fc2_size = 128
         self.fc3_size = 128
         self.action_size = nonspatial_act_size + 4
-        self.hidden_size = 128
+        self.hidden_size = 256
         self.action_fcsize = 128
+        self.graph_lstm_out_size = self.hidden_size + self.fc3_size + self.action_size
         
         
         FILTERS1 = 64
@@ -44,13 +45,13 @@ class GraphConvNet(nn.Module):
         
         
         #self.fc1 = nn.Linear(self.hidden_size, self.action_fcsize)
-        self.action_choice = nn.Linear(self.hidden_size, nonspatial_act_size)
+        self.action_choice = nn.Linear(self.graph_lstm_out_size, nonspatial_act_size)
         
-        self.value_layer = nn.Linear(self.hidden_size, 1)
+        self.value_layer = nn.Linear(self.graph_lstm_out_size, 1)
         
         
         
-        self.tconv1 = torch.nn.ConvTranspose2d(self.hidden_size, 
+        self.tconv1 = torch.nn.ConvTranspose2d(self.graph_lstm_out_size, 
                                                     FILTERS1,
                                                     kernel_size=4,
                                                     padding=0,
@@ -117,16 +118,17 @@ class GraphConvNet(nn.Module):
         prev_actions = torch.from_numpy(prev_actions).to(self.device).float()
         relevant_frames = torch.from_numpy(relevant_frames).to(self.device).float()
         
-        graph_conv_out = self.graph_LSTM_forward(G, X, LSTM_hidden, prev_actions, relevant_frames).squeeze(0)
+        LSTM_graph_out, LSTM_hidden = self.graph_LSTM_forward(G, X, LSTM_hidden, prev_actions, relevant_frames)
         
         
-        nonspatial = self.action_choice(graph_conv_out)
+        
+        nonspatial = self.action_choice(LSTM_graph_out)
         nonspatial.masked_fill_(1-avail_actions, float('-inf'))
         nonspatial_policy = F.softmax(nonspatial)
         
-        value = self.value_layer(graph_conv_out)
+        value = self.value_layer(LSTM_graph_out)
         
-        stacked_h3 = graph_conv_out.reshape((N, self.hidden_size, 1, 1))
+        stacked_h3 = LSTM_graph_out.reshape((N, self.graph_lstm_out_size, 1, 1))
         
         s1 = F.leaky_relu(self.tconv1_bn(self.tconv1(stacked_h3)), 0.1)
         s2 = F.relu(self.tconv2_bn(self.tconv2(s1)), 0.1)
@@ -137,6 +139,8 @@ class GraphConvNet(nn.Module):
         choice = None
         if (choosing):
             assert(N==1)
+            #print(torch.max(spatial_policy))
+            #print(torch.max(nonspatial_policy))
             if (rand < epsilon):
                 spatial_policy = torch.ones(spatial_policy.shape).float().to(self.device) / (self.spatial_width ** 2)
                 nonspatial_policy = torch.ones(nonspatial_policy.shape).float().to(self.device) * avail_actions.float()
@@ -155,6 +159,7 @@ class GraphConvNet(nn.Module):
     def graph_LSTM_forward(self, G, X, LSTM_hidden, prev_actions, relevant_frames):
         
         batch_size, D = G.shape[0], G.shape[1]
+        graph_out_actions = None
         for i in range(D):
             G_curr = G[:,i,:,:]
             X_curr = X[:,i,:,:]
@@ -173,9 +178,9 @@ class GraphConvNet(nn.Module):
             if (irrelevant_mask.size() != torch.Size([0]) and torch.sum(irrelevant_mask) > 0):
 
                 LSTM_hidden[:,:,irrelevant_mask,:] = self.init_hidden(torch.sum(irrelevant_mask), device=self.device)
-            
-            
-        return output
+
+        output = torch.cat([output.squeeze(0), graph_out_actions], dim=1)
+        return output, LSTM_hidden
             
         
         

@@ -40,7 +40,6 @@ class MinigameEnvironment:
         self._curr_frame = None
         self._terminal = True
 
-        self.action_space = 10
         FACTOR = 9  # TODO
         self.observation_space = [84, 84, FACTOR]
         self.select_space = Actuator._SELECT_SPACE

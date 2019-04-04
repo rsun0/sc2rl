@@ -55,9 +55,9 @@ class PPOAgent(object):
         self.lam = 0.95
         self.batch_size = 32
         
-        self.epsilon_max = 0.05
+        self.epsilon_max = 1.0
         self.epsilon_min = 0.05
-        self.epsilon_schedule = 2000000
+        self.epsilon_schedule = 1000000
         
         self.env = env
         nonspatial_act_size, spatial_act_depth = env.action_space
@@ -71,10 +71,10 @@ class PPOAgent(object):
         self.loss = nn.MSELoss()
         
         self.c1 = 1.0
-        self.c2 = 0.03
+        self.c2 = 0.2
         
         ### scaling constants for spatial and nonspatial entropy
-        self.c3 = 1.0
+        self.c3 = 0.1
         self.c4 = 1.0
         
         self.averages = []
@@ -86,7 +86,7 @@ class PPOAgent(object):
         self.net.load_state_dict(torch.load("save_model/Starcraft2" + self.env.map + "PPO"))
         self.update_target_net()
         
-    def train(self):
+    def train(self, training=True):
     
         evaluation_reward = deque(maxlen=self.evaluation_reward_length)
     
@@ -153,11 +153,14 @@ class PPOAgent(object):
                 push_state = [G, X, avail_actions, prev_LSTM]
                     
                 ### Store transition in memory
+                if (score == 0 and done):
+                    reward -= 100
+                    score -= 100
                 self.memory.push(push_state, action, reward, done, value, 0, 0, step)
                 
                 ### Start training after random sample generation
                     
-                if (frame % self.train_step == 0 and frame != 0):
+                if (frame % self.train_step == 0 and frame != 0 and training):
                     prev_action = utils.action_to_onehot(action, GraphConvConfigMinigames.action_space, GraphConvConfigMinigames.spatial_width)
                     _, _, frame_next_val, _, _ = self.net(np.expand_dims(G, 1), np.expand_dims(X, 1), avail_actions, LSTM_hidden, np.expand_dims(prev_action,1))
                     frame_next_val = frame_next_val.cpu().data.numpy().item()
@@ -356,7 +359,7 @@ def main():
                                             step_multiplier=8)
     lr = 0.00025                       
     agent = PPOAgent(env, lr)
-    agent.load_saved_model()
+    #agent.load_saved_model()
     agent.train()
 
 

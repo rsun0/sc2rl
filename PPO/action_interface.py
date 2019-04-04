@@ -13,7 +13,7 @@ class Action(Enum):
 
 class Actuator:
 
-    _ACTION_SPACE = (5, 2)
+    _ACTION_SPACE = (4, 2)
     _SELECT_SPACE = 64
     _SCREEN = 84
 
