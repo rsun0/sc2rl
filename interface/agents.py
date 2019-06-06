@@ -1,6 +1,21 @@
-class AbstractAgent:
+from memory import Memory
+from pysc2.agents import base_agent
+from pysc2.lib import actions, features
+
+
+class AbstractAgent(base_agent.BaseAgent):
     def __init__(self):
-        pass
+        ''' 
+        Stores s, a, r, s', d for each frame relavant to training or testing
+        '''
+        self.memory = Memory()
+        
+    def state_modifier(self, state):
+        '''
+        Returns an altered state for the agent based on the given state
+        Output is same format as input to forward        
+        '''
+        raise NotImplementedError
 
     def sample(self, state):
         '''
@@ -16,10 +31,24 @@ class AbstractAgent:
         (usually a probability distribution of actions)
         '''
         raise NotImplementedError
-
-    def train(self, state, action, reward, next_state):
+        
+    def train(self):
+        '''
+        Calls train_step until it has run through memory self.epochs times
+        '''
+        raise NotImplementedError
+        
+    def train_step(self, batch_size):
         '''
         Updates the agent with the experience of going from
         state to next_state when taking action
         '''
         raise NotImplementedError
+        
+    def action_space_converter(self, action):
+        '''
+        Takes in action, an output from self.sample
+        Returns equivalent sc2env action
+        '''
+        raise NotImplementedError
+        
