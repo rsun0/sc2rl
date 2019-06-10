@@ -9,13 +9,15 @@ These functions and settings are passed into the Experiment constructor.
 
 """
 
+import numpy as np
+
 class Experiment:
     def __init__(self, agents, custom_env, run_settings):
         self.agents = agents
-        self.custom_env
+        self.custom_env = custom_env
         self.run_settings = run_settings
 
-    def train():
+    def train(self):
         """
         Trains the agent(s) using the custom environment
         """
@@ -26,7 +28,7 @@ class Experiment:
         for frame in range(train_length):
             
             actions = []
-            for i in range(len(self.agents))
+            for i in range(len(self.agents)):
                 
                 agent = self.agents[i]
                 
@@ -46,12 +48,12 @@ class Experiment:
             
             if (frame != 0):
                 for i in range(len(self.agents)):
-                    ### Push memory
+                    # Push memory
                     agent_modified_state = agent_states[i]
                     agent_action = agent_actions[i]
                     agent_reward = agent_rewards[i]
                     agent_done = agent_dones[i]
-                    agent.memory.push([agent_modified_space, agent_action,
+                    agent.memory.push([agent_modified_state, agent_action,
                         agent_reward, agent_done])
                     
             if (np.array(agent_dones) == False).all():
