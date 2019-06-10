@@ -1,15 +1,13 @@
-from memory import Memory
-from pysc2.agents import base_agent
-from pysc2.lib import actions, features
-
-
-class AbstractAgent(base_agent.BaseAgent):
-    def __init__(self):
-        ''' 
-        Stores s, a, r, s', d for each frame relavant to training or testing
-        '''
-        self.memory = Memory()
+class Agent():
+    def __init__(self, model, optim_settings, memory):
+        self.model = model
+        self.optim_settings = optim_settings
+        self.memory = memory
         
+        # Instantiate optimizer
+        self.optimizer = self.optim_settings.optimizer(
+            params=self.model.parameters(), lr=self.optim_settings.learning_rate)
+    
     def state_modifier(self, state):
         '''
         Returns an altered state for the agent based on the given state
@@ -52,3 +50,22 @@ class AbstractAgent(base_agent.BaseAgent):
         '''
         raise NotImplementedError
         
+
+class Model():
+    def parameters(self):
+        raise NotImplementedError()
+
+
+class OptimizerSettings():
+    def __init__(self, optimizer, learning_rate):
+        """
+        :param optimizer: A class from torch.optim (instantiated later)
+        """
+        # optimizer should be a class, will be instantiated later
+        self.optimizer = optimizer
+        self.learning_rate = learning_rate
+
+
+class Memory():
+    def __init__(self):
+        raise NotImplementedError
