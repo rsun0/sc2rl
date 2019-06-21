@@ -1,12 +1,12 @@
 class Agent():
-    def __init__(self, model, optim_settings, memory):
+    def __init__(self, model, settings, memory):
         self.model = model
-        self.optim_settings = optim_settings
+        self.settings = settings
         self.memory = memory
         
         # Instantiate optimizer
-        self.optimizer = self.optim_settings.optimizer(
-            params=self.model.parameters(), lr=self.optim_settings.learning_rate)
+        self.optimizer = self.settings.optimizer(
+            params=self.model.parameters(), lr=self.settings.learning_rate)
     
     def state_modifier(self, state):
         '''
@@ -56,14 +56,21 @@ class Model():
         raise NotImplementedError()
 
 
-class OptimizerSettings():
-    def __init__(self, optimizer, learning_rate):
+class AgentSettings():
+    def __init__(self, optimizer, learning_rate,
+            epsilon_max, epsilon_min, epsilon_duration):
         """
         :param optimizer: A class from torch.optim (instantiated later)
+        :param learning_rate: The learning rate for the network
+        :param epsilon_max: The starting epsilon
+        :param epsilon_min: The final epsilon
+        :param epsilon_duration: The number of frames to reach the final epsilon
         """
-        # optimizer should be a class, will be instantiated later
         self.optimizer = optimizer
         self.learning_rate = learning_rate
+        self.epsilon_max = epsilon_max
+        self.epsilon_min = epsilon_min
+        self.epsilon_duration = epsilon_duration
 
 
 class Memory():
