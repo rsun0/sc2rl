@@ -21,58 +21,73 @@ class Experiment:
         """
         Trains the agent(s) using the custom environment
         """
-        train_length = max([self.agents[i].train_length for i in range(len(self.agents))])
-        
-        env_obs = self.custom_env.reset()
-        
-        for frame in range(train_length):
+        total_frame_count = 0
+
+        for e in range(self.run_settings.num_episodes):
+            # Initialize episode
+            states, rewards, done, info = self.custom_env.reset()
             
-            actions = []
-            for i in range(len(self.agents)):
-                
-                agent = self.agents[i]
-                
-                if frame % agent.train_every == 0:
-                    agent.train()
-                
-                agent_state = env_obs[i].observation
-                agent_action, agent_modified_state = agent.sample(agent_state)
-                converted_action = agent.action_space_converter(agent_action)
-                
-                agent_states[i] = agent_modified_state
-                agent_actions[i] = converted_action
-                
-            env_obs = self.custom_env.step(agent_actions)
-            agent_rewards = [env_obs[i].reward for i in range(len(env_obs))]
-            agent_dones = [env_obs[i].last() for i in range(len(env_obs))]
-            
-            if (frame != 0):
-                for i in range(len(self.agents)):
-                    # Push memory
-                    agent_modified_state = agent_states[i]
-                    agent_action = agent_actions[i]
-                    agent_reward = agent_rewards[i]
-                    agent_done = agent_dones[i]
-                    agent.memory.push([agent_modified_state, agent_action,
-                        agent_reward, agent_done])
+            while not done:
+                total_frame_count += 1
+
+                actions = []
+                for a in range(len(self.agents)):
+                    agent = self.agents[a]
+                    state = states[a]
+                    reward = rewards[a]
+
+                    if total_frame_count % self.run_settings.train_every == 0:
+                        agent.train()
+
+                    action = agent.sample(state)
+                    actions.append(action)
                     
-            if (np.array(agent_dones) == False).all():
-                env_obs = self.custom_env.reset()
-                agent_states = [None for i in range(len(self.agents))]
-                agent_actions = [None for i in range(len(self.agents))]
-                agent_rewards = [0 for i in range(len(self.agents))]
-                agent_dones = [False for i in range(len(self.agents))]
+                states, rewards, done, info = self.custom_env.step(actions)
+                
+                # Push to agent Memories
+                for a in range(len(self.agents)):
+                    agent = self.agents[a]
+                    state = states[a]
+                    action = actions[a]
+                    reward = rewards[a]
+                    agent.memory.push(state, action, reward, done)
 
 
 class CustomEnvironment():
-    def step(self, action):
+    def step(self, actions):
+        """
+        :actions: A list of actions, one for each agent
+
+        :returns: states, rewards, done, info
+        states is an list of states, one for each agent
+        rewards is an list of rewards, one for each agent
+        done is the flag for the terminal frame
+        info is auxiliary data used by the controlling system (not visible to agents)
+        """
         raise NotImplementedError()
 
     def reset(self):
+        """
+        Should work even if reset is called multiple times in a row.
+
+        :returns: states, rewards, done, info
+        states is an list of states, one for each agent
+        rewards is an list of rewards, one for each agent
+        done is the flag for the terminal frame
+        info is auxiliary data used by the controlling system (not visible to agents)
+        """
         raise NotImplementedError()
 
 
 class RunSettings:
-    def __init__(self, num_epochs, batch_size):
+    def __init__(self, num_episodes, num_epochs, batch_size, train_every):
+        """
+        :param num_episodes: The total number of episodes to play
+        :param num_epochs: The number of update iterations for each experience set
+        :param batch_size: The number of experiences to process at once
+        :param train_every: Update the networks every X frames
+        """
+        self.num_episodes = num_episodes
         self.num_epochs = num_epochs
         self.batch_size = batch_size
+        self.train_every = train_every

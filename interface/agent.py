@@ -76,3 +76,6 @@ class AgentSettings():
 class Memory():
     def __init__(self):
         raise NotImplementedError
+
+    def push(self, state, action, reward, done):
+        raise NotImplementedError
