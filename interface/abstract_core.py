@@ -26,31 +26,28 @@ class Experiment:
         for e in range(self.run_settings.num_episodes):
             # Initialize episode
             states, rewards, done, info = self.custom_env.reset()
+            # Initialize scores to starting reward (probably 0)
+            scores = rewards
             
             while not done:
                 total_frame_count += 1
 
-                actions = []
-                for a in range(len(self.agents)):
-                    agent = self.agents[a]
-                    state = states[a]
-                    reward = rewards[a]
-
-                    if total_frame_count % self.run_settings.train_every == 0:
+                # Train agents
+                if total_frame_count % self.run_settings.train_every == 0:
+                    for agent in self.agents:
                         agent.train()
 
-                    action = agent.sample(state)
-                    actions.append(action)
-                    
+                # Get actions
+                actions = [self.agents[a].sample(states[a])]
+                # Take environment step
                 states, rewards, done, info = self.custom_env.step(actions)
-                
+                # Update scores
+                scores = [scores[a] + rewards[a] for a in range(len(self.agents))]
                 # Push to agent Memories
                 for a in range(len(self.agents)):
-                    agent = self.agents[a]
-                    state = states[a]
-                    action = actions[a]
-                    reward = rewards[a]
-                    agent.memory.push(state, action, reward, done)
+                    self.agents[a].memory.push(states[a], actions[a], rewards[a], done)
+
+                # TODO Save models and record metrics
 
 
 class CustomEnvironment():
