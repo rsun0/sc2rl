@@ -13,27 +13,28 @@ class Agent():
         Calls _sample after wrapping with state_space_converter
         and action_space_converter
         """
-        internal_state = self.state_space_converter(state)
-        internal_action = self._sample(internal_state)
-        return self.action_space_converter(internal_action)
+        personal_state = self.state_space_converter(state)
+        personal_action = self._sample(personal_state)
+        return self.action_space_converter(personal_action)
 
     def forward(self, state):
         """
         Calls _forward after wrapping with state_space_converter
         """
-        internal_state = self.state_space_converter(state)
-        return self._forward(internal_state)
+        personal_state = self.state_space_converter(state)
+        return self._forward(personal_state)
 
     def state_space_converter(self, state):
         """
-        Returns an altered state for the agent based on the given state
-        Output is same format as input to forward        
+        Returns a personalized state for the agent based on
+        the given CustomEnvironment state.
+        Output is same format as input to self._sample and self._forward       
         """
         raise NotImplementedError
         
-    def action_space_converter(self, action):
+    def action_space_converter(self, personal_action):
         """
-        Takes in action, an output from self.sample
+        Takes in personalized action, an output from self._sample
         Returns equivalent CustomEnvironment action
         """
         raise NotImplementedError
