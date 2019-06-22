@@ -72,6 +72,15 @@ class AgentSettings():
         self.epsilon_min = epsilon_min
         self.epsilon_duration = epsilon_duration
 
+    def get_epsilon(self, frame_num):
+        """
+        Computes the epsilon for a given frame based
+        on epsilon_max, epsilon_min, and epsilon_duration
+        """
+        progress = frame_num / self.epsilon_duration
+        reduction = -(self.epsilon_max - self.epsilon_min) * progress
+        return max(self.epsilon_min, self.epsilon_max + reduction)
+
 
 class Memory():
     def __init__(self):
