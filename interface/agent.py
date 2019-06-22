@@ -8,14 +8,37 @@ class Agent():
         self.optimizer = self.settings.optimizer(
             params=self.model.parameters(), lr=self.settings.learning_rate)
     
-    def state_modifier(self, state):
+    def sample(self, state):
+        """
+        Calls _sample after wrapping with state_space_converter
+        and action_space_converter
+        """
+        internal_state = self.state_space_converter(state)
+        internal_action = self._sample(internal_state)
+        return self.action_space_converter(internal_action)
+
+    def forward(self, state):
+        """
+        Calls _forward after wrapping with state_space_converter
+        """
+        internal_state = self.state_space_converter(state)
+        return self._forward(internal_state)
+
+    def state_space_converter(self, state):
         """
         Returns an altered state for the agent based on the given state
         Output is same format as input to forward        
         """
         raise NotImplementedError
+        
+    def action_space_converter(self, action):
+        """
+        Takes in action, an output from self.sample
+        Returns equivalent CustomEnvironment action
+        """
+        raise NotImplementedError
 
-    def sample(self, state):
+    def _sample(self, state):
         """
         Returns an action chosen by the agent for the given state.
         May not be deterministic if the agent probabilistically
@@ -23,7 +46,7 @@ class Agent():
         """
         raise NotImplementedError
 
-    def forward(self, state):
+    def _forward(self, state):
         """
         Returns the network output given the current state
         (usually a probability distribution of actions)
@@ -40,13 +63,6 @@ class Agent():
         """
         Updates the agent with the experience of going from
         state to next_state when taking action
-        """
-        raise NotImplementedError
-        
-    def action_space_converter(self, action):
-        """
-        Takes in action, an output from self.sample
-        Returns equivalent sc2env action
         """
         raise NotImplementedError
 
