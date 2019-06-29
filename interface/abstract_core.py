@@ -25,7 +25,7 @@ class Experiment:
 
         for e in range(self.run_settings.num_episodes):
             # Initialize episode
-            env_states, rewards, done, info = self.custom_env.reset()
+            env_states, rewards, done, metainfo = self.custom_env.reset()
             # Initialize scores to starting reward (probably 0)
             scores = rewards
             
@@ -48,7 +48,7 @@ class Experiment:
                 actions = [self.agents[a].sample(states[a]) for a in range(len(self.agents))]
                 env_actions = [self.agents[a].action_space_converter(actions[a]) for a in range(len(self.agents))]
                 # Take environment step
-                env_states, rewards, done, info = self.custom_env.step(env_actions)
+                env_states, rewards, done, metainfo = self.custom_env.step(env_actions)
                 
                 # Update scores
                 scores = [scores[a] + rewards[a] for a in range(len(self.agents))]
@@ -63,11 +63,11 @@ class CustomEnvironment():
         """
         :actions: A list of actions, one for each agent
 
-        :returns: states, rewards, done, info
+        :returns: states, rewards, done, metainfo
         states is an list of states, one for each agent
         rewards is an list of rewards, one for each agent
         done is the flag for the terminal frame
-        info is auxiliary data used by the controlling system (not visible to agents)
+        metainfo is auxiliary data used by the controlling system (not visible to agents)
         """
         raise NotImplementedError()
 
@@ -75,11 +75,11 @@ class CustomEnvironment():
         """
         Should work even if reset is called multiple times in a row.
 
-        :returns: states, rewards, done, info
+        :returns: states, rewards, done, metainfo
         states is an list of states, one for each agent
         rewards is an list of rewards, one for each agent
         done is the flag for the terminal frame
-        info is auxiliary data used by the controlling system (not visible to agents)
+        metainfo is auxiliary data used by the controlling system (not visible to agents)
         """
         raise NotImplementedError()
 
