@@ -30,17 +30,25 @@ class Experiment:
             scores = rewards
             
             while not done:
+                
+                states = [self.agents[a].state_space_converter(states[a]) for a in range(len(self.agents))]
+            
                 total_frame_count += 1
 
                 # Train agents
                 if total_frame_count % self.run_settings.train_every == 0:
                     for agent in self.agents:
                         agent.train()
+                        
+                        # Save agent model
+                        agent.save()
 
                 # Get actions
-                actions = [self.agents[a].sample(states[a])]
+                actions = [self.agents[a].sample(states[a]) for a in range(len(self.agents))]
+                env_actions = [self.agents[a].action_space_converter(actions[a]) for a in range(len(self.agents))]
                 # Take environment step
-                states, rewards, done, info = self.custom_env.step(actions)
+                next_states, rewards, done, info = self.custom_env.step(env_actions)
+                
                 # Update scores
                 scores = [scores[a] + rewards[a] for a in range(len(self.agents))]
                 # Push to agent Memories
@@ -48,7 +56,8 @@ class Experiment:
                     self.agents[a].memory.push(states[a], actions[a], rewards[a], done)
 
                 # TODO Save models and record metrics
-
+                states = next_states
+            
 
 class CustomEnvironment():
     def step(self, actions):
