@@ -25,13 +25,12 @@ class Experiment:
 
         for e in range(self.run_settings.num_episodes):
             # Initialize episode
-            states, rewards, done, info = self.custom_env.reset()
+            env_states, rewards, done, info = self.custom_env.reset()
             # Initialize scores to starting reward (probably 0)
             scores = rewards
             
             while not done:
-                
-                states = [self.agents[a].state_space_converter(states[a]) for a in range(len(self.agents))]
+                states = [self.agents[a].state_space_converter(env_states[a]) for a in range(len(self.agents))]
             
                 total_frame_count += 1
 
@@ -40,14 +39,16 @@ class Experiment:
                     for agent in self.agents:
                         agent.train()
                         
-                        # Save agent model
+                # Save agent model
+                if total_frame_count % self.run_settings.save_every == 0:
+                    for agent in self.agents:
                         agent.save()
 
                 # Get actions
                 actions = [self.agents[a].sample(states[a]) for a in range(len(self.agents))]
                 env_actions = [self.agents[a].action_space_converter(actions[a]) for a in range(len(self.agents))]
                 # Take environment step
-                next_states, rewards, done, info = self.custom_env.step(env_actions)
+                env_states, rewards, done, info = self.custom_env.step(env_actions)
                 
                 # Update scores
                 scores = [scores[a] + rewards[a] for a in range(len(self.agents))]
@@ -55,10 +56,8 @@ class Experiment:
                 for a in range(len(self.agents)):
                     self.agents[a].memory.push(states[a], actions[a], rewards[a], done)
 
-                # TODO Save models and record metrics
-                states = next_states
+                # TODO Record metrics
             
-
 class CustomEnvironment():
     def step(self, actions):
         """
@@ -86,14 +85,16 @@ class CustomEnvironment():
 
 
 class RunSettings:
-    def __init__(self, num_episodes, num_epochs, batch_size, train_every):
+    def __init__(self, num_episodes, num_epochs, batch_size, train_every, save_every):
         """
         :param num_episodes: The total number of episodes to play
         :param num_epochs: The number of update iterations for each experience set
         :param batch_size: The number of experiences to process at once
         :param train_every: Update the networks every X frames
+        :param save_every: Save the model every X frames
         """
         self.num_episodes = num_episodes
         self.num_epochs = num_epochs
         self.batch_size = batch_size
         self.train_every = train_every
+        self.save_every = save_every
