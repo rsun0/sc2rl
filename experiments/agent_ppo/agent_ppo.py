@@ -1,9 +1,14 @@
+from agent import Agent, Model, Memory, AgentSettings
+from config import GraphConvConfigMinigames
+from modified_state_space import state_modifier
+import utils
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import numpy as np
 
-from interface.agent import Agent, Model, Memory, AgentSettings
-from PPO.config import GraphConvConfigMinigames
+import copy
 
 
 class PPOAgent(Agent):
@@ -14,33 +19,54 @@ class PPOAgent(Agent):
 
     def __init__(self, model, settings, memory, PPO_settings):
         super().__init__(model, settings, memory)
+        self.step = 0
         self.frame_count = 0
         self.epochs_trained = 0
         self.PPO_settings = PPO_settings
+        self.target_model = copy.deepcopy(model)
+        self.hidden_state = self.model.init_hidden(use_torch=False)
+        self.prev_hidden_state = None
+        self.optimizer = settings.optimizer(model.parameters(), lr=settings.learning_rate)
+        self.action = [np.array([[0,0],[0,0]]),0]
+        self.config = GraphConvConfigMinigames
+        self.value = 0
+        self.loss = nn.MSELoss().to(PPO_settings['device'])
     
-    def _forward(self, agent_state):
-        return self.model(agent_state)
+    def _forward(self, agent_state, choosing=False):
+        (G, X, avail_actions) = agent_state
+        self.prev_action = utils.action_to_onehot(self.action, self.config.action_space, self.config.spatial_width)
+        self.prev_hidden_state = copy.deepcopy(self.hidden_state)
+        _, _, value, self.hidden_state, action = self.model(np.expand_dims(G, 1),
+                                                    np.expand_dims(X, 1),
+                                                    avail_actions,
+                                                    self.hidden_state,
+                                                    np.expand_dims(self.prev_action, 1),
+                                                    epsilon=self.settings.get_epsilon(self.frame_count),
+                                                    choosing=True)
+        return _, _, value.cpu().data.numpy().item(), self.hidden_state.cpu().data.numpy(), action
+        
+                                
 
     def _sample(self, agent_state):
-        probs = self._forward(agent_state).cpu().data.numpy().flatten()
-        action = np.argmax(np.random.multinomial(1, probs))
+        _, _, self.value, self.hidden_state, self.action = self._forward(agent_state, choosing=True)
         self.frame_count += 1
-        return action
+        self.step += 1
+        return self.action
         
     def state_space_converter(self, state):
-        return state
+        return state_modifier.graph_conv_modifier(state)[:3]
     
     def action_space_converter(self, personal_action):
         return personal_action
         
     
-    def train(self):
+    def train(self, run_settings):
         self.memory.compute_vtargets_adv(self.PPO_settings['discount_factor'],
                                             self.PPO_settings['lambda'])
                                             
-        batch_size = self.PPO_settings['batch_size']
+        batch_size = run_settings.batch_size
         num_iters = int(len(self.memory) / batch_size)
-        epochs = self.PPO_settings['epochs']
+        epochs = run_settings.num_epochs
         
         for i in range(epochs):
         
@@ -60,11 +86,12 @@ class PPOAgent(Agent):
             vf_loss /= num_iters
             ent_total /= num_iters
             print("Epoch %d: Policy loss: %f. Value loss: %f. Entropy %f" % 
-                            (self.num_epochs_trained, 
+                            (self.epochs_trained, 
                             pol_loss, 
                             vf_loss, 
                             ent_total)
                             )
+        self.update_target_net()
          
         print("\n\n ------- Training sequence ended ------- \n\n")
     
@@ -76,9 +103,10 @@ class PPOAgent(Agent):
         eps_denom = self.PPO_settings['eps_denom']
         c1 = self.PPO_settings['c1']
         c2 = self.PPO_settings['c2']
+        clip_param = self.PPO_settings['clip_param']
         
         
-        mini_batch = self.memory.sample_bini_batch(self.frame_count,
+        mini_batch = self.memory.sample_mini_batch(self.frame_count,
                                                     hist_size)
         mini_batch = np.array(mini_batch).transpose()
         
@@ -131,7 +159,7 @@ class PPOAgent(Agent):
                                                     avail_states,
                                                     hidden_states,
                                                     prev_actions,
-                                                    relevant_frame=relevant_states
+                                                    relevant_frames=relevant_states
                                                     )
         
         gathered_nonspatials = nonspatial_probs.gather(1, nonspatial_acts).squeeze(1)
@@ -147,6 +175,7 @@ class PPOAgent(Agent):
         denom = torch.log(old_gathered_nonspatials + eps_denom) 
         denom = denom + torch.log(self.index_spatial_probs(old_spatial_probs[:,0,:,:], first_spatials) + eps_denom) * first_spatial_mask 
         denom = denom + (torch.log(self.index_spatial_probs(old_spatial_probs[:,1,:,:], second_spatials) + eps_denom) * second_spatial_mask)
+        denom = denom.detach()
         
         ratio = torch.exp(numerator - denom)
         ratio_adv = ratio * advantages.detach()
@@ -168,23 +197,41 @@ class PPOAgent(Agent):
         
         return pol_loss, vf_loss, ent_total
         
+    def load(self):
+        self.net.load_state_dict(torch.load("save_model/Starcraft2" + self.env.map + "PPO"))
+        self.update_target_net()
         
-     ### Unique PPO functions below this line
+    def save(self):
+        torch.save(self.model.state_dict(), "save_model/Starcraft2PPO")
+        
+    def push_memory(self, state, action, reward, done):
+        push_state = list(state) + [self.prev_hidden_state]
+        self.memory.push(push_state, action, reward, done, self.value, 0, 0, self.step)
+        if done:
+            step = 0
+            value = 0
+            self.hidden_state = self.model.init_hidden(use_torch=False)
+        
+        
+    ### Unique PPO functions below this line
      
-     def index_spatial_probs(self, spatial_probs, indices):
+    def update_target_net(self):
+        self.target_model.load_state_dict(self.model.state_dict())
+     
+    def index_spatial_probs(self, spatial_probs, indices):
         index_tuple = torch.meshgrid([torch.arange(x) for x in spatial_probs.size()[:-2]]) + (indices[:,0], indices[:,1],)
         output = spatial_probs[index_tuple]
         return output
         
     def entropy(self, spatial_probs, nonspatial_probs):
-        c3 = self.PPO_settings.c3
-        c4 = self.PPO_settings.c4
-        eps_denom = self.PPO_settings.eps_denom
+        c3 = self.PPO_settings['c3']
+        c4 = self.PPO_settings['c4']
+        eps_denom = self.PPO_settings['eps_denom']
         
         prod_s = spatial_probs[:,0,:,:] * torch.log(spatial_probs[:,0,:,:]+eps_denom)
         prod_n = nonspatial_probs * torch.log(nonspatial_probs+eps_denom)
         
-        ent = - c3 * (torch.mean(torch.sum(prod_s, dim=(1,2)))
+        ent = - c3 * (torch.mean(torch.sum(prod_s, dim=(1,2))))
         ent = ent - c4 * torch.mean(torch.sum(prod_n, dim=1))
         
         return ent

@@ -13,16 +13,14 @@ class Agent():
         Calls _sample after wrapping with state_space_converter
         and action_space_converter
         """
-        personal_state = self.state_space_converter(state)
-        personal_action = self._sample(personal_state)
+        personal_action = self._sample(state)
         return self.action_space_converter(personal_action)
 
     def forward(self, state):
         """
-        Calls _forward after wrapping with state_space_converter
+        Calls _forward, which is defined by subclass agent
         """
-        personal_state = self.state_space_converter(state)
-        return self._forward(personal_state)
+        return self._forward(state)
 
     def state_space_converter(self, state):
         """
@@ -70,6 +68,13 @@ class Agent():
     def save(self):
         """
         Saves model and necessary data
+        """
+        raise NotImplementedError
+        
+    def push_memory(self, state, action, reward, done):
+        """
+        Pushes state, action, reward, done, and whatever else the subclass agent
+        wants to push to memory
         """
         raise NotImplementedError
         
