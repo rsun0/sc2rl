@@ -8,46 +8,74 @@ class Agent():
         self.optimizer = self.settings.optimizer(
             params=self.model.parameters(), lr=self.settings.learning_rate)
     
-    def state_modifier(self, state):
-        '''
-        Returns an altered state for the agent based on the given state
-        Output is same format as input to forward        
-        '''
+    def sample(self, state):
+        """
+        Calls _sample after wrapping with state_space_converter
+        and action_space_converter
+        """
+        personal_action = self._sample(state)
+        return self.action_space_converter(personal_action)
+
+    def forward(self, state):
+        """
+        Calls _forward, which is defined by subclass agent
+        """
+        return self._forward(state)
+
+    def state_space_converter(self, state):
+        """
+        Returns a personalized state for the agent based on
+        the given CustomEnvironment state.
+        Output is same format as input to self._sample and self._forward       
+        """
+        raise NotImplementedError
+        
+    def action_space_converter(self, personal_action):
+        """
+        Takes in personalized action, an output from self._sample
+        Returns equivalent CustomEnvironment action
+        """
         raise NotImplementedError
 
-    def sample(self, state):
-        '''
+    def _sample(self, state):
+        """
         Returns an action chosen by the agent for the given state.
         May not be deterministic if the agent probabilistically
         chooses between multiple actions for the given state.
-        '''
+        """
         raise NotImplementedError
 
-    def forward(self, state):
-        '''
+    def _forward(self, state):
+        """
         Returns the network output given the current state
         (usually a probability distribution of actions)
-        '''
+        """
         raise NotImplementedError
         
     def train(self):
-        '''
+        """
         Calls train_step until it has run through memory self.epochs times
-        '''
+        """
         raise NotImplementedError
         
     def train_step(self, batch_size):
-        '''
+        """
         Updates the agent with the experience of going from
         state to next_state when taking action
-        '''
+        """
+        raise NotImplementedError
+
+    def save(self):
+        """
+        Saves model and necessary data
+        """
         raise NotImplementedError
         
-    def action_space_converter(self, action):
-        '''
-        Takes in action, an output from self.sample
-        Returns equivalent sc2env action
-        '''
+    def push_memory(self, state, action, reward, done):
+        """
+        Pushes state, action, reward, done, and whatever else the subclass agent
+        wants to push to memory
+        """
         raise NotImplementedError
         
 
@@ -71,6 +99,15 @@ class AgentSettings():
         self.epsilon_max = epsilon_max
         self.epsilon_min = epsilon_min
         self.epsilon_duration = epsilon_duration
+
+    def get_epsilon(self, frame_num):
+        """
+        Computes the epsilon for a given frame based
+        on epsilon_max, epsilon_min, and epsilon_duration
+        """
+        progress = frame_num / self.epsilon_duration
+        reduction = -(self.epsilon_max - self.epsilon_min) * progress
+        return max(self.epsilon_min, self.epsilon_max + reduction)
 
 
 class Memory():
