@@ -21,7 +21,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 def main():
 
     map_name = "DefeatRoaches"
-    render = False
+    render = True
     step_mul = 8
 
 
@@ -36,9 +36,9 @@ def main():
     
     
     lr = 5e-3
-    eps_max = 1.0
-    eps_min = 0.1
-    eps_duration=1e6
+    eps_max = 0.3
+    eps_min = 0.05
+    eps_duration=1e5
     
     
     num_episodes = 1000000
@@ -75,8 +75,8 @@ def main():
         "device": device,
         "eps_denom": 1e-6,
         "c1": 1.0,
-        "c2": 0.01,
-        "c3": 0.1,
+        "c2": 0.5,
+        "c3": 0.5,
         "c4": 1.0,
         "clip_param": 0.1
     }
