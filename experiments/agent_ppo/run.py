@@ -1,7 +1,6 @@
 import sys
 sys.path.insert(0, '/home/michael/Documents/Projects/sc2rl/interface/')
 
-
 from custom_env import MinigameEnvironment
 from graphconv import GraphConvModel
 from modified_state_space import state_modifier
