@@ -10,7 +10,6 @@ These functions and settings are passed into the Experiment constructor.
 """
 
 import numpy as np
-import copy
 import matplotlib.pyplot as plt
 from collections import deque   
 
@@ -25,8 +24,8 @@ class Experiment:
         Trains the agent(s) using the custom environment
         """
         total_steps = 0
-        evaluation_rewards = [deque(maxlen=100) for i in range(len(self.agents))]
-        averages = [[] for i in range(len(self.agents))]
+        scores_history = [deque(maxlen=100) for a in range(len(self.agents))]
+        averages_history = [[] for a in range(len(self.agents))]
         
         for e in range(self.run_settings.num_episodes):
             # Initialize episode
@@ -67,21 +66,21 @@ class Experiment:
                     self.agents[a].push_memory(states[a], actions[a], rewards[a], done)
                 
                 if done:
-                    curr_averages = []
-                    for i in range(len(evaluation_rewards)):
-                        evaluation_rewards[i].append(scores[i])
-                        curr_averages.append(np.mean(evaluation_rewards[i]))
-                        averages[i].append(curr_averages[i])
+                    averages = []
+                    for a in range(len(scores_history)):
+                        scores_history[a].append(scores[a])
+                        averages.append(np.mean(scores_history[a]))
+                        averages_history[a].append(averages[a])
                         
                     if len(scores) == 1:
                         scores = scores[0]
-                        curr_averages = curr_averages[0]
-                    recent_mean = np.mean(evaluation_rewards)
+                        averages = averages[0]
+                    recent_mean = np.mean(scores_history)
                     print("Game {} ended after {} steps. Game score: {}. Averages: {}"
-                        .format(e+1, step, scores, curr_averages))
+                        .format(e+1, step, scores, averages))
                     
             if e > 0 and e % self.run_settings.graph_every == 0:
-                self.plot_results(averages)
+                self.plot_results(averages_history)
 
     @staticmethod            
     def plot_results(averages):
@@ -93,6 +92,7 @@ class Experiment:
         plt.ylabel("Average score")
         for i in range(len(averages)):
             plt.plot(averages[i])
+        # Makes graph update nonblocking
         plt.pause(0.005)
             
 class CustomEnvironment():
