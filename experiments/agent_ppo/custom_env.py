@@ -3,9 +3,10 @@ from pysc2.lib import features, protocol
 from action_interface import Action, Actuator
 import numpy as np
 from enum import Enum
+from abstract_core import CustomEnvironment
 
 
-class MinigameEnvironment:
+class MinigameEnvironment(CustomEnvironment):
 
     screen_width = 84
     action_width = 64
@@ -68,7 +69,7 @@ class MinigameEnvironment:
             info = None
         """
         info = None
-        return [agent_obs], [self._curr_frame.reward], [self._curr_frame.last()], [info]  # exclude selected
+        return [agent_obs], [self._curr_frame.reward], self._curr_frame.last(), [info]  # exclude selected
 
     def step(self, action):
         '''
@@ -110,7 +111,7 @@ class MinigameEnvironment:
             info = None
         """
         info = None
-        return [agent_obs], [self._curr_frame.reward], [self._curr_frame.last()], [info]  # exclude selected
+        return [agent_obs], [self._curr_frame.reward], self._curr_frame.last(), [info]  # exclude selected
 
     def _run_to_next(self, start_action=None, topleft=None, botright=None):
 
