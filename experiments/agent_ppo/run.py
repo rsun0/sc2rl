@@ -45,6 +45,8 @@ def main():
     batch_size = 32
     train_every = 1024
     save_every = 10240
+    graph_every = 50
+    averaging_window = 100
     
     """
         :param optimizer: A class from torch.optim (instantiated later)
@@ -63,7 +65,9 @@ def main():
                                 num_epochs,
                                 batch_size,
                                 train_every,
-                                save_every)
+                                save_every,
+                                graph_every,
+                                averaging_window)
                                 
     memory = ReplayMemory(train_every, 1, batch_size)
                                 

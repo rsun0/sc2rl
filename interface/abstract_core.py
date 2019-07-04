@@ -24,7 +24,8 @@ class Experiment:
         Trains the agent(s) using the custom environment
         """
         total_steps = 0
-        scores_history = [deque(maxlen=100) for a in range(len(self.agents))]
+        scores_history = [deque(maxlen=self.run_settings.averaging_window)
+            for a in range(len(self.agents))]
         averages_history = [[] for a in range(len(self.agents))]
         
         for e in range(self.run_settings.num_episodes):
@@ -79,10 +80,11 @@ class Experiment:
                     print("Game {} ended after {} steps. Game score: {}. Averages: {}"
                         .format(e+1, step, scores, averages))
                     
-            if e > 0 and e % self.run_settings.graph_every == 0:
+            if (self.run_settings.graph_every > 0 and e > 0
+                    and e % self.run_settings.graph_every == 0):
                 self.plot_results(averages_history)
 
-    @staticmethod            
+    @staticmethod
     def plot_results(averages):
         plt.figure(1)
         plt.clf()
@@ -123,7 +125,7 @@ class CustomEnvironment():
 
 class RunSettings:
     def __init__(self, num_episodes, num_epochs, batch_size, train_every,
-            save_every, graph_every):
+            save_every, graph_every, averaging_window):
         """
         :param num_episodes: The total number of episodes to play
         :param num_epochs: The number of update iterations for each experience set
@@ -131,6 +133,8 @@ class RunSettings:
         :param train_every: Update the networks every X frames
         :param save_every: Save the model every X frames
         :param graph_every: Graph the evaluation metrics every X episodes
+            (Set to 0 to avoid graphing)
+        :param averaging_window: Use the last X scores to calculate the running average
         """
         self.num_episodes = num_episodes
         self.num_epochs = num_epochs
@@ -138,3 +142,4 @@ class RunSettings:
         self.train_every = train_every
         self.save_every = save_every
         self.graph_every = graph_every
+        self.averaging_window = averaging_window
