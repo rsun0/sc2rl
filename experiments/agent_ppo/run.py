@@ -1,5 +1,5 @@
 import sys
-sys.path.insert(0, '/home/michael/Documents/Projects/sc2rl/interface/')
+sys.path.insert(0, "../../interface/")
 
 from custom_env import MinigameEnvironment
 from graphconv import GraphConvModel
