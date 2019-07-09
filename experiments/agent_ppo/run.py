@@ -1,5 +1,5 @@
 import sys
-sys.path.insert(0, '/home/michael/Documents/Projects/sc2rl/interface/')
+sys.path.insert(0, "../../interface/")
 
 from custom_env import MinigameEnvironment
 from graphconv import GraphConvModel
@@ -45,6 +45,8 @@ def main():
     batch_size = 32
     train_every = 1024
     save_every = 10240
+    graph_every = 50
+    averaging_window = 100
     
     """
         :param optimizer: A class from torch.optim (instantiated later)
@@ -63,7 +65,9 @@ def main():
                                 num_epochs,
                                 batch_size,
                                 train_every,
-                                save_every)
+                                save_every,
+                                graph_every,
+                                averaging_window)
                                 
     memory = ReplayMemory(train_every, 8, batch_size)
                                 
