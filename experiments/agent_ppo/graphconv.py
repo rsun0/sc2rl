@@ -152,7 +152,6 @@ class GraphConvModel(nn.Module, Model):
 
 
     def graph_LSTM_forward(self, G, X, LSTM_hidden, prev_actions, relevant_frames):
-        
         batch_size, D = G.shape[0], G.shape[1]
         graph_out_actions = None
         for i in range(D):

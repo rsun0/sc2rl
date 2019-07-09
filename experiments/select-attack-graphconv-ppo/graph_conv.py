@@ -118,6 +118,12 @@ class GraphConvModel(nn.Module, Model):
         relevant_frames = torch.from_numpy(relevant_frames).to(self.device).float()
         selecting = torch.from_numpy(selecting).to(self.device).float()
         
+        
+        # Shape is (2, graph_n, N, hidden_size) after this
+        LSTM_hidden = LSTM_hidden.expand(-1, graph_n, N, -1)
+        # Shape is (2, 1, graph_n*N, hidden_size) after this
+        LSTM_hidden = LSTM_hidden.flatten(start_dim=1,end_dim=2).unsqueeze(1)
+        
         LSTM_graph_out, LSTM_hidden = self.graph_LSTM_forward(G, X, LSTM_hidden, prev_actions, relevant_frames, selecting)
         
         spatial_policy, nonspatial_policy, attack_value, attack_choice = self.attack(LSTM_graph_out, avail_actions, selecting)
@@ -145,19 +151,55 @@ class GraphConvModel(nn.Module, Model):
             G_curr = G[:,i,:,:]
             X_curr = X[:,i,:,:]
             relevance = relevant_frames[:,i]
-            
+
+            # shape is (N, graph_n, fc3_size)            
             graph_out = self.graph_forward(G_curr, X_curr)
             expanded_prev_actions = prev_actions[:,[i],:].expand(batch_size,
                                                                     self.config.graph_n,
                                                                     -1)
-            
-            graph_out_actions = torch.cat([graph_out, expanded_prev_actions], dim=-1)
                                                                     
+            # select_moves, attack_moves are (N,) shape one-hot vecs
+            # select_moves[j] is 1 iff prev_actions[j,i] corresponds to selection
+            # attack_moves[j] is 1 iff prev_actions[j,i] corresponds to attack
+            select_moves, attack_moves = self.parse_action_phases(expanded_prev_actions)
+
+            graph_out_actions = torch.cat([graph_out, expanded_prev_actions], dim=-1)
+               
+            # (N, graph_n, -1)                                                     
             embedded_graph = self.activation(self.LSTM_embed_in(graph_out_actions))
-            embedded_graph = embedded_graph.unsqueeze(0)
             
+            """
+            # shape is (1, N*graph_n, embed_size) after next line
+            embedded_graph = embedded_graph.unsqueeze(0).flatten(start_dim=1, end_dim=2)
+            """
+            
+            # @TODO: Implement attack_LSTM, select_LSTM, merge_select_attack
+            
+            attack_output, attack_LSTM_hidden = self.attack_LSTM(embedded_graph,
+                                                                LSTM_hidden,
+                                                                expanded_prev_actions,   
+                                                                attack_moves)
+            
+            select_output, select_LSTM_hidden = self.select_LSTM(embedded_graph,
+                                                                LSTM_hidden,
+                                                                expanded_prev_actions,
+                                                                select_moves)
+                                                               
+            # output: (1, N, graph_n, -1). LSTM_hidden: (2, 1, N, graph_n, -1) 
+            output, LSTM_hidden = self.merge_select_attack(attack_output,
+                                                            attack_LSTM_hidden,
+                                                            attack_moves,
+                                                            select_output,
+                                                            select_LSTM_hidden,
+                                                            select_moves
+                                                            )
+            
+            """
+            # embedded graph: (1, N*graph_n, embed_size)
+            # LSTM_hidden: (2, 1, N*graph_n, hidden_size)
             output, LSTM_hidden = self.hidden_layer(embedded_graph, tuple(LSTM_hidden))
             LSTM_hidden = torch.stack(LSTM_hidden)
+            """
             
             irrelevant_mask = relevance == 0
             if (irrelevant_mask.size() != torch.Size([0]) and torch.sum(irrelevant_mask) > 0):
@@ -165,9 +207,10 @@ class GraphConvModel(nn.Module, Model):
                 
         output = torch.cat([output.squeeze(0), graph_out_actions], dim=-1)
         return output, LSTM_hidden
-            
-            
 
+    """
+        Returns graph output of shape (N, graph_n, fc3_size)
+    """
     def graph_forward(self, G, X):
     
         A = G + torch.eye(self.config.graph_n).to(self.device).unsqueeze(0)
@@ -187,6 +230,17 @@ class GraphConvModel(nn.Module, Model):
         graph_conv_out = h3
         
         return graph_conv_out
+        
+    # @TODO: Implement
+    def merge_select_attack(self, 
+                                attack_output,
+                                attack_LSTM_hidden,
+                                attack_moves,
+                                select_output,
+                                select_LSTM_hidden,
+                                select_moves
+                                ):
+        raise NotImplementedError
 
     def choose(self, spatial_probs, nonspatial_probs):
         '''
@@ -245,8 +299,8 @@ class GraphConvModel(nn.Module, Model):
         
     def init_hidden(self, batch_size=1, device=None, use_torch=True):
         if (not use_torch):
-            return np.zeros((2, 1, batch_size, self.hidden_size))
-        return torch.zeros((2, 1, batch_size, self.hidden_size)).float().to(device)
+            return np.zeros((2, 1, batch_size, 1, self.hidden_size))
+        return torch.zeros((2, 1, batch_size, 1, self.hidden_size)).float().to(device)
     
     def null_actions(self, batch_size, use_torch=True):
         if (not use_torch):

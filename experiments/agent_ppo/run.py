@@ -20,7 +20,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 def main():
 
     map_name = "DefeatRoaches"
-    render = True
+    render = False
     step_mul = 8
 
 
@@ -65,7 +65,7 @@ def main():
                                 train_every,
                                 save_every)
                                 
-    memory = ReplayMemory(train_every, 1, batch_size)
+    memory = ReplayMemory(train_every, 8, batch_size)
                                 
     PPO_settings = {
         "discount_factor": 0.99,

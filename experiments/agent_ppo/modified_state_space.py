@@ -38,6 +38,7 @@ class state_modifier():
         units = np.array(obs.observation.feature_units)
         units = units[np.argsort(units, axis=0)[:,GraphConvConfigMinigames.y_ind]]
 
+
         #print(units, dir(obs.observation.feature_units))
         G = state_modifier.to_graph(units)
         X = state_modifier.preprocess_units(units)
