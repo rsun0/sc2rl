@@ -138,7 +138,7 @@ class GraphConvModel(nn.Module, Model):
         
         ### @TODO: Implement self.attack, self.select, self.mesh_select_attack
         
-        return spatial_policy, 
+        return spatial_policy, nonspatial_policy, value, LSTM_hidden, choice
         
         
             
@@ -157,7 +157,7 @@ class GraphConvModel(nn.Module, Model):
             expanded_prev_actions = prev_actions[:,[i],:].expand(batch_size,
                                                                     self.config.graph_n,
                                                                     -1)
-                                                                    
+            
             # select_moves, attack_moves are (N,) shape one-hot vecs
             # select_moves[j] is 1 iff prev_actions[j,i] corresponds to selection
             # attack_moves[j] is 1 iff prev_actions[j,i] corresponds to attack
@@ -231,16 +231,33 @@ class GraphConvModel(nn.Module, Model):
         
         return graph_conv_out
         
+        
+    def attack_LSTM(self,
+                    embedded_graph,
+                    LSTM_hidden,
+                    expanded_prev_actions,   
+                    attack_moves):
+            
+    def select_LSTM(self,
+                    embedded_graph,
+                    LSTM_hidden,
+                    expanded_prev_actions,
+                    select_moves):
+        
+                    
+        
     # @TODO: Implement
     def merge_select_attack(self, 
-                                attack_output,
-                                attack_LSTM_hidden,
-                                attack_moves,
-                                select_output,
-                                select_LSTM_hidden,
-                                select_moves
-                                ):
+                            attack_output,
+                            attack_LSTM_hidden,
+                            attack_moves,
+                            select_output,
+                            select_LSTM_hidden,
+                            select_moves):
         raise NotImplementedError
+        
+    def parse_action_phases(prev_actions):
+        
 
     def choose(self, spatial_probs, nonspatial_probs):
         '''
