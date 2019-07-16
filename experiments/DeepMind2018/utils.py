@@ -22,8 +22,16 @@ class ConvLSTM(nn.Module):
         self.input_to_output = nn.Conv2d(input_size, hidden_size, kernel_size=3, stride=1, padding=1)
         self.hidden_to_output = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, stride=1, padding=1)
 
-    def forward(self, input, (h_0, c_0)):
+    """
+        input: torch tensor of shape (N, D, H, W)
+        hidden_state: torch tensor of shape (N, 2, D, H, W)
 
+        D is placeholder as usual
+    """
+    def forward(self, input, hidden_state):
+
+        h_0 = hidden_state[:,0]
+        c_0 = hidden_state[:,1]
         i = F.sigmoid(self.input_to_input(input) + self.hidden_to_input(h_0))
         f = F.sigmoid(self.input_to_forget(input) + self.hidden_to_forget(h_0))
         g = F.tanh(self.input_to_gate(input) + self.hidden_to_gate(h_0))
@@ -31,7 +39,9 @@ class ConvLSTM(nn.Module):
         c_t = f * c_0 + i * g
         h_t = o * F.tanh(c_t)
 
-        return o, (h_0, c_0)
+        hidden_state_out = torch.cat([h_t.unsqueeze(1), c_t.unsqueeze(1)], dim=1)
+
+        return o, hidden_state_out
 
 
 
@@ -84,6 +94,10 @@ class SelfAttentionBlock(nn.Module):
             nn.InstanceNorm1d(num_features)
         )
 
+        self.QueryNorm = nn.InstanceNorm1d(num_features)
+        self.KeyNorm = nn.InstanceNorm1d(num_features)
+        self.ValueNorm = nn.InstanceNorm1d(num_features)
+
     """
         Take in x of shape (N, H, W, D), perform attention calculations,
         return processed output of shape (N, H, W, num_features)
@@ -92,9 +106,9 @@ class SelfAttentionBlock(nn.Module):
         (N, H, W, D) = x.shape
         flattened = x.flatten(start_dim=1, end_dim=-2)
 
-        Q = self.QueryLayer(flattened)
-        K = self.KeyLayer(flattened)
-        V = self.ValueLayer(flattened)
+        Q = self.QueryNorm(self.QueryLayer(flattened))
+        K = self.KeyNorm(self.KeyLayer(flattened))
+        V = self.ValueNorm(self.ValueLayer(flattened))
 
         numerator = torch.matmul(Q, K.permute(0,2,1))
         scaled = numerator / (torch.sqrt(self.num_features))
