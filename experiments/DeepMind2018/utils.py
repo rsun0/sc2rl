@@ -103,3 +103,94 @@ class SelfAttentionBlock(nn.Module):
         A = A.reshape((N, H, W, -1))
 
         return A
+
+class Downsampler(nn.Module):
+    def __init__(self, net_config, input_features):
+        super(Downsampler, self).__init__()
+
+        self.block1 = nn.Sequential(
+            nn.Conv2d(net_config[input_features]],
+                net_config['down_conv_features'],
+                kernel_size=(4,4),
+                stride=2,
+                padding=2),
+            nn.ReLU(),
+
+            ResnetBlock(net_config['down_conv_features'],
+                            net_config['resnet_depth']),
+            ResnetBlock(net_config['down_conv_features'],
+                            net_config['resnet_depth'])
+        )
+
+        self.block2 = nn.Sequential(
+            nn.Conv2d(net_config['down_conv_features']],
+                2*net_config['down_conv_features'],
+                kernel_size=(4,4),
+                stride=2,
+                padding=2),
+            nn.ReLU(),
+
+            ResnetBlock(2*net_config['down_conv_features'],
+                            net_config['resnet_depth']),
+            ResnetBlock(2*net_config['down_conv_features'],
+                            net_config['resnet_depth'])
+        )
+
+        self.block3 = nn.Sequential(
+            nn.Conv2d(2*net_config[input_features]],
+                4*net_config['down_conv_features'],
+                kernel_size=(4,4),
+                stride=2,
+                padding=2),
+            nn.ReLU(),
+
+            ResnetBlock(4*net_config['down_conv_features'],
+                            net_config['resnet_depth']),
+            ResnetBlock(4*net_config['down_conv_features'],
+                            net_config['resnet_depth'])
+        )
+
+    def forward(self, input):
+        h1 = self.block1(input)
+        h2 = self.block2(h1)
+        h3 = self.block3(h2)
+        return h3
+
+class SpatialUpsampler(nn.Module):
+    def __init__(self, net_config):
+        super(Upsampler, self).__init__()
+        self.tconv1 = nn.Sequential(
+            nn.ConvTranspose2d(
+                net_config['up_features'],
+                net_config['up_conv_features'],
+                kernel_size=4,
+                stride=2,
+                padding=1
+            ),
+            nn.ReLU()
+        )
+
+        self.tconv2 = nn.Sequential(
+            nn.ConvTranspose2d(
+                net_config['up_conv_features'],
+                int(0.5 * net_config['up_conv_features']),
+                kernel_size=4,
+                stride=2,
+                padding=1
+            ),
+            nn.ReLU()
+        )
+
+        self.conv_out = nn.Conv2d(net_config['relational_spatial_depth'],
+                                        net_config['spatial_action_depth'],
+                                        kernel_size=1,
+                                        stride=1,
+                                        padding=1)
+
+    def forward(self, x, action_embedding):
+        h1 = self.tconv1(x)
+        h2 = self.tconv2(h1)
+
+        ### @TODO: Append action_embedding to h2
+
+        return None
