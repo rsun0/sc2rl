@@ -4,7 +4,7 @@ import torch.nn.Functional as F
 
 from agent import Model
 
-from utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler
+from utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze
 
 class Model(nn.Module, Model):
 
@@ -23,6 +23,9 @@ class Model(nn.Module, Model):
             "resnet_depth": int, number of convolutional layers in resnet block
             "LSTM_in_size": int, number of features in the input to the LSTM
             "LSTM_hidden_size:" int, number of features in the hidden state of LSTM
+            "inputs2d_size": int, number of features in inputs2d variable
+            "relational_features": int, number of features in each relational block
+            "relational_depth": int, number of relational blocks to put in sequence
         }
     """
     def __init__(self, net_config):
@@ -42,6 +45,97 @@ class Model(nn.Module, Model):
             nn.ReLU(),
             nn.Linear(128, 64)
         )
+
+        self.attention_blocks = nn.Sequential(
+            SelfAttentionBlock(net_config['inputs2d_size'],
+                                net_config['relational_features'])
+        )
+        for i in range(net_config['relational_depth']-1):
+            self.attention_blocks.add_module("Block"+str(i+2),
+                                                SelfAttentionBlock(
+                                                    net_config['relational_features'],
+                                                    net_config['relational_features']
+                                                )
+                                            )
+
+        self.relational_processor = nn.Sequential(
+            nn.MaxPool2d(net_config['inputs3d_width']),
+            Unsqueeze(),
+            Unsqueeze(),
+            nn.Linear(net_config['inputs3d_width'],
+                        512),
+            nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.ReLU()
+        )
+
+
+    """
+        minimap: (N, D, H, W)
+        screen: (N, D, H, W)
+        player: (N, D)
+        last_action: (N, D)
+        hidden: (N, 2, D, H, W)
+        curr_action: (N, D) (curr_action is not None if and only if training)
+        choosing: True if sampling an action, False otherwise
+
+        D is a placeholder for feature dimensions.
+    """
+    def forward(self, minimap, screen, player, last_action, hidden, curr_action=None, choosing=False):
+        if (choosing):
+            assert (curr_action is None)
+        if (not choosing):
+            assert (curr_action is not None)
+
+        processed_minimap = self.down_layers_minimap(minimap)
+        processed_screen = self.down_layers_screen(screen)
+        inputs3d = torch.cat([processed_minimap, processed_screen], dim=1)
+
+        nonspatial_concat = torch.cat([player, last_action], dim=-1)
+        inputs2d = self.inputs2d_MLP(nonspatial_concat)
+
+        ### @TODO: LSTM_in concatenates inputs2d and inputs3d
+        LSTM_in = None
+
+        outputs2d, hidden = self.convLSTM(LSTM_in, hidden)
+        relational_spatial = self.attention_blocks(outputs2d)
+        relational_nonspatial = self.relational_processor(relational_spatial)
+
+        shared_features = torch.cat([inputs2d, relational_nonspatial], dim=-1)
+        value = self.value_MLP(shared_features)
+        action_logits = self.action_MLP(shared_features)
+
+        choice = None
+        if (choosing):
+            action = self.sample_action(action_logits)
+        else:
+            action = curr_action
+
+        embedded_action = self.embed_action(action)
+        shared_conditioned = torch.cat([shared_features, embedded_action], dim=-1)
+        arg_logits = self.arg_MLP(shared_conditioned)
+
+        arg = None
+        if (choosing):
+            arg = self.sample_arg(arg_logits)
+
+        spatial_input = self.spatial_upsampler(relational_spatial)
+        ### @TODO: spatial_input appends embedded_action
+        spatial_logits = self.spatial_out(spatial_input)
+
+        spatial = None
+        if (choosing):
+            spatial = self.sample_spatial(spatial_logits)
+
+        choice = [action, arg, spatial]
+
+
+
+
+        return action_logits, arg_logits, spatial_logits, hidden, value, choice
+
+
+
 
 
 

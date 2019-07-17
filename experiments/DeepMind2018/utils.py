@@ -208,3 +208,7 @@ class SpatialUpsampler(nn.Module):
         ### @TODO: Append action_embedding to h2
 
         return None
+
+class Unsqueeze(nn.Module):
+    def forward(self, x):
+        return x.unsqueeze(-1)
