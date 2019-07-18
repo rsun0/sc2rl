@@ -4,7 +4,8 @@ import torch.nn.Functional as F
 
 from agent import Model
 
-from utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze
+from sc2env_utils import generate_embeddings, multi_embed
+from net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze
 
 class Model(nn.Module, Model):
 
@@ -44,13 +45,13 @@ class Model(nn.Module, Model):
         self.net_config = net_config
 
         # @TODO: Make this code not shitty
-        self.embeddings = [minimap_embeddings, screen_embeddings, player_embeddings] = [[], [], []]
-        input_names = ["minimap", "screen", "player"]
-        for i in range(len(input_names)):
-            cat_indices = net_config[base + "_categorical_indices"]
-            cat_sizes = net_config[base + "_categorical_size"]
 
-            self.embeddings[i].append(nn.Embedding(cat_indices))
+        self.embeddings = generate_embeddings(net_config)
+        self.embedding_indices = [
+            net_config["minimap_categorical_indices"],
+            net_config["screen_categorical_indices"],
+            net_config["player_categorical_indices"]
+        ]
 
         # END todo
 
@@ -111,6 +112,9 @@ class Model(nn.Module, Model):
         if (not choosing):
             assert (curr_action is not None)
 
+        inputs = [minimap, screen, player]
+        [minimap, screen, player] = self.embed_inputs(inputs, net_config)
+
         processed_minimap = self.down_layers_minimap(minimap)
         processed_screen = self.down_layers_screen(screen)
         inputs3d = torch.cat([processed_minimap, processed_screen], dim=1)
@@ -157,6 +161,11 @@ class Model(nn.Module, Model):
 
 
         return action_logits, arg_logits, spatial_logits, hidden, value, choice
+
+
+    def embed_inputs(self, inputs, net_config):
+        return multi_embed(inputs, self.embeddings, self.embedding_indices)
+
 
 
 
