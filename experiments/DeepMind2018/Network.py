@@ -26,10 +26,34 @@ class Model(nn.Module, Model):
             "inputs2d_size": int, number of features in inputs2d variable
             "relational_features": int, number of features in each relational block
             "relational_depth": int, number of relational blocks to put in sequence
+            "screen_categorical_indices": int array, binary mask. i'th index is 1
+                                            iff i'th layer of screen is categorical
+            "minimap_categorical_indices": Like screen_categorical_indices.
+            "player_categorical_indices": Like screen_categorical_indices.
+            "screen_categorical_size": int array, number of screen categories
+                                        to embed, corresponds with *_indices
+            "minimap_categorical_size": int array, number of mmap categories
+                                        to embed, corresponds with *_indices
+            "player_categorical_size": int array, number of player categories
+                                        to embed, corresponds with *_indices
+            "embedding_size": int, number of features output by embeddings
+
         }
     """
     def __init__(self, net_config):
         self.net_config = net_config
+
+        # @TODO: Make this code not shitty
+        self.embeddings = [minimap_embeddings, screen_embeddings, player_embeddings] = [[], [], []]
+        input_names = ["minimap", "screen", "player"]
+        for i in range(len(input_names)):
+            cat_indices = net_config[base + "_categorical_indices"]
+            cat_sizes = net_config[base + "_categorical_size"]
+
+            self.embeddings[i].append(nn.Embedding(cat_indices))
+
+        # END todo
+
 
         self.down_layers_minimap = self.Downsampler(net_config['minimap_features'], net_config)
         self.down_layers_screen = self.Downsampler(net_config['screen_features'], net_config)
