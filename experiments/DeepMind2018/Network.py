@@ -112,8 +112,8 @@ class Model(nn.Module, Model):
         if (not choosing):
             assert (curr_action is not None)
 
-        inputs = [minimap, screen, player]
-        [minimap, screen, player] = self.embed_inputs(inputs, net_config)
+        inputs = [minimap, screen]
+        [minimap, screen] = self.embed_inputs(inputs, net_config)
 
         processed_minimap = self.down_layers_minimap(minimap)
         processed_screen = self.down_layers_screen(screen)
