@@ -44,17 +44,12 @@ class Model(nn.Module, Model):
     def __init__(self, net_config):
         self.net_config = net_config
 
-        # @TODO: Make this code not shitty
-
         self.embeddings = generate_embeddings(net_config)
         self.embedding_indices = [
             net_config["minimap_categorical_indices"],
             net_config["screen_categorical_indices"],
             net_config["player_categorical_indices"]
         ]
-
-        # END todo
-
 
         self.down_layers_minimap = self.Downsampler(net_config['minimap_features'], net_config)
         self.down_layers_screen = self.Downsampler(net_config['screen_features'], net_config)
@@ -141,11 +136,11 @@ class Model(nn.Module, Model):
 
         embedded_action = self.embed_action(action)
         shared_conditioned = torch.cat([shared_features, embedded_action], dim=-1)
-        arg_logits = self.arg_MLP(shared_conditioned)
+        arg_logit_inputs = self.arg_MLP(shared_conditioned)
 
         arg = None
         if (choosing):
-            arg = self.sample_arg(arg_logits)
+            arg = self.sample_arg(arg_logit_inputs)
 
         spatial_input = self.spatial_upsampler(relational_spatial)
         ### @TODO: spatial_input appends embedded_action

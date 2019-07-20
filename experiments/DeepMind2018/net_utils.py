@@ -10,6 +10,8 @@ import torch.nn.functional as F
 class ConvLSTM(nn.Module):
     def __init__(self, input_size, hidden_size):
 
+        self.input_size, self.hidden_size = input_size, hidden_size
+
         self.input_to_input = nn.Conv2d(input_size, hidden_size, kernel_size=3, stride=1, padding=1)
         self.hidden_to_input = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, stride=1, padding=1)
 
@@ -43,6 +45,8 @@ class ConvLSTM(nn.Module):
 
         return o, hidden_state_out
 
+    def init_hidden_state(self, batch_size=1, width=84, device="cuda:0"):
+        return torch.zeros((batch_size, self.hidden_size, width, width)).float().to(device)
 
 
 

@@ -5,6 +5,19 @@ import torch
 import torch.nn as nn
 
 
+
+preprocess_config = {
+    "minimap_features": 0 #int, number of features in minimap image
+    "screen_features": 0 #int, number of features in screen image
+    "player_features": 0 #int, number of features in player variable
+
+    "num_arg_types": 0 #int, number of sets of arguments to choose from
+    "arg_sizes": 0 #int, max size of a set of arguments
+    "arg_mask": [0] #int array of size num_arg_types * arg_sizes, 1 if the action can pick an arg from that index, 0 otherwise
+    "base_action_to_args"
+}
+
+
 def categorical_mask(features):
     categorical_indices = []
     categorical_sizes = []
@@ -19,39 +32,12 @@ def categorical_mask(features):
 minimap_categorical_indices, minimap_categorical_sizes = categorical_mask(MINIMAP_FEATURES)
 screen_categorical_indices, screen_categorical_sizes = categorical_mask(SCREEN_FEATURES)
 
-
-
-for i in range(len(features)):
-    name, scale, featuretype = (features[i].name, features[i].scale, features[i].type)
-
-    dim = scale
-    if (featuretype == SCALAR or (featuretype == CATEGORICAL and dim == 2)):
-        val_list = np.log(val_list.clip(0) + 1)
-        dim = 1
-        depths = features_depth * np.ones(n_curr)
-    else:
-
-        depths = val_list + features_depth
-        val_list = np.ones(n_curr)
-
-    addition = np.stack([zeros, depths, x_coords, y_coords])
-    if (i == 0):
-        indices = addition
-    else:
-        indices = np.concatenate([indices, addition],1)
-
-    values = np.append(values, val_list)
-
-    features_depth += dim
-
-
-
-
 def generate_embeddings(net_config):
 
-    embeddings = [minimap_embeddings, screen_embeddings, player_embeddings] = [[], [], []]
+    embeddings = [minimap_embeddings, screen_embeddings] = [[], []]
     input_names = ["minimap", "screen"]
     for i in range(len(input_names)):
+        base = input_names[i]
         cat_indices = net_config[base + "_categorical_indices"]
         cat_sizes = net_config[base + "_categorical_size"]
         embed_size = net_config['embedding_size']
