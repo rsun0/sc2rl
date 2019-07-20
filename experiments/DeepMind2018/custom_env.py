@@ -6,7 +6,10 @@ from abstract_core import CustomEnvironment
 from process_state import state_processor
 from process_action import action_to_pysc2
 
-
+"""
+    Generalized environment that uses a preprocessed version of the full state,
+    and the full action space. Currently only supports single agent maps.
+"""
 class FullStateActionEnvironment(CustomEnvironment):
 
     def __init__(self, state_modifier_func, map_name_, render=False, step_multiplier=None):
@@ -43,9 +46,33 @@ class FullStateActionEnvironment(CustomEnvironment):
                 [self.curr_frame.reward], self.curr_frame.last(), [info]
 
     def step(self, action):
+
+        assert (not self._terminal)
         self._run_to_next(action)
         agent_obs = self.state_modifier_func(self._curr_frame)
         reward = self._curr_frame.reward
         done = self._curr_frame.last()
         info = None
         return [agent_obs], [reward], done, [info]
+
+    def _run_to_next(self, action=None, reset=False):
+        if reset:
+            self._reset_env()
+            return
+
+        if self._curr_frame.last():
+            return
+
+        raw_action = self.action_modifier_func(action)
+        self._step_env(raw_action)
+
+    def _reset_env(self):
+        self._curr_frame = self._env.reset()[0]
+
+    def _step_env(self, raw_action):
+        self._prev_frame = self._curr_frame
+        try:
+            self._curr_frame = self._env.step(
+                [raw_action])[0]  # get obs for 1st agent
+        except protocol.ConnectionError:
+            self._curr_frame = self._env.reset()[0]
