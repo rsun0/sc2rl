@@ -14,7 +14,7 @@ preprocess_config = {
     "num_arg_types": 0 #int, number of sets of arguments to choose from
     "arg_sizes": 0 #int, max size of a set of arguments
     "arg_mask": [0] #int array of size num_arg_types * arg_sizes, 1 if the action can pick an arg from that index, 0 otherwise
-    "base_action_to_args"
+    "base_action_to_args": {} # dictionary mapping from base_action index to arg type index, number of arg candidates, 
 }
 
 
