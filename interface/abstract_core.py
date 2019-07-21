@@ -11,7 +11,7 @@ These functions and settings are passed into the Experiment constructor.
 
 import numpy as np
 import matplotlib.pyplot as plt
-from collections import deque   
+from collections import deque
 
 class Experiment:
     def __init__(self, agents, custom_env, run_settings):
@@ -27,15 +27,15 @@ class Experiment:
         scores_history = [deque(maxlen=self.run_settings.averaging_window)
             for a in range(len(self.agents))]
         averages_history = [[] for a in range(len(self.agents))]
-        
+
         for e in range(self.run_settings.num_episodes):
             # Initialize episode
             env_states, rewards, done, metainfo = self.custom_env.reset()
-            
+
             # Initialize scores to starting reward (probably 0)
             scores = rewards
             step = 0
-            
+
             while not done:
                 states = [self.agents[a].state_space_converter(env_states[a])
                     for a in range(len(self.agents))]
@@ -44,7 +44,7 @@ class Experiment:
                 if total_steps > 0 and total_steps % self.run_settings.train_every == 0:
                     for agent in self.agents:
                         agent.train(self.run_settings)
-                        
+
                 # Save agent model
                 if total_steps > 0 and total_steps % self.run_settings.save_every == 0:
                     for agent in self.agents:
@@ -59,30 +59,74 @@ class Experiment:
                 env_states, rewards, done, metainfo = self.custom_env.step(env_actions)
                 step += 1
                 total_steps += 1
-                
+
                 # Update scores
                 scores = [scores[a] + rewards[a] for a in range(len(self.agents))]
                 # Push to agent Memories
                 for a in range(len(self.agents)):
                     self.agents[a].push_memory(states[a], actions[a], rewards[a], done)
-                
+
                 if done:
                     averages = []
                     for a in range(len(scores_history)):
                         scores_history[a].append(scores[a])
                         averages.append(np.mean(scores_history[a]))
                         averages_history[a].append(averages[a])
-                        
+
                     if len(scores) == 1:
                         scores = scores[0]
                         averages = averages[0]
                     recent_mean = np.mean(scores_history)
                     print("Game {} ended after {} steps. Game score: {}. Averages: {}"
                         .format(e+1, step, scores, averages))
-                    
+
             if (self.run_settings.graph_every > 0 and e > 0
                     and e % self.run_settings.graph_every == 0):
                 self.plot_results(averages_history)
+
+    def test(self):
+        """
+        Tests the agents using the custom environment
+        """
+        total_steps = 0
+        running_scores = np.zeros(len(self.agents))
+
+        for e in range(self.run_settings.test_episodes):
+            # Initialize episode
+            env_states, rewards, done, metainfo = self.custom_env.reset()
+
+            # Initialize scores to starting reward (probably 0)
+            scores = np.array(rewards)
+            step = 0
+
+            while not done:
+                states = [self.agents[a].state_space_converter(env_states[a])
+                    for a in range(len(self.agents))]
+
+                # Get actions
+                actions = [self.agents[a].sample(states[a])
+                    for a in range(len(self.agents))]
+                env_actions = [self.agents[a].action_space_converter(actions[a])
+                    for a in range(len(self.agents))]
+                # Take environment step
+                env_states, rewards, done, metainfo = self.custom_env.step(env_actions)
+                step += 1
+                total_steps += 1
+
+                # Update scores
+                scores += np.array(rewards)
+
+                if done:
+                    running_scores += scores
+
+                    if len(scores) == 1:
+                        scores = scores[0]
+                        averages = averages[0]
+                    print("Game {} ended after {} steps. Game score: {}. Averages: {}"
+                        .format(e+1, step, scores, averages))
+
+            print("Average game scores: {}".format(running_scores / self.run_settings.test_episodes))
+
 
     @staticmethod
     def plot_results(averages):
@@ -96,7 +140,7 @@ class Experiment:
             plt.plot(averages[i])
         # Makes graph update nonblocking
         plt.pause(0.005)
-            
+
 class CustomEnvironment():
     def step(self, actions):
         """

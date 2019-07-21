@@ -6,7 +6,8 @@ from pysc2.lib.actions import FUNCTIONS, TYPES
     agent_action = [base_action, args, spatial_args]
 
     base_action: int, refers to index in FUNCTIONS
-    args, int array of length len(TYPES).
+    args: int array of length len(TYPES).
+    spatial_args: array of int arrays of length 2
 """
 
 def action_to_pysc2(agent_action):
@@ -23,8 +24,10 @@ def action_to_pysc2(agent_action):
         id = arg_ids[i]
         if is_spatial_arg(id):
             spatial_arg_inputs.append(spatial_args[id])
-        else:
+        elif TYPES[id].value is not None:
             arg_inputs.append(TYPES[id].values(args[id]))
+        else:
+            arg_inputs.append(args[id])
 
     return base_action_func(*arg_inputs, *spatial_arg_inputs)
 

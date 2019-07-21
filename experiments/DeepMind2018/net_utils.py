@@ -45,9 +45,11 @@ class ConvLSTM(nn.Module):
 
         return o, hidden_state_out
 
-    def init_hidden_state(self, batch_size=1, width=84, device="cuda:0"):
-        return torch.zeros((batch_size, self.hidden_size, width, width)).float().to(device)
-
+    def init_hidden_state(self, batch_size=1, width=84, use_torch=True, device="cuda:0"):
+        if (use_torch):
+            return torch.zeros((batch_size, self.hidden_size, width, width)).float().to(device)
+        else:
+            return np.zeros((batch_size, self.hidden_size, width, width)).astype(np.float32)
 
 
 

@@ -12,6 +12,4 @@ def state_processor(obs):
     avail_actions = np.zeros(ACTION_SPACE)
     avail_actions[obs.observation.available_actions] = 1
 
-    info = None
-
-    return (minimap, screen, player), avail_actions, info
+    return np.array([minimap, screen, player, avail_actions])

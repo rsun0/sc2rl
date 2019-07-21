@@ -3,10 +3,18 @@ CATEGORICAL = FeatureType.CATEGORICAL
 SCALAR = FeatureType.SCALAR
 import torch
 import torch.nn as nn
+import numpy as np
 
+def get_action_args(action):
+    base_action_func = FUNCTIONS._func_list[action]
+    arg_types = base_action_func.args
+    arg_ids = np.array([arg_types[i].id for i in range(len(arg_types))])
+    return arg_ids
 
+def is_spatial_arg(action_id):
+    return action_id < 3
 
-preprocess_config = {
+env_config = {
     "minimap_features": 0 #int, number of features in minimap image
     "screen_features": 0 #int, number of features in screen image
     "player_features": 0 #int, number of features in player variable
@@ -14,9 +22,17 @@ preprocess_config = {
     "num_arg_types": 0 #int, number of sets of arguments to choose from
     "arg_sizes": 0 #int, max size of a set of arguments
     "arg_mask": [0] #int array of size num_arg_types * arg_sizes, 1 if the action can pick an arg from that index, 0 otherwise
-    "base_action_to_args": {} # dictionary mapping from base_action index to arg type index, number of arg candidates, 
+    "arg_depth": 10,
+    "max_arg_size:" 500,
+    "spatial_arg_depth": 3,
+    "spatial_arg_size": 84
 }
 
+valid_args = np.zeros((arg_depth, max_arg_size))
+for i in range(3, 13):
+    type = TYPES[i]
+    size = type.sizes[0]
+    valid_args[i,:size] = 1
 
 def categorical_mask(features):
     categorical_indices = []
