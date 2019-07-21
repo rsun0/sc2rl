@@ -92,6 +92,10 @@ class Model(nn.Module, Model):
             nn.ReLU()
         )
 
+
+        self.value_MLP = nn.Sequential(
+
+        )
         self.action_MLP = nn.Sequential(nn.Linear(512, 256),
                                         nn.ReLU(),
                                         nn.Linear(256, net_config["action_space"])
