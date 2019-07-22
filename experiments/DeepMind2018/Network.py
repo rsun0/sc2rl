@@ -4,12 +4,26 @@ import torch.nn.Functional as F
 
 from agent import Model
 
-from sc2env_utils import generate_embeddings, multi_embed, valid_args, get_action_args, is_spatial_arg
-from net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze
+from sc2env_utils import generate_embeddings, multi_embed, valid_args, get_action_args, is_spatial_arg, env_config, processed_feature_dim
+from net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze, Squeeze
 
-class Model(nn.Module, Model):
+class RRLModel(nn.Module, Model):
 
     """
+        net_config = {
+            "state_embedding_size": state_embed, # number of features output by embeddings
+            "action_embedding_size": action_embed,
+            "down_conv_features": 64,
+            "up_features": 64,
+            "up_conv_features": 256
+            "resnet_features": 256,
+            "LSTM_in_size": 128,
+            "LSTM_hidden_size:" 256,
+            "inputs2d_size": 128,
+            "relational_features": 64
+            "relational_depth": 3
+            "spatial_out_depth": 64
+        }
         net_config = {
             "minimap_features": int, number of features in minimap image
             "screen_features": int, number of features in screen image
@@ -25,7 +39,6 @@ class Model(nn.Module, Model):
             "spatial_action_depth": int, max number of spatial arguments for action
             "spatial_action_size": int, width and height of spatial action space
             "resnet_features": int, number of features in each convolutional layer
-            "resnet_depth": int, number of convolutional layers in resnet block
             "LSTM_in_size": int, number of features in the input to the LSTM
             "LSTM_hidden_size:" int, number of features in the hidden state of LSTM
             "inputs2d_size": int, number of features in inputs2d variable
@@ -44,33 +57,38 @@ class Model(nn.Module, Model):
             "embedding_size": int, number of features output by embeddings
         }
     """
-    def __init__(self, net_config):
+    def __init__(self, net_config, device="cpu"):
         self.net_config = net_config
 
-        self.embeddings = generate_embeddings(net_config)
-        self.embedding_indices = [
-            net_config["minimap_categorical_indices"],
-            net_config["screen_categorical_indices"],
-            net_config["player_categorical_indices"]
+        self.state_embeddings = generate_embeddings(net_config)
+        self.minimap_features = processed_feature_dim(env_config["raw_minimap"], self.state_embeddings[0])
+        self.screen_features = processed_feature_dim(env_config["raw_screen"], self.state_embeddings[1])
+        self.player_features = env_config["raw_player"]
+        self.state_embedding_indices = [
+            env_config["minimap_categorical_indices"],
+            env_config["screen_categorical_indices"],
+            env_config["player_categorical_indices"]
         ]
+        self.action_embedding = nn.Embedding(env_config["action_space"], config["action_embedding_size"])
 
-        self.down_layers_minimap = self.Downsampler(net_config['minimap_features'], net_config)
-        self.down_layers_screen = self.Downsampler(net_config['screen_features'], net_config)
+        self.down_layers_minimap = self.Downsampler(self.minimap_features, net_config)
+        self.down_layers_screen = self.Downsampler(self.screen_features, net_config)
 
-        self.convLSTM = ConvLSTM(self.net_config['LSTM_in_size'],
+        self.LSTM_in_size = 2*(4*net_config["down_conv_features"]) + net_config["inputs2d_size"]
+        self.convLSTM = ConvLSTM(self.LSTM_in_size,
                                     self.net_config['LSTM_hidden_size'])
 
-        self.spatial_upsampler = SpatialUpsampler(net_config)
+        self.spatial_upsampler = SpatialUpsampler(net_config, env_config["spatial_out_depth"])
 
         self.inputs2d_MLP = nn.Sequential(
-            nn.Linear(net_config['player_features'] + net_config['last_action_features'],
+            nn.Linear(net_config['player_features'] + net_config["action_embedding_size"],
                         128),
             nn.ReLU(),
-            nn.Linear(128, 64)
+            nn.Linear(128, net_config["inputs2d_size"])
         )
 
         self.attention_blocks = nn.Sequential(
-            SelfAttentionBlock(net_config['inputs2d_size'],
+            SelfAttentionBlock(net_config['LSTM_hidden_size'],
                                 net_config['relational_features'])
         )
         for i in range(net_config['relational_depth']-1):
@@ -83,8 +101,8 @@ class Model(nn.Module, Model):
 
         self.relational_processor = nn.Sequential(
             nn.MaxPool2d(net_config['inputs3d_width']),
-            Unsqueeze(),
-            Unsqueeze(),
+            Squeeze(),
+            Squeeze(),
             nn.Linear(net_config['inputs3d_width'],
                         512),
             nn.ReLU(),
@@ -94,22 +112,33 @@ class Model(nn.Module, Model):
 
 
         self.value_MLP = nn.Sequential(
-
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1)
         )
-        self.action_MLP = nn.Sequential(nn.Linear(512, 256),
-                                        nn.ReLU(),
-                                        nn.Linear(256, net_config["action_space"])
-                                        )
+
+        self.action_MLP = nn.Sequential(
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, net_config["action_space"])
+        )
 
         self.arg_MLP = nn.Linear(net_config["shared_conditioned_features"],
                                     net_config["arg_depth"]*net_config["max_arg_size"])
 
-        self.arg_depth = net_config["arg_depth"]
-        self.arg_size = net_config["max_arg_size"]
-        self.spatial_depth = net_config["spatial_action_depth"]
-        self.spatial_size = net_config["spatial_action_size"]
+        self.spatial_out = nn.Conv2d(
+            net_config["spatial_out_depth"] + net_config["action_embedding_size"],
+            env_config["spatial_arg_depth"],
+            kernel_size=1,
+            padding=0
+        )
 
-        self.valid_args = valid_args
+        self.arg_depth = env_config["arg_depth"]
+        self.arg_size = env_config["max_arg_size"]
+        self.spatial_depth = env_config["spatial_action_depth"]
+        self.spatial_size = env_config["spatial_action_size"]
+
+        self.valid_args = torch.from_numpy(valid_args).to(self.device)
         self.action_to_args = action_to_args
 
 
@@ -139,7 +168,7 @@ class Model(nn.Module, Model):
         processed_screen = self.down_layers_screen(screen)
         inputs3d = torch.cat([processed_minimap, processed_screen], dim=1)
 
-        embedded_last_action = self.embed_action(last_action)
+        embedded_last_action = self.action_embedding(last_action)
         nonspatial_concat = torch.cat([player, embedded_last_action], dim=-1)
         inputs2d = self.inputs2d_MLP(nonspatial_concat)
 
@@ -163,7 +192,7 @@ class Model(nn.Module, Model):
         else:
             action = curr_action
 
-        embedded_action = self.embed_action(action)
+        embedded_action = self.action_embedding(action)
         shared_conditioned = torch.cat([shared_features, embedded_action], dim=-1)
         arg_logit_inputs = self.arg_MLP(shared_conditioned)
         arg_logit_inputs = arg_logit_inputs.reshape((N, self.arg_depth, self.arg_size))
@@ -194,6 +223,7 @@ class Model(nn.Module, Model):
 
     def embed_inputs(self, inputs, net_config):
         return multi_embed(inputs, self.embeddings, self.embedding_indices)
+
 
     def sample_func(self, probs):
         return np.argmax(np.random.multinomial(probs))

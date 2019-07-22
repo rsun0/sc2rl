@@ -125,11 +125,11 @@ class SelfAttentionBlock(nn.Module):
         return A
 
 class Downsampler(nn.Module):
-    def __init__(self, net_config, input_features):
+    def __init__(self, input_features, net_config):
         super(Downsampler, self).__init__()
 
         self.block1 = nn.Sequential(
-            nn.Conv2d(net_config[input_features]],
+            nn.Conv2d(input_features,
                 net_config['down_conv_features'],
                 kernel_size=(4,4),
                 stride=2,
@@ -177,7 +177,7 @@ class Downsampler(nn.Module):
         return h3
 
 class SpatialUpsampler(nn.Module):
-    def __init__(self, net_config):
+    def __init__(self, net_config, output_depth):
         super(Upsampler, self).__init__()
         self.tconv1 = nn.Sequential(
             nn.ConvTranspose2d(
@@ -201,20 +201,23 @@ class SpatialUpsampler(nn.Module):
             nn.ReLU()
         )
 
-        self.conv_out = nn.Conv2d(net_config['relational_spatial_depth'],
-                                        net_config['spatial_action_depth'],
+        self.conv_out = nn.Conv2d(int(0.5 * net_config['up_conv_features']),
+                                        output_depth,
                                         kernel_size=1,
                                         stride=1,
                                         padding=1)
 
-    def forward(self, x, action_embedding):
+    def forward(self, x):
+        
         h1 = self.tconv1(x)
         h2 = self.tconv2(h1)
 
-        ### @TODO: Append action_embedding to h2
-
-        return None
+        return h2
 
 class Unsqueeze(nn.Module):
     def forward(self, x):
         return x.unsqueeze(-1)
+
+class Squeeze(nn.Module):
+    def forward(self, x):
+        return x.squeeze(-1)

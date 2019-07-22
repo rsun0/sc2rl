@@ -1,4 +1,4 @@
-from pysc2.lib.actions import FUNCTIONS, TYPES
+from pysc2.lib.actions import FUNCTIONS, TYPES, FunctionCall
 
 
 """
@@ -19,17 +19,19 @@ def action_to_pysc2(agent_action):
     arg_ids = [arg_types[i].id for i in range(len(arg_types))]
 
     arg_inputs = []
-    spatial_arg_names = []
+    spatial_arg_inputs = []
     for i in range(len(arg_ids)):
         id = arg_ids[i]
         if is_spatial_arg(id):
             spatial_arg_inputs.append(spatial_args[id])
-        elif TYPES[id].value is not None:
-            arg_inputs.append(TYPES[id].values(args[id]))
+        elif TYPES[id].values is not None:
+            arg_inputs.append([TYPES[id].values(args[id])])
         else:
-            arg_inputs.append(args[id])
+            arg_inputs.append([args[id]])
 
-    return base_action_func(*arg_inputs, *spatial_arg_inputs)
+    function = FunctionCall(base_action_func.id, arg_inputs + spatial_arg_inputs)
+
+    return function
 
 def is_spatial_arg(id):
     return id < 3

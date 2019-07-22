@@ -12,7 +12,7 @@ from process_action import action_to_pysc2
 """
 class FullStateActionEnvironment(CustomEnvironment):
 
-    def __init__(self, state_modifier_func, map_name_, render=False, step_multiplier=None):
+    def __init__(self, map_name_, render=False, step_multiplier=None):
 
         import sys
         from absl import flags
@@ -27,7 +27,7 @@ class FullStateActionEnvironment(CustomEnvironment):
             agent_interface_format=features.AgentInterfaceFormat(
                 feature_dimensions=features.Dimensions(screen=84, minimap=84),
                 use_feature_units=True
-            )
+            ),
             step_mul=step_multiplier,
             visualize=render,
             game_steps_per_episode=None
@@ -43,7 +43,7 @@ class FullStateActionEnvironment(CustomEnvironment):
         agent_obs = self._curr_frame
         info = None
         return [self.state_modifier_func(self._curr_frame)],  \
-                [self.curr_frame.reward], self.curr_frame.last(), [info]
+                [self._curr_frame.reward], self._curr_frame.last(), [info]
 
     def step(self, action):
 
@@ -72,6 +72,7 @@ class FullStateActionEnvironment(CustomEnvironment):
     def _step_env(self, raw_action):
         self._prev_frame = self._curr_frame
         try:
+            print(raw_action)
             self._curr_frame = self._env.step(
                 [raw_action])[0]  # get obs for 1st agent
         except protocol.ConnectionError:

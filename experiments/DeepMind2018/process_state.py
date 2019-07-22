@@ -1,4 +1,4 @@
-from pysc2.actions import FUNCTIONS
+from pysc2.lib.actions import FUNCTIONS
 import numpy as np
 
 ACTION_SPACE = len(FUNCTIONS)

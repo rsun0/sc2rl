@@ -1,26 +1,23 @@
+import sys
+sys.path.insert(0, "../../interface/")
+
 from pysc2.env import sc2_env
 from pysc2.lib import features, protocol
-from pysc2.actions import FUNCTIONS
-import sys
-from absl import flags
-FLAGS = flags.FLAGS
-FLAGS(sys.argv)
+from process_state import state_processor
+from pysc2.lib.actions import FUNCTIONS, FunctionCall
+from custom_env import FullStateActionEnvironment
 
+import numpy as np
 
+env = FullStateActionEnvironment("DefeatRoaches")
 
-env = sc2_env.SC2Env(
-    map_name="DefeatRoaches",
-    agent_interface_format=features.AgentInterfaceFormat(
-        feature_dimensions=features.Dimensions(screen=84,minimap=84),
-        use_feature_units=True
-    ),
-    step_mul=8,
-    visualize=False,
-    game_steps_per_episode=None
-)
-
-
+obs, _, _, _ = env.reset()
 for i in range(100):
-    base_action = np.random.randint(len(FUNCTIONS))
-    print("\n\n", FUNCTIONS[base_action], "\n\n")
-    
+    args = np.zeros(10)
+    args[0] = 1
+    args_spatial = np.zeros((3,2))
+    args_spatial[0] = [10,10]
+    args_spatial[2] = [50,50]
+    f = [3, args, args_spatial]
+    obs, _, _, _ = env.step(f)
+    print(len(obs))
