@@ -12,4 +12,8 @@ def state_processor(obs):
     avail_actions = np.zeros(ACTION_SPACE)
     avail_actions[obs.observation.available_actions] = 1
 
+    minimap = minimap.reshape((1,) + minimap.shape)
+    screen = screen.reshape((1,) + screen.shape)
+    player = player.reshape((1,) + player.shape)
+
     return np.array([minimap, screen, player, avail_actions])

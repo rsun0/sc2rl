@@ -1,7 +1,4 @@
 from agent import Agent, Model, Memory, AgentSettings
-from config import GraphConvConfigMinigames
-from modified_state_space import state_modifier
-import utils
 
 import torch
 import torch.nn as nn
@@ -26,12 +23,12 @@ class RRLAgent(Agent):
 
     def _forward(self, agent_state, choosing=True):
         (minimap, screen, player, avail_actions) = agent_state
-        self.prev_hidden_state = copy.deepcopy(self.hidden_state):
-        _, _, value, self.hidden_state, action = self.model(minimap,
+        self.prev_hidden_state = copy.deepcopy(self.hidden_state)
+        _, _, _, self.hidden_state, value, action = self.model(minimap,
                                                             screen,
                                                             player,
                                                             avail_actions,
-                                                            self.action,
+                                                            np.array([self.action[0]]),
                                                             self.hidden_state,
                                                             choosing=choosing)
         return _, _, value.cpu().data.numpy().item(), self.hidden_state.cpu().data.numpy(), action

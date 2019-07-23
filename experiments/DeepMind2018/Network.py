@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-import torch.nn.Functional as F
+import torch.nn.functional as F
+import numpy as np
 
 from agent import Model
 
@@ -20,9 +21,10 @@ class RRLModel(nn.Module, Model):
             "LSTM_in_size": 128,
             "LSTM_hidden_size:" 256,
             "inputs2d_size": 128,
+            "inputs3d_width": 8,
             "relational_features": 64
             "relational_depth": 3
-            "spatial_out_depth": 64
+            "spatial_out_depth": 128
         }
         net_config = {
             "minimap_features": int, number of features in minimap image
@@ -58,30 +60,32 @@ class RRLModel(nn.Module, Model):
         }
     """
     def __init__(self, net_config, device="cpu"):
+        super(RRLModel, self).__init__()
         self.net_config = net_config
+        self.device = device
 
+        #self.minimap_embeddings, self.screen_embeddings = generate_embeddings(net_config)
         self.state_embeddings = generate_embeddings(net_config)
         self.minimap_features = processed_feature_dim(env_config["raw_minimap"], self.state_embeddings[0])
         self.screen_features = processed_feature_dim(env_config["raw_screen"], self.state_embeddings[1])
         self.player_features = env_config["raw_player"]
         self.state_embedding_indices = [
             env_config["minimap_categorical_indices"],
-            env_config["screen_categorical_indices"],
-            env_config["player_categorical_indices"]
+            env_config["screen_categorical_indices"]
         ]
-        self.action_embedding = nn.Embedding(env_config["action_space"], config["action_embedding_size"])
+        self.action_embedding = nn.Embedding(env_config["action_space"], net_config["action_embedding_size"])
 
-        self.down_layers_minimap = self.Downsampler(self.minimap_features, net_config)
-        self.down_layers_screen = self.Downsampler(self.screen_features, net_config)
+        self.down_layers_minimap = Downsampler(self.minimap_features, net_config)
+        self.down_layers_screen = Downsampler(self.screen_features, net_config)
 
         self.LSTM_in_size = 2*(4*net_config["down_conv_features"]) + net_config["inputs2d_size"]
         self.convLSTM = ConvLSTM(self.LSTM_in_size,
                                     self.net_config['LSTM_hidden_size'])
 
-        self.spatial_upsampler = SpatialUpsampler(net_config, env_config["spatial_out_depth"])
+        self.spatial_upsampler = SpatialUpsampler(net_config, net_config["spatial_out_depth"])
 
         self.inputs2d_MLP = nn.Sequential(
-            nn.Linear(net_config['player_features'] + net_config["action_embedding_size"],
+            nn.Linear(self.player_features + net_config["action_embedding_size"],
                         128),
             nn.ReLU(),
             nn.Linear(128, net_config["inputs2d_size"])
@@ -103,7 +107,7 @@ class RRLModel(nn.Module, Model):
             nn.MaxPool2d(net_config['inputs3d_width']),
             Squeeze(),
             Squeeze(),
-            nn.Linear(net_config['inputs3d_width'],
+            nn.Linear(net_config['relational_features'],
                         512),
             nn.ReLU(),
             nn.Linear(512, 512),
@@ -112,23 +116,23 @@ class RRLModel(nn.Module, Model):
 
 
         self.value_MLP = nn.Sequential(
-            nn.Linear(512, 256),
+            nn.Linear(512 + net_config["inputs2d_size"], 256),
             nn.ReLU(),
             nn.Linear(256, 1)
         )
 
         self.action_MLP = nn.Sequential(
-            nn.Linear(512, 256),
+            nn.Linear(512 + net_config["inputs2d_size"], 256),
             nn.ReLU(),
-            nn.Linear(256, net_config["action_space"])
+            nn.Linear(256, env_config["action_space"])
         )
 
-        self.arg_MLP = nn.Linear(net_config["shared_conditioned_features"],
-                                    net_config["arg_depth"]*net_config["max_arg_size"])
+        self.arg_MLP = nn.Linear(net_config["inputs2d_size"] + 512 + net_config["action_embedding_size"],
+                                    env_config["arg_depth"]*env_config["max_arg_size"])
 
         self.spatial_out = nn.Conv2d(
             net_config["spatial_out_depth"] + net_config["action_embedding_size"],
-            env_config["spatial_arg_depth"],
+            env_config["spatial_action_depth"],
             kernel_size=1,
             padding=0
         )
@@ -138,8 +142,7 @@ class RRLModel(nn.Module, Model):
         self.spatial_depth = env_config["spatial_action_depth"]
         self.spatial_size = env_config["spatial_action_size"]
 
-        self.valid_args = torch.from_numpy(valid_args).to(self.device)
-        self.action_to_args = action_to_args
+        self.valid_args = torch.from_numpy(valid_args).float().to(self.device)
 
 
     """
@@ -161,19 +164,27 @@ class RRLModel(nn.Module, Model):
 
         N = len(minimap)
 
+        minimap = torch.from_numpy(minimap).float()
+        screen = torch.from_numpy(screen).float()
+        player = torch.from_numpy(player).to(self.device).float()
+        last_action = torch.from_numpy(last_action).to(self.device).long()
+        hidden = torch.from_numpy(hidden).to(self.device).float()
+        avail_actions = torch.from_numpy(avail_actions).to(self.device).byte()
+
         inputs = [minimap, screen]
-        [minimap, screen] = self.embed_inputs(inputs, net_config)
+        [minimap, screen] = self.embed_inputs(inputs, self.net_config)
+        [minimap, screen] = [minimap.to(self.device), screen.to(self.device)]
 
         processed_minimap = self.down_layers_minimap(minimap)
         processed_screen = self.down_layers_screen(screen)
         inputs3d = torch.cat([processed_minimap, processed_screen], dim=1)
 
-        embedded_last_action = self.action_embedding(last_action)
+        embedded_last_action = self.action_embedding(last_action).to(self.device)
         nonspatial_concat = torch.cat([player, embedded_last_action], dim=-1)
         inputs2d = self.inputs2d_MLP(nonspatial_concat)
 
-        expanded_inputs2d = inputs2d.unsqueeze(2).unsqueeze(3).expand(inputs2d.shape + (self.spatial_size, self.spatial_size))
-        LSTM_in = torch.cat([inputs3d, expanded_inputs2d], axis=1)
+        expanded_inputs2d = inputs2d.unsqueeze(2).unsqueeze(3).expand(inputs2d.shape + (self.net_config["inputs3d_width"], self.net_config["inputs3d_width"]))
+        LSTM_in = torch.cat([inputs3d, expanded_inputs2d], dim=1)
 
         outputs2d, hidden = self.convLSTM(LSTM_in, hidden)
         relational_spatial = self.attention_blocks(outputs2d)
@@ -189,10 +200,12 @@ class RRLModel(nn.Module, Model):
         choice = None
         if (choosing):
             action = self.sample_action(action_logits)
+            processed_action = torch.from_numpy(np.array(action)).unsqueeze(0).long().to(self.device)
         else:
             action = curr_action
+            processed_action = torch.from_numpy(np.array(action)).long().to(self.device)
 
-        embedded_action = self.action_embedding(action)
+        embedded_action = self.action_embedding(processed_action)
         shared_conditioned = torch.cat([shared_features, embedded_action], dim=-1)
         arg_logit_inputs = self.arg_MLP(shared_conditioned)
         arg_logit_inputs = arg_logit_inputs.reshape((N, self.arg_depth, self.arg_size))
@@ -203,16 +216,18 @@ class RRLModel(nn.Module, Model):
             args = self.sample_arg(arg_logits, action)
 
         spatial_input = self.spatial_upsampler(relational_spatial)
+        w = spatial_input.shape[-1]
 
-        embedded_action = embedded_action.unsqueeze(2).unsqueeze(3)
-        embedded_action = embedded_action.reshape(embedded_action.shape + (self.spatial_size, self.spatial_size))
-        spatial_input = torch.cat([spatial_input, embedded_action], axis=1)
+        embedded_action = embedded_action.unsqueeze(2).unsqueeze(3).expand(embedded_action.shape + (w,w))
+        print(spatial_input.shape, embedded_action.shape)
+        spatial_input = torch.cat([spatial_input, embedded_action], dim=1)
         spatial_logits_in = self.spatial_out(spatial_input)
+        spatial_logits = self.generate_spatial_logits(spatial_logits_in)
 
 
         spatial = None
         if (choosing):
-            spatial = self.sample_spatial(spatial_logits_in)
+            spatial = self.sample_spatial(spatial_logits, action)
 
         choice = [action, args, spatial]
 
@@ -222,11 +237,11 @@ class RRLModel(nn.Module, Model):
         return self.convLSTM.init_hidden_state(use_torch=use_torch, device=device)
 
     def embed_inputs(self, inputs, net_config):
-        return multi_embed(inputs, self.embeddings, self.embedding_indices)
+        return multi_embed(inputs, self.state_embeddings, self.state_embedding_indices)
 
 
     def sample_func(self, probs):
-        return np.argmax(np.random.multinomial(probs))
+        return np.argmax(np.random.multinomial(1, probs.detach().cpu().numpy()))
 
     def sample_action(self, action_logits):
         action = self.sample_func(action_logits[0])
@@ -253,10 +268,18 @@ class RRLModel(nn.Module, Model):
 
         return spatial_arg_out
 
-    def generate_arg_logits(arg_logit_inputs):
+    def generate_arg_logits(self, arg_logit_inputs):
         initial_logits = F.softmax(arg_logit_inputs) * self.valid_args
-        final_logits = initial_logits / torch.sum(initial_logits, axis=-1)
+        print(initial_logits.shape)
+        final_logits = initial_logits / torch.sum(initial_logits, dim=-1).unsqueeze(2)
         return final_logits
+
+    def generate_spatial_logits(self, spatial_logits_in):
+        (N, D, H, W) = spatial_logits_in.shape
+        x = spatial_logits_in.flatten(start_dim=-2, end_dim=-1)
+        logits = F.softmax(x, dim=-1)
+        logits = logits.reshape((N, D, H, W))
+        return logits
 
     def action_to_nonspatial_args(self, action):
         args = get_action_args(action)

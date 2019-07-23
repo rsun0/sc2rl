@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
+import math
 
 
 """
@@ -9,6 +11,7 @@ import torch.nn.functional as F
 """
 class ConvLSTM(nn.Module):
     def __init__(self, input_size, hidden_size):
+        super(ConvLSTM, self).__init__()
 
         self.input_size, self.hidden_size = input_size, hidden_size
 
@@ -34,6 +37,7 @@ class ConvLSTM(nn.Module):
 
         h_0 = hidden_state[:,0]
         c_0 = hidden_state[:,1]
+        print(h_0.shape, c_0.shape)
         i = F.sigmoid(self.input_to_input(input) + self.hidden_to_input(h_0))
         f = F.sigmoid(self.input_to_forget(input) + self.hidden_to_forget(h_0))
         g = F.tanh(self.input_to_gate(input) + self.hidden_to_gate(h_0))
@@ -45,11 +49,11 @@ class ConvLSTM(nn.Module):
 
         return o, hidden_state_out
 
-    def init_hidden_state(self, batch_size=1, width=84, use_torch=True, device="cuda:0"):
+    def init_hidden_state(self, batch_size=1, width=8, use_torch=True, device="cuda:0"):
         if (use_torch):
-            return torch.zeros((batch_size, self.hidden_size, width, width)).float().to(device)
+            return torch.zeros((batch_size, 2, self.hidden_size, width, width)).float().to(device)
         else:
-            return np.zeros((batch_size, self.hidden_size, width, width)).astype(np.float32)
+            return np.zeros((batch_size, 2, self.hidden_size, width, width)).astype(np.float32)
 
 
 
@@ -64,13 +68,13 @@ class ResnetBlock(nn.Module):
             self.residuals.add_module(
                 "residual" + str(i+1),
                 nn.Sequential(
-                    nn.Conv2d(num_features, num_features, 3, 1, padding=0)
+                    nn.Conv2d(num_features, num_features, kernel_size=3, stride=1, padding=1),
                     self.activation()
                 )
             )
 
     def forward(self, x):
-        out = self.residuals(x):
+        out = self.residuals(x)
         return x + out
 
 
@@ -105,22 +109,23 @@ class SelfAttentionBlock(nn.Module):
         self.ValueNorm = nn.InstanceNorm1d(num_features)
 
     """
-        Take in x of shape (N, H, W, D), perform attention calculations,
-        return processed output of shape (N, H, W, num_features)
+        Take in x of shape (N, D, H, W), perform attention calculations,
+        return processed output of shape (N, num_features, H, W)
     """
     def forward(self, x):
-        (N, H, W, D) = x.shape
-        flattened = x.flatten(start_dim=1, end_dim=-2)
+        (N, D, H, W) = x.shape
+        new_x = x.permute(0, 2, 3, 1)
+        flattened = new_x.flatten(start_dim=1, end_dim=-2)
 
         Q = self.QueryNorm(self.QueryLayer(flattened))
         K = self.KeyNorm(self.KeyLayer(flattened))
         V = self.ValueNorm(self.ValueLayer(flattened))
 
         numerator = torch.matmul(Q, K.permute(0,2,1))
-        scaled = numerator / (torch.sqrt(self.num_features))
+        scaled = numerator / math.sqrt(self.num_features)
         attention_weights = F.softmax(scaled)
         A = torch.matmul(attention_weights, V)
-        A = A.reshape((N, H, W, -1))
+        A = A.reshape((N, -1, H, W))
 
         return A
 
@@ -133,41 +138,41 @@ class Downsampler(nn.Module):
                 net_config['down_conv_features'],
                 kernel_size=(4,4),
                 stride=2,
-                padding=2),
+                padding=1),
             nn.ReLU(),
 
             ResnetBlock(net_config['down_conv_features'],
-                            net_config['resnet_depth']),
+                            net_config['relational_depth']),
             ResnetBlock(net_config['down_conv_features'],
-                            net_config['resnet_depth'])
+                            net_config['relational_depth'])
         )
 
         self.block2 = nn.Sequential(
-            nn.Conv2d(net_config['down_conv_features']],
+            nn.Conv2d(net_config['down_conv_features'],
                 2*net_config['down_conv_features'],
                 kernel_size=(4,4),
                 stride=2,
-                padding=2),
+                padding=1),
             nn.ReLU(),
 
             ResnetBlock(2*net_config['down_conv_features'],
-                            net_config['resnet_depth']),
+                            net_config['relational_depth']),
             ResnetBlock(2*net_config['down_conv_features'],
-                            net_config['resnet_depth'])
+                            net_config['relational_depth'])
         )
 
         self.block3 = nn.Sequential(
-            nn.Conv2d(2*net_config[input_features]],
+            nn.Conv2d(2*net_config['down_conv_features'],
                 4*net_config['down_conv_features'],
                 kernel_size=(4,4),
                 stride=2,
-                padding=2),
+                padding=1),
             nn.ReLU(),
 
             ResnetBlock(4*net_config['down_conv_features'],
-                            net_config['resnet_depth']),
+                            net_config['relational_depth']),
             ResnetBlock(4*net_config['down_conv_features'],
-                            net_config['resnet_depth'])
+                            net_config['relational_depth'])
         )
 
     def forward(self, input):
@@ -178,7 +183,7 @@ class Downsampler(nn.Module):
 
 class SpatialUpsampler(nn.Module):
     def __init__(self, net_config, output_depth):
-        super(Upsampler, self).__init__()
+        super(SpatialUpsampler, self).__init__()
         self.tconv1 = nn.Sequential(
             nn.ConvTranspose2d(
                 net_config['up_features'],
@@ -208,7 +213,7 @@ class SpatialUpsampler(nn.Module):
                                         padding=1)
 
     def forward(self, x):
-        
+
         h1 = self.tconv1(x)
         h2 = self.tconv2(h1)
 

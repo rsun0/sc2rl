@@ -5,6 +5,7 @@ import numpy as np
 from abstract_core import CustomEnvironment
 from process_state import state_processor
 from process_action import action_to_pysc2
+from sc2env_utils import env_config
 
 """
     Generalized environment that uses a preprocessed version of the full state,
@@ -25,7 +26,8 @@ class FullStateActionEnvironment(CustomEnvironment):
         self._env = sc2_env.SC2Env(
             map_name=self.map,
             agent_interface_format=features.AgentInterfaceFormat(
-                feature_dimensions=features.Dimensions(screen=84, minimap=84),
+                feature_dimensions=features.Dimensions(screen=env_config["screen_width"],
+                                                        minimap=env_config["minimap_width"]),
                 use_feature_units=True
             ),
             step_mul=step_multiplier,

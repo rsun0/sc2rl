@@ -15,12 +15,6 @@ def get_action_args(action):
 def is_spatial_arg(action_id):
     return action_id < 3
 
-valid_args = np.zeros((1, env_config["arg_depth"], env_config["max_arg_size"]))
-for i in range(10):
-    type = TYPES[i+3]
-    size = type.sizes[0]
-    valid_args[0,i,:size] = 1
-
 def categorical_mask(features):
     categorical_indices = []
     categorical_sizes = []
@@ -39,22 +33,32 @@ screen_categorical_indices, screen_categorical_sizes = categorical_mask(SCREEN_F
 
 
 env_config = {
-    "raw_minimap": len(SCREEN_FEATURES), #int, number of features in minimap image
-    "raw_screen": len(MINIMAP_FEATURES), #int, number of features in screen image
+    "raw_minimap": len(MINIMAP_FEATURES), #int, number of features in minimap image
+    "raw_screen": len(SCREEN_FEATURES), #int, number of features in screen image
     "raw_player": len(Player), #int, number of features in player variable
+
+    "minimap_width": 64,
+    "screen_width": 64,
 
     "screen_categorical_indices": screen_categorical_indices,
     "minimap_categorical_indices": minimap_categorical_indices,
     "screen_categorical_size": screen_categorical_sizes,
     "minimap_categorical_size": minimap_categorical_sizes,
 
-    "action_space": len(FUNCTIONS)
+    "action_space": len(FUNCTIONS),
     "num_arg_types": 13, #int, number of sets of arguments to choose from
     "arg_depth": 10,
     "max_arg_size": 500,
     "spatial_action_depth": 3,
-    "spatial_action_size": 84
+    "spatial_action_size": 64
 }
+
+
+valid_args = np.zeros((1, env_config["arg_depth"], env_config["max_arg_size"]))
+for i in range(10):
+    type = TYPES[i+3]
+    size = type.sizes[0]
+    valid_args[0,i,:size] = 1
 
 def generate_embeddings(config):
 
@@ -67,7 +71,7 @@ def generate_embeddings(config):
         embed_size = config['state_embedding_size']
 
         for j in range(len(cat_indices)):
-            embeddings[i].append(nn.Embedding(cat_sizes[i], embed_size))
+            embeddings[i].append(nn.Embedding(cat_sizes[j]+1, embed_size))
 
     return embeddings
 
@@ -78,23 +82,22 @@ def generate_embeddings(config):
 def embed(x, embedding_list, embedding_indices):
 
     s = x.shape
-    feature_dim = s[-1]
+    feature_dim = s[1]
     embedding_size = embedding_list[0].embedding_dim
     output_dim = feature_dim + sum([e.embedding_dim for e in embedding_list]) - len(embedding_list)
 
-    output = torch.zeros(s[:-1] + (output_dim,)).astype(x.dtype).to(x.device)
-
+    output = torch.zeros((s[0],) + (output_dim,) + s[2:], dtype=x.dtype, device=x.device)
     lower = 0
     upper = 0
     embed_count = 0
-    for i in range(len(output_dim)):
+    for i in range(feature_dim):
         if (i in embedding_indices):
             upper += embedding_size
-            output[...,lower:upper] = embedding_list[embed_count](x[...,i])
+            output[:,lower:upper] = embedding_list[embed_count](x[:,i].long()).permute((0,3,1,2))
             embed_count += 1
         else:
             upper += 1
-            output[...,lower:upper] = torch.log(x[...,i]+1.0)
+            output[:,lower:upper] = torch.log(x[:,i] - torch.min(x[:,i]) + 1.0)
         lower = upper
 
     return output

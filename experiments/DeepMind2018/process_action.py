@@ -12,7 +12,7 @@ from pysc2.lib.actions import FUNCTIONS, TYPES, FunctionCall
 
 def action_to_pysc2(agent_action):
 
-    [base_action, args, spatial_args] = agent_action
+    [[base_action, args, spatial_args]] = agent_action
 
     base_action_func = FUNCTIONS._func_list[base_action]
     arg_types = base_action_func.args
