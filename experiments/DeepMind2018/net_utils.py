@@ -37,7 +37,6 @@ class ConvLSTM(nn.Module):
 
         h_0 = hidden_state[:,0]
         c_0 = hidden_state[:,1]
-        print(h_0.shape, c_0.shape)
         i = F.sigmoid(self.input_to_input(input) + self.hidden_to_input(h_0))
         f = F.sigmoid(self.input_to_forget(input) + self.hidden_to_forget(h_0))
         g = F.tanh(self.input_to_gate(input) + self.hidden_to_gate(h_0))

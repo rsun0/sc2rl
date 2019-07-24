@@ -1,4 +1,5 @@
 from agent import Agent, Model, Memory, AgentSettings
+from sc2env_utils import batch_get_action_args, is_spatial_arg
 
 import torch
 import torch.nn as nn
@@ -10,16 +11,18 @@ import copy
 
 class RRLAgent(Agent):
 
-    def __init__(self, model, settings, memory, agent_settings):
+    def __init__(self, model, settings, memory, train_settings):
         super().__init__(model, settings, memory)
         self.step = 0
         self.frame_count = 0
         self.epochs_trained = 0
-        self.agent_settings = agent_settings
+        self.train_settings = train_settings
         self.target_model = copy.deepcopy(model)
         self.hidden_state = self.model.init_hidden(use_torch=False)
         self.prev_hidden_state = None
         self.action = [0, np.zeros(10), np.zeros((3,2))]
+        self.device = train_settings["device"]
+        self.loss = nn.MSELoss()
 
     def _forward(self, agent_state, choosing=True):
         (minimap, screen, player, avail_actions) = agent_state
@@ -46,10 +49,149 @@ class RRLAgent(Agent):
         return personal_action
 
     def train(self, run_settings):
-        raise NotImplementedError
+        self.memory.compute_vtargets_adv(self.train_settings['discount_factor'],
+                                            self.train_settings['lambda'])
+
+        batch_size = run_settings.batch_size
+        num_iters = int(len(self.memory) / batch_size)
+        epochs = run_settings.num_epochs
+
+        for i in range(epochs):
+
+            pol_loss = 0
+            vf_loss = 0
+            ent_total = 0
+
+            for j in range(num_iters):
+
+                d_pol, d_vf, d_ent = self.train_step(batch_size)
+                pol_loss += d_pol
+                vf_loss += d_vf
+                ent_total += d_ent
+
+            self.epochs_trained += 1
+            pol_loss /= num_iters
+            vf_loss /= num_iters
+            ent_total /= num_iters
+            print("Epoch %d: Policy loss: %f. Value loss: %f. Entropy %f" %
+                            (self.epochs_trained,
+                            pol_loss,
+                            vf_loss,
+                            ent_total)
+                            )
+        self.update_target_net()
+
+        print("\n\n ------- Training sequence ended ------- \n\n")
 
     def train_step(self, batch_size):
-        raise NotImplementedError
+
+        device = self.train_settings['device']
+        eps_denom = self.train_settings['eps_denom']
+        c1 = self.train_settings['c1']
+        c2 = self.train_settings['c2']
+        clip_param = self.train_settings['clip_param']
+
+        mini_batch = self.memory.sample_mini_batch(self.frame_count)
+        n = len(mini_batch)
+        mini_batch = np.array(mini_batch).transpose()
+
+
+
+        states = np.stack(mini_batch[0], axis=0)
+        minimaps = np.stack(states[:,0], axis=0).squeeze(1)
+        screens = np.stack(states[:,1], axis=0).squeeze(1)
+        players = np.stack(states[:,2], axis=0).squeeze(1)
+        avail_actions = np.stack(states[:,3], axis=0)
+        hidden_states = np.concatenate(states[:,4], axis=0)
+        prev_actions = np.stack(states[:,5], axis=0).squeeze(1)
+
+        actions = np.stack(np.array(mini_batch[1]), axis=0)
+        base_actions = np.stack(actions[:,0], 0).astype(np.int64).squeeze(1)
+        args = np.stack(actions[:,1], 0).astype(np.int64)
+        spatial_args = np.stack(actions[:,2], 0).astype(np.int64)
+
+        rewards = np.array(list(mini_batch[2]))
+        dones = mini_batch[3]
+        v_returns = mini_batch[5].astype(np.float32)
+        advantages = mini_batch[6].astype(np.float32)
+
+        rewards = torch.from_numpy(rewards).float().to(self.device)
+        advantages = torch.from_numpy(advantages).float().to(self.device)
+        v_returns = torch.from_numpy(v_returns).float().to(self.device)
+        dones = torch.from_numpy(dones.astype(np.uint8)).byte().to(self.device)
+
+
+        action_probs, arg_probs, spatial_probs, _, values, _ = self.model(
+            minimaps,
+            screens,
+            players,
+            avail_actions,
+            prev_actions,
+            hidden_states,
+            curr_action=base_actions
+        )
+
+        old_action_probs, old_arg_probs, old_spatial_probs, _, values, _ = self.target_model(
+            minimaps,
+            screens,
+            players,
+            avail_actions,
+            prev_actions,
+            hidden_states,
+            curr_action=base_actions
+        )
+
+        gathered_actions = action_probs[range(n), base_actions]
+        old_gathered_actions = old_action_probs[range(n), base_actions]
+
+        gathered_args, old_gathered_args = self.index_args(arg_probs, old_arg_probs, args)
+
+        gathered_spatial_args, old_gathered_spatial_args = self.index_spatial(spatial_probs,
+                                                                            old_spatial_probs,
+                                                                            spatial_args)
+
+        action_args = batch_get_action_args(base_actions)
+        numerator = torch.zeros((n,)).float().to(self.device)
+        denominator = torch.zeros((n,)).float().to(self.device)
+        entropy = torch.zeros((n,)).float().to(self.device)
+
+
+        for i in range(n):
+            curr_args = action_args[i]
+            for j in curr_args:
+                if is_spatial_arg(j):
+                    numerator[i] = numerator[i] + torch.log(gathered_spatial_args[i][j])
+                    denominator[i] = denominator[i] + torch.log(old_gathered_spatial_args[i][j])
+                    entropy[i] = entropy[i] + self.entropy(gathered_spatial_args[i][j])
+                else:
+                    numerator[i] = numerator[i] + torch.log(gathered_args[i][j-3])
+                    denominator[i] = denominator[i] + torch.log(old_gathered_args[i][j-3])
+                    entropy[i] = entropy[i] + self.entropy(gathered_args[i][j-3])
+
+        denominator = denominator.detach()
+
+        ratio = torch.exp(numerator - denominator)
+        ratio_adv = ratio * advantages.detach()
+        bounded_adv = torch.clamp(ratio, 1-clip_param, 1+clip_param)
+        bounded_adv = bounded_adv * advantages.detach()
+
+        pol_avg = - ((torch.min(ratio_adv, bounded_adv)).mean())
+        value_loss = self.loss(values.squeeze(1), v_returns.detach())
+        ent = entropy.mean()
+
+        total_loss = pol_avg + c1 * value_loss - c2 * ent
+        self.optimizer.zero_grad()
+        total_loss.backward()
+        self.optimizer.step()
+
+        pol_loss = pol_avg.detach().item()
+        vf_loss = value_loss.detach().item()
+        ent_total = ent.detach().item()
+
+        return pol_loss, vf_loss, ent_total
+
+
+
 
     def load(self):
         self.net.load_state_dict(torch.load("save_model/Starcraft2" + self.env.map + "RRL.pth"))
@@ -58,7 +200,51 @@ class RRLAgent(Agent):
     def save(self):
         torch.save(self.model.state_dict(), "save_model/Starcraft2" + self.env.map + "RRL.pth")
 
+    def push_memory(self, state, action, reward, done):
+        push_state = list(state) + [self.prev_hidden_state]
+        self.memory.push(push_state, action, reward, done, self.value, 0, 0, self.step)
+        if done:
+            self.step = 0
+            self.value = 0
+            self.hidden_state = self.model.init_hidden(use_torch=False)
+
     ### Unique RRL functions below this line
+
+    """
+        arg_probs: (N, 10, 500)
+        old_arg_probs: ""
+        args: (N, 10)
+
+        returns: (N, 10), (N, 10)
+    """
+    def index_args(self, arg_probs, old_arg_probs, args):
+        (N, D) = args.shape
+        flattened = arg_probs.view(-1, arg_probs.shape[-1])
+        old_flattened = old_arg_probs.view(-1, old_arg_probs.shape[-1])
+        gathered = flattened[range(len(flattened)), args.flatten()]
+        old_gathered = old_flattened[range(len(old_flattened)), args.flatten()]
+        return gathered.reshape((N, D)), old_gathered.reshape((N, D))
+
+    """
+        spatial_probs: (N, 3, 64, 64)
+        old_spatial_probs: ""
+        spatial_args: (N, 3, 2)
+
+        returns: (N, 3), (N, 3)
+    """
+    def index_spatial(self, spatial_probs, old_spatial_probs, spatial_args):
+        (N, D, H, W) = spatial_probs.shape
+        flattened = spatial_probs.view(-1, H, W)
+        old_flattened = old_spatial_probs.view(-1, H, W)
+        gathered = flattened[range(N*D), spatial_args[:,:,0].flatten(), spatial_args[:,:,1].flatten()]
+        old_gathered = old_flattened[range(N*D), spatial_args[:,:,0].flatten(), spatial_args[:,:,1].flatten()]
+        gathered = gathered.reshape((N, D))
+        old_gathered = old_gathered.reshape((N, D))
+        return gathered, old_gathered
+
 
     def update_target_net(self):
         self.target_model.load_state_dict(self.model.state_dict())
+
+    def entropy(self, x):
+        return torch.log(x) * x

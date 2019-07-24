@@ -5,7 +5,7 @@ import copy
 from sc2env_utils import env_config
 
 class ReplayMemory(object):
-    def __init__(self, mem_cap, hist_size, batch_size):
+    def __init__(self, mem_cap, batch_size, hist_size=1):
         self.memory = deque(maxlen=mem_cap)
         self.nonspatial_action_space = 84
         self.spatial_action_width = 84
@@ -26,10 +26,8 @@ class ReplayMemory(object):
         self.indices = list(range(1, self.Memory_capacity - (self.history_size)))
         random.shuffle(self.indices)
 
-    def sample_mini_batch(self, frame, hist_size):
+    def sample_mini_batch(self, frame, hist_size=1):
 
-
-        mini_batch = []
         if frame >= self.Memory_capacity:
             sample_range = self.Memory_capacity-1
         else:
@@ -44,62 +42,19 @@ class ReplayMemory(object):
         upper = min((self.batch_size*(self.access_num+1)), sample_range)
 
         idx_sample = self.indices[lower:upper]
-        states = []
+        mini_batch = []
         for i in idx_sample:
-            sample = []
-            G_samp = []
-            X_samp = []
-            avail_samp = []
-            hidden_samp = []
-            prev_action_samp = []
 
-            # Boolean array, corresponds to 1 if frame is valid, 0 if frame is from previous episode that ends between i and i+self.history_size
-            relevant_frame = []
-
-
-            for j in range(self.history_size):
-                sample.append(self.memory[i + j])
-                #print("\n", self.memory[i+j], "\n")
-                if (self.memory[i+j][-1] == 1):
-                    for k in range(j):
-
-                        G_samp[k] = np.zeros(G_samp[k].shape)
-                        X_samp[k] = np.zeros(X_samp[k].shape)
-                        avail_samp[k] = np.zeros(avail_samp[k].shape)
-                        hidden_samp[k] = np.zeros(hidden_samp[k].shape)
-                        action_arr[k] = np.zeros(action_arr[k].shape)
-                        relevant_frame[k] = 0
-
-
-                G_samp.append(self.memory[i+j][0][0][0])
-                X_samp.append(self.memory[i+j][0][1][0])
-                avail_samp.append(self.memory[i+j][0][2])
-                hidden_samp.append(self.memory[i+j][0][3])
-
-                #print("avail_actions here: ", self.memory[i+j][0][2].shape)
-
-                action_arr = utils.action_to_onehot(self.memory[i+j][1], self.nonspatial_action_space, self.spatial_action_width)[0]
-
-                prev_action_samp.append(action_arr)
-
-                relevant_frame.append(1)
-
-
-            G_samp = np.array(G_samp)
-            X_samp = np.array(X_samp)
-            avail_samp = np.array(avail_samp)
-            hidden_samp = np.array(hidden_samp)
-            prev_action_samp = np.array(prev_action_samp)
-            relevant_frame = np.array(relevant_frame)
-
-            #sample = np.array(sample)
-            row = copy.deepcopy(sample[self.history_size-1])
-            #print(row)
-            #print(sample.shape, row.shape, sample[:,0].shape, sample[0,:].shape, sample[:,0][0].shape, sample[0].shape, type(sample[:,0]), type(sample[:,0][0]))
-            #print(avail_samp.shape)
-            row[0] = np.array([G_samp, X_samp, avail_samp[-1], hidden_samp[0], prev_action_samp, relevant_frame])
+            if (i == 0):
+                prev_action = 0
+            else:
+                prev_action = np.array([self.memory[i-1][1][0]])
+            row = np.array(copy.deepcopy(self.memory[i]))
+            (minimap, screen, player, avail, hidden) = row[0]
+            row[0] = np.array([np.array(minimap), np.array(screen), np.array(player), np.array(avail), np.array(hidden), np.array(prev_action)])
+            row[1][0] = np.array([row[1][0]])
+            row[1] = np.array(row[1])
             mini_batch.append(row)
-
 
         self.access_num = (self.access_num + 1) % self.reset_num
         if (self.access_num == 0):

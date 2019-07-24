@@ -130,11 +130,20 @@ class RRLModel(nn.Module, Model):
         self.arg_MLP = nn.Linear(net_config["inputs2d_size"] + 512 + net_config["action_embedding_size"],
                                     env_config["arg_depth"]*env_config["max_arg_size"])
 
-        self.spatial_out = nn.Conv2d(
-            net_config["spatial_out_depth"] + net_config["action_embedding_size"],
-            env_config["spatial_action_depth"],
-            kernel_size=1,
-            padding=0
+        self.spatial_out = nn.Sequential(
+            nn.ConvTranspose2d(
+                net_config["spatial_out_depth"] + net_config["action_embedding_size"],
+                net_config["spatial_out_depth"] + net_config["action_embedding_size"],
+                kernel_size=4,
+                padding=1,
+                stride=2
+            ),
+            nn.Conv2d(
+                net_config["spatial_out_depth"] + net_config["action_embedding_size"],
+                env_config["spatial_action_depth"],
+                kernel_size=1,
+                padding=0
+            )
         )
 
         self.arg_depth = env_config["arg_depth"]
@@ -143,7 +152,7 @@ class RRLModel(nn.Module, Model):
         self.spatial_size = env_config["spatial_action_size"]
 
         self.valid_args = torch.from_numpy(valid_args).float().to(self.device)
-
+        self.call_count = 0
 
     """
         minimap: (N, D, H, W)
@@ -193,7 +202,7 @@ class RRLModel(nn.Module, Model):
         shared_features = torch.cat([inputs2d, relational_nonspatial], dim=-1)
         value = self.value_MLP(shared_features)
         action_logits_in = self.action_MLP(shared_features)
-        action_logits_in.masked_fill(1-avail_actions, float('-inf'))
+        action_logits_in = action_logits_in.masked_fill(1-avail_actions, float('-inf'))
         action_logits = F.softmax(action_logits_in)
         #action_logits = action_logits / torch.sum(action_logits, axis=-1)
 
@@ -203,7 +212,7 @@ class RRLModel(nn.Module, Model):
             processed_action = torch.from_numpy(np.array(action)).unsqueeze(0).long().to(self.device)
         else:
             action = curr_action
-            processed_action = torch.from_numpy(np.array(action)).long().to(self.device)
+            processed_action = torch.from_numpy(action).long().to(self.device)
 
         embedded_action = self.action_embedding(processed_action)
         shared_conditioned = torch.cat([shared_features, embedded_action], dim=-1)
@@ -219,7 +228,6 @@ class RRLModel(nn.Module, Model):
         w = spatial_input.shape[-1]
 
         embedded_action = embedded_action.unsqueeze(2).unsqueeze(3).expand(embedded_action.shape + (w,w))
-        print(spatial_input.shape, embedded_action.shape)
         spatial_input = torch.cat([spatial_input, embedded_action], dim=1)
         spatial_logits_in = self.spatial_out(spatial_input)
         spatial_logits = self.generate_spatial_logits(spatial_logits_in)
@@ -241,7 +249,9 @@ class RRLModel(nn.Module, Model):
 
 
     def sample_func(self, probs):
-        return np.argmax(np.random.multinomial(1, probs.detach().cpu().numpy()))
+        probs = probs.detach().cpu().numpy().astype(np.float64)
+        probs = probs / np.sum(probs)
+        return np.argmax(np.random.multinomial(1, probs))
 
     def sample_action(self, action_logits):
         action = self.sample_func(action_logits[0])
@@ -251,15 +261,16 @@ class RRLModel(nn.Module, Model):
         arg_logit_inputs: (N, num_args) shape
     """
     def sample_arg(self, arg_logits, action):
-        arg_out = np.zeros(self.arg_depth)
+        arg_out = np.zeros(self.arg_depth, dtype=np.int64)
         arg_types = self.action_to_nonspatial_args(action)
         for i in arg_types:
-            arg_out[i] = self.sample_func(arg_logits[0,i])
+            arg_out[i-3] = self.sample_func(arg_logits[0,i-3])
         return arg_out
 
     def sample_spatial(self, spatial_logits, action):
-        spatial_arg_out = np.zeros((self.spatial_depth, 2))
+        spatial_arg_out = np.zeros((self.spatial_depth, 2), dtype=np.int64)
         arg_types = self.action_to_spatial_args(action)
+
         for i in arg_types:
             spatial_probs_flat = spatial_logits[0,i].flatten()
             arg_index = self.sample_func(spatial_probs_flat)
@@ -270,7 +281,6 @@ class RRLModel(nn.Module, Model):
 
     def generate_arg_logits(self, arg_logit_inputs):
         initial_logits = F.softmax(arg_logit_inputs) * self.valid_args
-        print(initial_logits.shape)
         final_logits = initial_logits / torch.sum(initial_logits, dim=-1).unsqueeze(2)
         return final_logits
 

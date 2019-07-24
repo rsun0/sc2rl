@@ -25,12 +25,11 @@ def action_to_pysc2(agent_action):
         if is_spatial_arg(id):
             spatial_arg_inputs.append(spatial_args[id])
         elif TYPES[id].values is not None:
-            arg_inputs.append([TYPES[id].values(args[id])])
+            arg_inputs.append([TYPES[id].values(args[id-3])])
         else:
-            arg_inputs.append([args[id]])
+            arg_inputs.append([args[id-3]])
 
     function = FunctionCall(base_action_func.id, arg_inputs + spatial_arg_inputs)
-
     return function
 
 def is_spatial_arg(id):

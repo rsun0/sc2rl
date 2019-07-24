@@ -82,22 +82,22 @@ def main():
                                 graph_every,
                                 averaging_window)
 
-    memory = ReplayMemory(train_every, 8, batch_size)
+    memory = ReplayMemory(train_every, batch_size)
 
-    PPO_settings = {
+    train_settings = {
         "discount_factor": 0.99,
         "lambda": 0.95,
         "hist_size": 8,
         "device": device,
         "eps_denom": 1e-6,
         "c1": 1.0,
-        "c2": 0.5,
-        "c3": 0.5,
-        "c4": 1.0,
+        "c2": 0.01,
+        "c3": 0.01,
+        "c4": 0.01,
         "clip_param": 0.1
     }
 
-    agent = RRLAgent(model, agent_settings, memory, PPO_settings)
+    agent = RRLAgent(model, agent_settings, memory, train_settings)
     experiment = Experiment([agent], env, run_settings)
 
     experiment.train()

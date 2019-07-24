@@ -10,6 +10,13 @@ def get_action_args(action):
     base_action_func = FUNCTIONS._func_list[action]
     arg_types = base_action_func.args
     arg_ids = np.array([arg_types[i].id for i in range(len(arg_types))])
+
+    return arg_ids
+
+def batch_get_action_args(actions):
+    base_action_funcs = [FUNCTIONS._func_list[i] for i in actions]
+    arg_types = [base_action_funcs[i].args for i in range(len(base_action_funcs))]
+    arg_ids = np.array([[arg_types[i][j].id for j in range(len(arg_types[i]))] for i in range(len(arg_types))])
     return arg_ids
 
 def is_spatial_arg(action_id):
@@ -97,7 +104,7 @@ def embed(x, embedding_list, embedding_indices):
             embed_count += 1
         else:
             upper += 1
-            output[:,lower:upper] = torch.log(x[:,i] - torch.min(x[:,i]) + 1.0)
+            output[:,lower] = torch.log(x[:,i] - torch.min(x[:,i]) + 1.0)
         lower = upper
 
     return output
