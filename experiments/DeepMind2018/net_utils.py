@@ -219,15 +219,16 @@ class SpatialUpsampler(nn.Module):
         return h2
 
 class FastEmbedding(nn.Module):
-    def __init__(self, num_embeddings, embedding_dim):
+    def __init__(self, num_embeddings, embedding_dim, device="cuda:0"):
         super(FastEmbedding, self).__init__()
         self.num_embeddings = num_embeddings
         self.embedding_dim = embedding_dim
-        self.layer = nn.Linear(num_embeddings, embedding_dim)
+        self.weight = torch.from_numpy(np.random.uniform(-1,1, (num_embeddings, embedding_dim))).float().to(device)
 
     def forward(self, x):
-        one_hot = F.one_hot(x, self.num_embeddings).float()
-        return self.layer(one_hot)
+        s = x.shape
+        values = self.weight[x.view(-1)]
+        return values.view(s + (self.embedding_dim,))
 
 
 class Unsqueeze(nn.Module):

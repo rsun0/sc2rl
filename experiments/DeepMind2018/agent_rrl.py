@@ -212,7 +212,6 @@ class RRLAgent(Agent):
         pol_loss = pol_avg.detach().item()
         vf_loss = value_loss.detach().item()
         ent_total = ent.detach().item()
-        #print("load time: %f. preprocess time: %f. forward time: %f. parse time: %f. prep time: %f. PPO time: %f. " % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6))
 
         return pol_loss, vf_loss, -ent_total
 

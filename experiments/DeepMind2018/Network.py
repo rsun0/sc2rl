@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import time
 
 from agent import Model
 
@@ -108,26 +109,26 @@ class RRLModel(nn.Module, Model):
             Squeeze(),
             Squeeze(),
             nn.Linear(net_config['relational_features'],
-                        512),
+                        256),
             nn.ReLU(),
-            nn.Linear(512, 512),
+            nn.Linear(256, 256),
             nn.ReLU()
         )
 
 
         self.value_MLP = nn.Sequential(
-            nn.Linear(512 + net_config["inputs2d_size"], 256),
+            nn.Linear(256 + net_config["inputs2d_size"], 128),
             nn.ReLU(),
-            nn.Linear(256, 1)
+            nn.Linear(128, 1)
         )
 
         self.action_MLP = nn.Sequential(
-            nn.Linear(512 + net_config["inputs2d_size"], 256),
+            nn.Linear(256 + net_config["inputs2d_size"], 128),
             nn.ReLU(),
-            nn.Linear(256, env_config["action_space"])
+            nn.Linear(128, env_config["action_space"])
         )
 
-        self.arg_MLP = nn.Linear(net_config["inputs2d_size"] + 512 + net_config["action_embedding_size"],
+        self.arg_MLP = nn.Linear(net_config["inputs2d_size"] + 256 + net_config["action_embedding_size"],
                                     env_config["arg_depth"]*env_config["max_arg_size"])
 
         self.spatial_out = nn.Sequential(
@@ -181,26 +182,30 @@ class RRLModel(nn.Module, Model):
             hidden = torch.from_numpy(hidden).to(self.device).float()
             avail_actions = torch.from_numpy(avail_actions).to(self.device).byte()
 
+        t1 = time.time()
         inputs = [minimap, screen]
         [minimap, screen] = self.embed_inputs(inputs, self.net_config)
         [minimap, screen] = [minimap.to(self.device), screen.to(self.device)]
-
+        t2 = time.time()
         processed_minimap = self.down_layers_minimap(minimap)
         processed_screen = self.down_layers_screen(screen)
         inputs3d = torch.cat([processed_minimap, processed_screen], dim=1)
-
+        t3 = time.time()
         embedded_last_action = self.action_embedding(last_action).to(self.device)
         nonspatial_concat = torch.cat([player, embedded_last_action], dim=-1)
         inputs2d = self.inputs2d_MLP(nonspatial_concat)
+        t4 = time.time()
 
         expanded_inputs2d = inputs2d.unsqueeze(2).unsqueeze(3).expand(inputs2d.shape + (self.net_config["inputs3d_width"], self.net_config["inputs3d_width"]))
         LSTM_in = torch.cat([inputs3d, expanded_inputs2d], dim=1)
 
         outputs2d, hidden = self.convLSTM(LSTM_in, hidden)
+        t5 = time.time()
         if unrolling:
             return hidden
         relational_spatial = self.attention_blocks(outputs2d)
         relational_nonspatial = self.relational_processor(relational_spatial)
+        t6 = time.time()
 
         shared_features = torch.cat([inputs2d, relational_nonspatial], dim=-1)
         value = self.value_MLP(shared_features)
@@ -241,12 +246,14 @@ class RRLModel(nn.Module, Model):
             spatial = self.sample_spatial(spatial_logits, action)
 
         choice = [action, args, spatial]
+        t7 = time.time()
 
         return action_logits, arg_logits, spatial_logits, hidden, value, choice
 
     def unroll_forward(self, minimaps, screens, players, avail_actions, last_actions, hiddens, curr_actions, relevant_frames):
         hist_size = minimaps.shape[1]
         for i in range(hist_size-1):
+            t1 = time.time()
             hiddens = self.forward(minimaps[:,i],
                                         screens[:,i],
                                         players[:,i],
@@ -257,6 +264,7 @@ class RRLModel(nn.Module, Model):
                                         unrolling=True)
             irrelevant_mask = relevant_frames[:,i] == 0
             hiddens[irrelevant_mask] = self.init_hidden(batch_size=torch.sum(irrelevant_mask), device=self.device)
+        t1 = time.time()
         action_logits, arg_logits, spatial_logits, _, values, _ = self.forward(
                                                                                 minimaps[:,-1],
                                                                                 screens[:,-1],
@@ -266,6 +274,7 @@ class RRLModel(nn.Module, Model):
                                                                                 hiddens,
                                                                                 curr_action=curr_actions
                                                                             )
+
         return action_logits, arg_logits, spatial_logits, _, values, _
 
 

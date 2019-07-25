@@ -33,15 +33,15 @@ def main():
         "state_embedding_size": state_embed, # number of features output by embeddings
         "action_embedding_size": action_embed,
         "down_conv_features": 64,
-        "up_features": 64,
+        "up_features": 32,
         "up_conv_features": 256,
         "resnet_features": 256,
         "LSTM_in_size": 128,
         "LSTM_hidden_size": 256,
         "inputs2d_size": 128,
         "inputs3d_width": 8,
-        "relational_features": 64,
-        "relational_depth": 3,
+        "relational_features": 32,
+        "relational_depth": 2,
         "spatial_out_depth": 128,
         "device": device
     }
@@ -52,12 +52,12 @@ def main():
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=1e5
-    history_size=2
+    history_size=5
 
 
     num_episodes = 1000000
     num_epochs = 3
-    batch_size = 24
+    batch_size = 32
     train_every = 1024
     save_every = 10240
     graph_every = 50
