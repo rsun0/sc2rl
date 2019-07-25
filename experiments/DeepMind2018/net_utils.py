@@ -218,6 +218,18 @@ class SpatialUpsampler(nn.Module):
 
         return h2
 
+class FastEmbedding(nn.Module):
+    def __init__(self, num_embeddings, embedding_dim):
+        super(FastEmbedding, self).__init__()
+        self.num_embeddings = num_embeddings
+        self.embedding_dim = embedding_dim
+        self.layer = nn.Linear(num_embeddings, embedding_dim)
+
+    def forward(self, x):
+        one_hot = F.one_hot(x, self.num_embeddings).float()
+        return self.layer(one_hot)
+
+
 class Unsqueeze(nn.Module):
     def forward(self, x):
         return x.unsqueeze(-1)

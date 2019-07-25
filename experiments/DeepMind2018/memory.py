@@ -43,6 +43,7 @@ class ReplayMemory(object):
 
         idx_sample = self.indices[lower:upper]
         mini_batch = []
+        """
         for i in idx_sample:
 
             if (i == 0):
@@ -55,6 +56,50 @@ class ReplayMemory(object):
             row[1][0] = np.array([row[1][0]])
             row[1] = np.array(row[1])
             mini_batch.append(row)
+        """
+        for i in idx_sample:
+            sample = []
+            minimap_sample = []
+            screen_sample = []
+            player_sample = []
+            avail_sample = []
+            hidden_sample = []
+            prev_action_sample = []
+            relevant_frame = []
+
+            for j in range(self.history_size):
+                sample.append(self.memory[i+j])
+
+                # if done
+                if (self.memory[i+1][-1]):
+                    relevant_frame = [0 for k in relevant_frame]
+
+                state = self.memory[i+j][0]
+                prev_action = self.memory[i+j-1][1][0]
+
+                minimap_sample.append(state[0])
+                screen_sample.append(state[1])
+                player_sample.append(state[2])
+                avail_sample.append(state[3])
+                hidden_sample.append(state[4])
+                prev_action_sample.append(prev_action)
+                relevant_frame.append(1)
+
+            minimap_sample = np.array(minimap_sample)
+            screen_sample = np.array(screen_sample)
+            player_sample = np.array(player_sample)
+            avail_sample = np.array(avail_sample)
+            hidden_sample = np.array(hidden_sample)
+            prev_action_sample = np.array([prev_action_sample])
+            relevant_frame = np.array(relevant_frame)
+
+            row = copy.deepcopy(sample[self.history_size-1])
+            row[0] = np.array([minimap_sample, screen_sample, player_sample, avail_sample[-1], hidden_sample[0], prev_action_sample, relevant_frame])
+            row[1][0] = np.array([row[1][0]])
+            row[1] = np.array(row[1])
+            mini_batch.append(row)
+
+
 
         self.access_num = (self.access_num + 1) % self.reset_num
         if (self.access_num == 0):

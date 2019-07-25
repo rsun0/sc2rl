@@ -42,7 +42,8 @@ def main():
         "inputs3d_width": 8,
         "relational_features": 64,
         "relational_depth": 3,
-        "spatial_out_depth": 128
+        "spatial_out_depth": 128,
+        "device": device
     }
 
     model = RRLModel(net_config, device=device).to(device)
@@ -51,11 +52,12 @@ def main():
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=1e5
+    history_size=2
 
 
     num_episodes = 1000000
     num_epochs = 3
-    batch_size = 32
+    batch_size = 24
     train_every = 1024
     save_every = 10240
     graph_every = 50
@@ -82,19 +84,20 @@ def main():
                                 graph_every,
                                 averaging_window)
 
-    memory = ReplayMemory(train_every, batch_size)
+    memory = ReplayMemory(train_every, batch_size, hist_size=history_size)
 
     train_settings = {
         "discount_factor": 0.99,
         "lambda": 0.95,
         "hist_size": 8,
         "device": device,
-        "eps_denom": 1e-6,
+        "eps_denom": 1e-5,
         "c1": 1.0,
         "c2": 0.01,
         "c3": 0.01,
         "c4": 0.01,
-        "clip_param": 0.1
+        "clip_param": 0.1,
+        "map": map_name
     }
 
     agent = RRLAgent(model, agent_settings, memory, train_settings)

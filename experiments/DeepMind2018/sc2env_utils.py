@@ -2,6 +2,7 @@ from pysc2.lib.features import SCREEN_FEATURES, MINIMAP_FEATURES, FeatureType, P
 CATEGORICAL = FeatureType.CATEGORICAL
 SCALAR = FeatureType.SCALAR
 from pysc2.lib.actions import FUNCTIONS, TYPES
+from net_utils import FastEmbedding
 import torch
 import torch.nn as nn
 import numpy as np
@@ -78,13 +79,13 @@ def generate_embeddings(config):
         embed_size = config['state_embedding_size']
 
         for j in range(len(cat_indices)):
-            embeddings[i].append(nn.Embedding(cat_sizes[j]+1, embed_size))
+            embeddings[i].append(FastEmbedding(cat_sizes[j]+1, embed_size).to(config["device"]))
 
     return embeddings
 
 """
     Performs log transform for scalar features
-    Performs torch.nn.Embedding for categorical features
+    Performs FastEmbedding for categorical features
 """
 def embed(x, embedding_list, embedding_indices):
 

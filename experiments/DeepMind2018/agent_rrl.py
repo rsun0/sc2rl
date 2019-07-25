@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+import time
 
 import copy
 
@@ -22,7 +23,8 @@ class RRLAgent(Agent):
         self.prev_hidden_state = None
         self.action = [0, np.zeros(10), np.zeros((3,2))]
         self.device = train_settings["device"]
-        self.loss = nn.MSELoss()
+        self.loss = nn.SmoothL1Loss()
+        self.map = train_settings["map"]
 
     def _forward(self, agent_state, choosing=True):
         (minimap, screen, player, avail_actions) = agent_state
@@ -85,6 +87,8 @@ class RRLAgent(Agent):
 
     def train_step(self, batch_size):
 
+        t1 = time.time()
+
         device = self.train_settings['device']
         eps_denom = self.train_settings['eps_denom']
         c1 = self.train_settings['c1']
@@ -92,18 +96,21 @@ class RRLAgent(Agent):
         clip_param = self.train_settings['clip_param']
 
         mini_batch = self.memory.sample_mini_batch(self.frame_count)
+        t2 = time.time()
         n = len(mini_batch)
         mini_batch = np.array(mini_batch).transpose()
 
 
-
         states = np.stack(mini_batch[0], axis=0)
-        minimaps = np.stack(states[:,0], axis=0).squeeze(1)
-        screens = np.stack(states[:,1], axis=0).squeeze(1)
-        players = np.stack(states[:,2], axis=0).squeeze(1)
-        avail_actions = np.stack(states[:,3], axis=0)
-        hidden_states = np.concatenate(states[:,4], axis=0)
-        prev_actions = np.stack(states[:,5], axis=0).squeeze(1)
+        minimaps = torch.from_numpy(np.stack(states[:,0], axis=0).squeeze(2)).float().to(self.device)
+        screens = torch.from_numpy(np.stack(states[:,1], axis=0).squeeze(2)).float().to(self.device)
+        players = torch.from_numpy(np.stack(states[:,2], axis=0).squeeze(2)).float().to(self.device)
+        avail_actions = torch.from_numpy(np.stack(states[:,3], axis=0)).byte().to(self.device)
+        hidden_states = torch.from_numpy(np.concatenate(states[:,4], axis=0)).float().to(self.device)
+        prev_actions = torch.from_numpy(np.stack(states[:,5], axis=0)).long().to(self.device).squeeze(1)
+        relevant_states = torch.from_numpy(np.stack(states[:,6], axis=0)).byte().to(self.device)
+
+
 
         actions = np.stack(np.array(mini_batch[1]), axis=0)
         base_actions = np.stack(actions[:,0], 0).astype(np.int64).squeeze(1)
@@ -119,27 +126,31 @@ class RRLAgent(Agent):
         advantages = torch.from_numpy(advantages).float().to(self.device)
         v_returns = torch.from_numpy(v_returns).float().to(self.device)
         dones = torch.from_numpy(dones.astype(np.uint8)).byte().to(self.device)
+        t3 = time.time()
 
-
-        action_probs, arg_probs, spatial_probs, _, values, _ = self.model(
+        # minimaps, screens, players, avail_actions, last_actions, hiddens, curr_actions, relevant_frames
+        action_probs, arg_probs, spatial_probs, _, values, _ = self.model.unroll_forward(
             minimaps,
             screens,
             players,
             avail_actions,
             prev_actions,
             hidden_states,
-            curr_action=base_actions
+            base_actions,
+            relevant_states
         )
 
-        old_action_probs, old_arg_probs, old_spatial_probs, _, values, _ = self.target_model(
+        old_action_probs, old_arg_probs, old_spatial_probs, _, values, _ = self.target_model.unroll_forward(
             minimaps,
             screens,
             players,
             avail_actions,
             prev_actions,
             hidden_states,
-            curr_action=base_actions
+            base_actions,
+            relevant_states
         )
+        t4 = time.time()
 
         gathered_actions = action_probs[range(n), base_actions]
         old_gathered_actions = old_action_probs[range(n), base_actions]
@@ -151,9 +162,17 @@ class RRLAgent(Agent):
                                                                             spatial_args)
 
         action_args = batch_get_action_args(base_actions)
+        """
         numerator = torch.zeros((n,)).float().to(self.device)
         denominator = torch.zeros((n,)).float().to(self.device)
         entropy = torch.zeros((n,)).float().to(self.device)
+        """
+
+        numerator = torch.log(gathered_actions)
+        denominator = torch.log(old_gathered_actions + eps_denom)
+        entropy = self.entropy(gathered_actions)
+        num_args = torch.ones(n,).to(self.device)
+
 
 
         for i in range(n):
@@ -167,10 +186,15 @@ class RRLAgent(Agent):
                     numerator[i] = numerator[i] + torch.log(gathered_args[i][j-3])
                     denominator[i] = denominator[i] + torch.log(old_gathered_args[i][j-3])
                     entropy[i] = entropy[i] + self.entropy(gathered_args[i][j-3])
+            num_args[i] += len(curr_args)
+
 
         denominator = denominator.detach()
+        t5 = time.time()
 
-        ratio = torch.exp(numerator - denominator)
+        #print(numerator, denominator, num_args)
+
+        ratio = torch.exp((numerator - denominator) * (1 / num_args))
         ratio_adv = ratio * advantages.detach()
         bounded_adv = torch.clamp(ratio, 1-clip_param, 1+clip_param)
         bounded_adv = bounded_adv * advantages.detach()
@@ -178,17 +202,19 @@ class RRLAgent(Agent):
         pol_avg = - ((torch.min(ratio_adv, bounded_adv)).mean())
         value_loss = self.loss(values.squeeze(1), v_returns.detach())
         ent = entropy.mean()
+        t6 = time.time()
 
-        total_loss = pol_avg + c1 * value_loss - c2 * ent
+        total_loss = pol_avg + c1 * value_loss + c2 * ent
         self.optimizer.zero_grad()
         total_loss.backward()
         self.optimizer.step()
-
+        t7 = time.time()
         pol_loss = pol_avg.detach().item()
         vf_loss = value_loss.detach().item()
         ent_total = ent.detach().item()
+        #print("load time: %f. preprocess time: %f. forward time: %f. parse time: %f. prep time: %f. PPO time: %f. " % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6))
 
-        return pol_loss, vf_loss, ent_total
+        return pol_loss, vf_loss, -ent_total
 
 
 
@@ -198,7 +224,7 @@ class RRLAgent(Agent):
         self.update_target_net()
 
     def save(self):
-        torch.save(self.model.state_dict(), "save_model/Starcraft2" + self.env.map + "RRL.pth")
+        torch.save(self.model.state_dict(), "save_model/Starcraft2" + self.map + "RRL.pth")
 
     def push_memory(self, state, action, reward, done):
         push_state = list(state) + [self.prev_hidden_state]

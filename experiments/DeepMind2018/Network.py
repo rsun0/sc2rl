@@ -6,7 +6,7 @@ import numpy as np
 from agent import Model
 
 from sc2env_utils import generate_embeddings, multi_embed, valid_args, get_action_args, is_spatial_arg, env_config, processed_feature_dim
-from net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze, Squeeze
+from net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze, Squeeze, FastEmbedding
 
 class RRLModel(nn.Module, Model):
 
@@ -73,7 +73,7 @@ class RRLModel(nn.Module, Model):
             env_config["minimap_categorical_indices"],
             env_config["screen_categorical_indices"]
         ]
-        self.action_embedding = nn.Embedding(env_config["action_space"], net_config["action_embedding_size"])
+        self.action_embedding = FastEmbedding(env_config["action_space"], net_config["action_embedding_size"]).to(self.device)
 
         self.down_layers_minimap = Downsampler(self.minimap_features, net_config)
         self.down_layers_screen = Downsampler(self.screen_features, net_config)
@@ -165,20 +165,21 @@ class RRLModel(nn.Module, Model):
 
         D is a placeholder for feature dimensions.
     """
-    def forward(self, minimap, screen, player, avail_actions, last_action, hidden, curr_action=None, choosing=False):
+    def forward(self, minimap, screen, player, avail_actions, last_action, hidden, curr_action=None, choosing=False, unrolling=False):
         if (choosing):
             assert (curr_action is None)
-        if (not choosing):
+        if (not choosing and not unrolling):
             assert (curr_action is not None)
 
         N = len(minimap)
 
-        minimap = torch.from_numpy(minimap).float()
-        screen = torch.from_numpy(screen).float()
-        player = torch.from_numpy(player).to(self.device).float()
-        last_action = torch.from_numpy(last_action).to(self.device).long()
-        hidden = torch.from_numpy(hidden).to(self.device).float()
-        avail_actions = torch.from_numpy(avail_actions).to(self.device).byte()
+        if choosing:
+            minimap = torch.from_numpy(minimap).to(self.device).float()
+            screen = torch.from_numpy(screen).to(self.device).float()
+            player = torch.from_numpy(player).to(self.device).float()
+            last_action = torch.from_numpy(last_action).to(self.device).long()
+            hidden = torch.from_numpy(hidden).to(self.device).float()
+            avail_actions = torch.from_numpy(avail_actions).to(self.device).byte()
 
         inputs = [minimap, screen]
         [minimap, screen] = self.embed_inputs(inputs, self.net_config)
@@ -196,6 +197,8 @@ class RRLModel(nn.Module, Model):
         LSTM_in = torch.cat([inputs3d, expanded_inputs2d], dim=1)
 
         outputs2d, hidden = self.convLSTM(LSTM_in, hidden)
+        if unrolling:
+            return hidden
         relational_spatial = self.attention_blocks(outputs2d)
         relational_nonspatial = self.relational_processor(relational_spatial)
 
@@ -241,8 +244,33 @@ class RRLModel(nn.Module, Model):
 
         return action_logits, arg_logits, spatial_logits, hidden, value, choice
 
-    def init_hidden(self, use_torch=True, device="cuda:0"):
-        return self.convLSTM.init_hidden_state(use_torch=use_torch, device=device)
+    def unroll_forward(self, minimaps, screens, players, avail_actions, last_actions, hiddens, curr_actions, relevant_frames):
+        hist_size = minimaps.shape[1]
+        for i in range(hist_size-1):
+            hiddens = self.forward(minimaps[:,i],
+                                        screens[:,i],
+                                        players[:,i],
+                                        None,
+                                        last_actions[:,i],
+                                        hiddens,
+                                        curr_action=None,
+                                        unrolling=True)
+            irrelevant_mask = relevant_frames[:,i] == 0
+            hiddens[irrelevant_mask] = self.init_hidden(batch_size=torch.sum(irrelevant_mask), device=self.device)
+        action_logits, arg_logits, spatial_logits, _, values, _ = self.forward(
+                                                                                minimaps[:,-1],
+                                                                                screens[:,-1],
+                                                                                players[:,-1],
+                                                                                avail_actions,
+                                                                                last_actions[:,-1],
+                                                                                hiddens,
+                                                                                curr_action=curr_actions
+                                                                            )
+        return action_logits, arg_logits, spatial_logits, _, values, _
+
+
+    def init_hidden(self, batch_size=1, use_torch=True, device="cuda:0"):
+        return self.convLSTM.init_hidden_state(batch_size=batch_size, use_torch=use_torch, device=device)
 
     def embed_inputs(self, inputs, net_config):
         return multi_embed(inputs, self.state_embeddings, self.state_embedding_indices)
