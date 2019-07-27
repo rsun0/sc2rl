@@ -79,10 +79,11 @@ class Experiment:
                     recent_mean = np.mean(scores_history)
                     print("Game {} ended after {} steps. Game score: {}. Averages: {}"
                         .format(e+1, step, scores, averages))
-
+            """
             if (self.run_settings.graph_every > 0 and e > 0
                     and e % self.run_settings.graph_every == 0):
                 self.plot_results(averages_history)
+            """
 
     def test(self):
         """

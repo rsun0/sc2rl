@@ -17,8 +17,8 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 def main():
 
-    map_name = "DefeatRoaches"
-    render = True
+    map_name = "DefeatZerglingsAndBanelings"
+    render = False
     step_mul = 8
 
 
@@ -92,7 +92,7 @@ def main():
     train_settings = {
         "discount_factor": 0.99,
         "lambda": 0.95,
-        "hist_size": 8,
+        "hist_size": 12,
         "device": device,
         "eps_denom": 1e-8,
         "c1": 1.0,
