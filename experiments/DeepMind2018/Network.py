@@ -134,13 +134,13 @@ class RRLModel(nn.Module, Model):
         self.spatial_out = nn.Sequential(
             nn.ConvTranspose2d(
                 net_config["spatial_out_depth"] + net_config["action_embedding_size"],
-                net_config["spatial_out_depth"] + net_config["action_embedding_size"],
+                net_config["channels3"],
                 kernel_size=4,
                 padding=1,
                 stride=2
             ),
             nn.Conv2d(
-                net_config["spatial_out_depth"] + net_config["action_embedding_size"],
+                net_config["channels3"],
                 env_config["spatial_action_depth"],
                 kernel_size=1,
                 padding=0
@@ -313,7 +313,6 @@ class RRLModel(nn.Module, Model):
             arg_index = self.sample_func(spatial_probs_flat)
             spatial_arg_out[i] = np.array([int(arg_index / self.spatial_size),
                                             arg_index % self.spatial_size])
-
         return spatial_arg_out
 
     def generate_arg_logits(self, arg_logit_inputs):

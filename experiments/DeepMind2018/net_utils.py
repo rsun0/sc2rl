@@ -205,18 +205,23 @@ class SpatialUpsampler(nn.Module):
             nn.ReLU()
         )
 
-        self.conv_out = nn.Conv2d(int(0.5 * net_config['up_conv_features']),
+        self.conv_out = nn.Sequential(
+            nn.Conv2d(int(0.5 * net_config['up_conv_features']),
                                         output_depth,
                                         kernel_size=1,
                                         stride=1,
-                                        padding=1)
+                                        padding=0
+            ),
+            nn.ReLU()
+        )
 
     def forward(self, x):
 
         h1 = self.tconv1(x)
         h2 = self.tconv2(h1)
+        h3 = self.conv_out(h2)
 
-        return h2
+        return h3
 
 class FastEmbedding(nn.Module):
     def __init__(self, num_embeddings, embedding_dim, device="cuda:0"):

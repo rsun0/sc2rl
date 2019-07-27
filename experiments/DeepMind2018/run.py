@@ -18,7 +18,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 def main():
 
     map_name = "DefeatRoaches"
-    render = False
+    render = True
     step_mul = 8
 
 
@@ -32,27 +32,30 @@ def main():
     net_config = {
         "state_embedding_size": state_embed, # number of features output by embeddings
         "action_embedding_size": action_embed,
-        "down_conv_features": 64,
+        "down_conv_features": 32,
         "up_features": 32,
-        "up_conv_features": 256,
-        "resnet_features": 256,
-        "LSTM_in_size": 128,
-        "LSTM_hidden_size": 256,
-        "inputs2d_size": 128,
+        "up_conv_features": 128,
+        "resnet_features": 128,
+        "LSTM_in_size": 64,
+        "LSTM_hidden_size": 96,
+        "inputs2d_size": 64,
         "inputs3d_width": 8,
         "relational_features": 32,
         "relational_depth": 2,
-        "spatial_out_depth": 128,
+        "spatial_out_depth": 64,
+        "channels3": 16,
         "device": device
     }
 
     model = RRLModel(net_config, device=device).to(device)
+    print(model)
 
-    lr = 5e-3
+
+    lr = 1e-4
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=1e5
-    history_size=5
+    history_size=8
 
 
     num_episodes = 1000000
@@ -91,7 +94,7 @@ def main():
         "lambda": 0.95,
         "hist_size": 8,
         "device": device,
-        "eps_denom": 1e-5,
+        "eps_denom": 1e-8,
         "c1": 1.0,
         "c2": 0.01,
         "c3": 0.01,

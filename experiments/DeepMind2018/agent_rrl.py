@@ -3,6 +3,7 @@ from sc2env_utils import batch_get_action_args, is_spatial_arg
 
 import torch
 import torch.nn as nn
+from torch.nn.utils import clip_grad_norm_
 import torch.optim as optim
 import numpy as np
 import time
@@ -140,7 +141,7 @@ class RRLAgent(Agent):
             relevant_states
         )
 
-        old_action_probs, old_arg_probs, old_spatial_probs, _, values, _ = self.target_model.unroll_forward(
+        old_action_probs, old_arg_probs, old_spatial_probs, _, old_values, _ = self.target_model.unroll_forward(
             minimaps,
             screens,
             players,
@@ -204,9 +205,12 @@ class RRLAgent(Agent):
         ent = entropy.mean()
         t6 = time.time()
 
-        total_loss = pol_avg + c1 * value_loss + c2 * ent
+        #total_loss = pol_avg + c1 * value_loss + c2 * ent
+        #total_loss = value_loss
+        total_loss = ent
         self.optimizer.zero_grad()
         total_loss.backward()
+        clip_grad_norm_(self.model.parameters(), 100.0)
         self.optimizer.step()
         t7 = time.time()
         pol_loss = pol_avg.detach().item()
