@@ -223,7 +223,7 @@ class RRLAgent(Agent):
 
 
     def load(self):
-        self.net.load_state_dict(torch.load("save_model/Starcraft2" + self.env.map + "RRL.pth"))
+        self.model.load_state_dict(torch.load("save_model/Starcraft2" + self.map + "RRL.pth"))
         self.update_target_net()
 
     def save(self):
@@ -274,6 +274,7 @@ class RRLAgent(Agent):
 
     def update_target_net(self):
         self.target_model.load_state_dict(self.model.state_dict())
+        self.target_model.eval()
 
     def entropy(self, x):
         return torch.log(x) * x
