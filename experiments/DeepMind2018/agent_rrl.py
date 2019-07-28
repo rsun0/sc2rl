@@ -24,7 +24,7 @@ class RRLAgent(Agent):
         self.prev_hidden_state = None
         self.action = [0, np.zeros(10), np.zeros((3,2))]
         self.device = train_settings["device"]
-        self.loss = nn.SmoothL1Loss()
+        self.loss = nn.MSELoss()
         self.map = train_settings["map"]
 
     def _forward(self, agent_state, choosing=True):
