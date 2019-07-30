@@ -119,15 +119,15 @@ class RRLModel(nn.Module, Model):
 
 
         self.value_MLP = nn.Sequential(
-            nn.Linear(256 + net_config["inputs2d_size"], 128),
+            nn.Linear(256 + net_config["inputs2d_size"], 256),
             nn.ReLU(),
-            nn.Linear(128, 1)
+            nn.Linear(256, 1)
         )
 
         self.action_MLP = nn.Sequential(
-            nn.Linear(256 + net_config["inputs2d_size"], 128),
+            nn.Linear(256 + net_config["inputs2d_size"], 512),
             nn.ReLU(),
-            nn.Linear(128, env_config["action_space"])
+            nn.Linear(512, env_config["action_space"])
         )
 
         self.arg_MLP = nn.Linear(net_config["inputs2d_size"] + 256 + net_config["action_embedding_size"],

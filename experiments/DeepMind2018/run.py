@@ -42,7 +42,7 @@ def main():
         "inputs3d_width": 8,
         "relational_features": 32,
         "relational_depth": 3,
-        "relational_heads": 2,
+        "relational_heads": 3,
         "spatial_out_depth": 64,
         "channels3": 16,
         "device": device
@@ -56,13 +56,13 @@ def main():
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=1e5
-    history_size=12
+    history_size=20
 
 
     num_episodes = 1000000
-    num_epochs = 3
+    num_epochs = 2
     batch_size = 32
-    train_every = 1024
+    train_every = 2048
     save_every = 10240
     graph_every = 50
     averaging_window = 100
@@ -95,7 +95,7 @@ def main():
         "lambda": 0.95,
         "hist_size": 12,
         "device": device,
-        "eps_denom": 1e-8,
+        "eps_denom": 1e-6,
         "c1": 0.1,
         "c2": 0.05,
         "c3": 0.01,
