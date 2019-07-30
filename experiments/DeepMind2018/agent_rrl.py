@@ -108,8 +108,9 @@ class RRLAgent(Agent):
         players = torch.from_numpy(np.stack(states[:,2], axis=0).squeeze(2)).float().to(self.device)
         avail_actions = torch.from_numpy(np.stack(states[:,3], axis=0)).byte().to(self.device)
         hidden_states = torch.from_numpy(np.concatenate(states[:,4], axis=0)).float().to(self.device)
-        prev_actions = torch.from_numpy(np.stack(states[:,5], axis=0)).long().to(self.device).squeeze(1)
-        relevant_states = torch.from_numpy(np.stack(states[:,6], axis=0)).byte().to(self.device)
+        old_hidden_states = torch.from_numpy(np.concatenate(states[:,5], axis=0)).float().to(self.device)
+        prev_actions = torch.from_numpy(np.stack(states[:,6], axis=0)).long().to(self.device).squeeze(1)
+        relevant_states = torch.from_numpy(np.stack(states[:,7], axis=0)).byte().to(self.device)
 
 
 
@@ -141,15 +142,15 @@ class RRLAgent(Agent):
             relevant_states
         )
 
-        old_action_probs, old_arg_probs, old_spatial_probs, _, old_values, _ = self.target_model.unroll_forward(
-            minimaps,
-            screens,
-            players,
+        old_action_probs, old_arg_probs, old_spatial_probs, _, _, _ = self.target_model.unroll_forward(
+            minimaps[:,[-1]],
+            screens[:,[-1]],
+            players[:,[-1]],
             avail_actions,
-            prev_actions,
-            hidden_states,
+            prev_actions[:,[-1]],
+            old_hidden_states,
             base_actions,
-            relevant_states
+            relevant_states[:,[-1]]
         )
         t4 = time.time()
 
@@ -182,13 +183,12 @@ class RRLAgent(Agent):
                 if is_spatial_arg(j):
                     numerator[i] = numerator[i] + torch.log(gathered_spatial_args[i][j])
                     denominator[i] = denominator[i] + torch.log(old_gathered_spatial_args[i][j])
-                    entropy[i] = entropy[i] + self.entropy(gathered_spatial_args[i][j])
+                    entropy[i] = entropy[i] + torch.mean(self.entropy(gathered_spatial_args[i][j]))
                 else:
                     numerator[i] = numerator[i] + torch.log(gathered_args[i][j-3])
                     denominator[i] = denominator[i] + torch.log(old_gathered_args[i][j-3])
-                    entropy[i] = entropy[i] + self.entropy(gathered_args[i][j-3])
+                    entropy[i] = entropy[i] + torch.mean(self.entropy(gathered_args[i][j-3]))
             num_args[i] += len(curr_args)
-
 
         denominator = denominator.detach()
         t5 = time.time()
@@ -205,9 +205,9 @@ class RRLAgent(Agent):
         ent = entropy.mean()
         t6 = time.time()
 
-        #total_loss = pol_avg + c1 * value_loss + c2 * ent
+        total_loss = pol_avg + c1 * value_loss + c2 * ent
         #total_loss = value_loss
-        total_loss = ent
+        #total_loss = ent
         self.optimizer.zero_grad()
         total_loss.backward()
         clip_grad_norm_(self.model.parameters(), 100.0)
@@ -216,6 +216,7 @@ class RRLAgent(Agent):
         pol_loss = pol_avg.detach().item()
         vf_loss = value_loss.detach().item()
         ent_total = ent.detach().item()
+        #print("%f %f %f %f %f %f, total: %f" % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t7-t1))
 
         return pol_loss, vf_loss, -ent_total
 
@@ -277,4 +278,5 @@ class RRLAgent(Agent):
         self.target_model.eval()
 
     def entropy(self, x):
+        output = torch.log(x) * x
         return torch.log(x) * x

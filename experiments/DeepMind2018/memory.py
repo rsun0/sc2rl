@@ -94,7 +94,7 @@ class ReplayMemory(object):
             relevant_frame = np.array(relevant_frame)
 
             row = copy.deepcopy(sample[self.history_size-1])
-            row[0] = np.array([minimap_sample, screen_sample, player_sample, avail_sample[-1], hidden_sample[0], prev_action_sample, relevant_frame])
+            row[0] = np.array([minimap_sample, screen_sample, player_sample, avail_sample[-1], hidden_sample[0], hidden_sample[-1], prev_action_sample, relevant_frame])
             row[1][0] = np.array([row[1][0]])
             row[1] = np.array(row[1])
             mini_batch.append(row)

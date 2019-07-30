@@ -23,7 +23,7 @@ def action_to_pysc2(agent_action):
     for i in range(len(arg_ids)):
         id = arg_ids[i]
         if is_spatial_arg(id):
-            spatial_arg_inputs.append(spatial_args[id])
+            spatial_arg_inputs.append(2 * spatial_args[id])
         elif TYPES[id].values is not None:
             arg_inputs.append([TYPES[id].values(args[id-3])])
         else:

@@ -41,7 +41,8 @@ def main():
         "inputs2d_size": 64,
         "inputs3d_width": 8,
         "relational_features": 32,
-        "relational_depth": 2,
+        "relational_depth": 3,
+        "relational_heads": 2,
         "spatial_out_depth": 64,
         "channels3": 16,
         "device": device
@@ -95,7 +96,7 @@ def main():
         "hist_size": 12,
         "device": device,
         "eps_denom": 1e-8,
-        "c1": 1.0,
+        "c1": 0.1,
         "c2": 0.05,
         "c3": 0.01,
         "c4": 0.01,

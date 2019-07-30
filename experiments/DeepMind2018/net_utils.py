@@ -76,10 +76,71 @@ class ResnetBlock(nn.Module):
         out = self.residuals(x)
         return x + out
 
+class RelationalProjection(nn.Module):
+    def __init__(self, in_size, num_features):
+
+        super(RelationalProjection, self).__init__()
+        self.layer = nn.Sequential(
+            nn.Linear(in_size, num_features),
+            nn.InstanceNorm1d(num_features)
+        )
+
+    def forward(self, x):
+        return self.layer(x)
 
 class SelfAttentionBlock(nn.Module):
+    def __init__(self, in_size, num_features, num_heads, device="cuda:0"):
 
-    def __init__(self, in_size, num_features):
+        super(SelfAttentionBlock, self).__init__()
+        self.device = device
+        self.in_size = in_size
+        self.num_features = num_features
+        self.num_heads = num_heads
+        self.QueryLayers = []
+        self.KeyLayers = []
+        self.ValueLayers = []
+
+        for i in range(in_size):
+            self.QueryLayers.append(RelationalProjection(in_size, num_features).to(self.device))
+            self.KeyLayers.append(RelationalProjection(in_size, num_features).to(self.device))
+            self.ValueLayers.append(RelationalProjection(in_size, num_features).to(self.device))
+        self.MLP = nn.Sequential(
+            nn.Linear(self.num_heads * self.num_features, self.num_heads * self.num_features),
+            nn.ReLU(),
+            nn.Linear(self.num_heads * self.num_features, self.num_heads * self.num_features),
+            nn.ReLU()
+        ).to(self.device)
+
+        self.output_norm = nn.InstanceNorm1d(num_features)
+
+    def forward(self, x):
+        (N, D, H, W) = x.shape
+        new_x = x.permute(0, 2, 3, 1)
+        flattened = new_x.flatten(start_dim=1, end_dim=-2)
+
+        heads_out = []
+
+        for i in range(self.num_heads):
+            Q = self.QueryLayers[i](flattened)
+            K = self.KeyLayers[i](flattened)
+            V = self.ValueLayers[i](flattened)
+            numerator = torch.matmul(Q, K.permute(0,2,1))
+            scaled = numerator / math.sqrt(self.num_features)
+            attention_weights = F.softmax(scaled)
+            A = torch.matmul(attention_weights, V)
+            heads_out.append(A)
+
+        heads_out = torch.cat(heads_out, dim=-1)
+        output = self.output_norm(self.MLP(heads_out) + heads_out)
+        output = output.permute(0,2,1).contiguous().view((N, -1, H, W))
+
+        return output
+
+
+
+class RelationalModule(nn.Module):
+
+    def __init__(self, in_size, num_features, num_heads):
         super(SelfAttentionBlock, self).__init__()
 
         self.in_size = in_size
@@ -87,19 +148,16 @@ class SelfAttentionBlock(nn.Module):
 
         self.QueryLayer = nn.Sequential(
             nn.Linear(in_size, num_features),
-            nn.Tanh(),
             nn.InstanceNorm1d(num_features)
         )
 
         self.KeyLayer = nn.Sequential(
             nn.Linear(in_size, num_features),
-            nn.Tanh(),
             nn.InstanceNorm1d(num_features)
         )
 
         self.ValueLayer = nn.Sequential(
             nn.Linear(in_size, num_features),
-            nn.Tanh(),
             nn.InstanceNorm1d(num_features)
         )
 
@@ -124,9 +182,9 @@ class SelfAttentionBlock(nn.Module):
         scaled = numerator / math.sqrt(self.num_features)
         attention_weights = F.softmax(scaled)
         A = torch.matmul(attention_weights, V)
-        A = A.reshape((N, -1, H, W))
+        A_out = A.view((N, -1, H, W))
 
-        return A
+        return A_out
 
 class Downsampler(nn.Module):
     def __init__(self, input_features, net_config):
@@ -185,7 +243,7 @@ class SpatialUpsampler(nn.Module):
         super(SpatialUpsampler, self).__init__()
         self.tconv1 = nn.Sequential(
             nn.ConvTranspose2d(
-                net_config['up_features'],
+                net_config['relational_features'] * net_config["relational_heads"] + net_config["action_embedding_size"],
                 net_config['up_conv_features'],
                 kernel_size=4,
                 stride=2,
