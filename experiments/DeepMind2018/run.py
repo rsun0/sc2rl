@@ -1,13 +1,13 @@
 import sys
 sys.path.insert(0, "../../interface/")
 
-from custom_env import FullStateActionEnvironment
-from Network import RRLModel
-from agent_rrl import RRLAgent
+from base_agent.custom_env import FullStateActionEnvironment
+from RRLNetwork import RRLModel
+from base_agent.base_agent import BaseAgent
 from abstract_core import Experiment, RunSettings
-from memory import ReplayMemory
+from base_agent.memory import ReplayMemory
 from agent import AgentSettings
-from sc2env_utils import env_config
+from base_agent.sc2env_utils import env_config
 import torch
 import argparse
 
@@ -104,7 +104,7 @@ def main():
         "map": map_name
     }
 
-    agent = RRLAgent(model, agent_settings, memory, train_settings)
+    agent = BaseAgent(model, agent_settings, memory, train_settings)
     experiment = Experiment([agent], env, run_settings)
 
     experiment.train()

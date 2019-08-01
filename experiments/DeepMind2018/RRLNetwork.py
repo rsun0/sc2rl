@@ -4,64 +4,19 @@ import torch.nn.functional as F
 import numpy as np
 import time
 
-from agent import Model
+from base_agent.Network import BaseNetwork
 
-from sc2env_utils import generate_embeddings, multi_embed, valid_args, get_action_args, is_spatial_arg, env_config, processed_feature_dim
-from net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze, Squeeze, FastEmbedding
+from base_agent.sc2env_utils import generate_embeddings, multi_embed, valid_args, get_action_args, is_spatial_arg, env_config, processed_feature_dim
+from base_agent.net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze, Squeeze, FastEmbedding
 
-class RRLModel(nn.Module, Model):
+class RRLModel(BaseNetwork):
 
     """
-        net_config = {
-            "state_embedding_size": state_embed, # number of features output by embeddings
-            "action_embedding_size": action_embed,
-            "down_conv_features": 64,
-            "up_features": 64,
-            "up_conv_features": 256
-            "resnet_features": 256,
-            "LSTM_in_size": 128,
-            "LSTM_hidden_size:" 256,
-            "inputs2d_size": 128,
-            "inputs3d_width": 8,
-            "relational_features": 64
-            "relational_depth": 3
-            "spatial_out_depth": 128
-        }
-        net_config = {
-            "minimap_features": int, number of features in minimap image
-            "screen_features": int, number of features in screen image
-            "player": int, number of features in player variable
-            "last_action_features": int, number of features in last_action variable
-            "down_conv_features": int, numbe features coming out of first convolution
-            "up_features": int, number of features going into first upsample
-            "up_conv_features": int, number of features coming out of first upsample
-            "relational_spatial_depth": int, number of features going into output conv
-            "action_space": int, number of base actions to pick from
-            "arg_depth": int, total number of nonspatial argument types
-            "max_arg_size": int, maximum number of arg categories to pick from
-            "spatial_action_depth": int, max number of spatial arguments for action
-            "spatial_action_size": int, width and height of spatial action space
-            "resnet_features": int, number of features in each convolutional layer
-            "LSTM_in_size": int, number of features in the input to the LSTM
-            "LSTM_hidden_size:" int, number of features in the hidden state of LSTM
-            "inputs2d_size": int, number of features in inputs2d variable
-            "relational_features": int, number of features in each relational block
-            "relational_depth": int, number of relational blocks to put in sequence
-            "screen_categorical_indices": int array, binary mask. i'th index is 1
-                                            iff i'th layer of screen is categorical
-            "minimap_categorical_indices": Like screen_categorical_indices.
-            "player_categorical_indices": Like screen_categorical_indices.
-            "screen_categorical_size": int array, number of screen categories
-                                        to embed, corresponds with *_indices
-            "minimap_categorical_size": int array, number of mmap categories
-                                        to embed, corresponds with *_indices
-            "player_categorical_size": int array, number of player categories
-                                        to embed, corresponds with *_indices
-            "embedding_size": int, number of features output by embeddings
-        }
+        net_config: Specifies parameters for network
+        device: "cpu" or "cuda:" + str(put int here)
     """
     def __init__(self, net_config, device="cpu"):
-        super(RRLModel, self).__init__()
+        super(RRLModel, self).__init__(net_config, device)
         self.net_config = net_config
         self.device = device
 
@@ -258,111 +213,3 @@ class RRLModel(nn.Module, Model):
 
 
         return action_logits, arg_logits, spatial_logits, hidden, value, choice
-
-    def unroll_forward(self, minimaps, screens, players, avail_actions, last_actions, hiddens, curr_actions, relevant_frames):
-        t1 = time.time()
-        hist_size = minimaps.shape[1]
-        for i in range(hist_size-1):
-            hiddens = self.forward(minimaps[:,i],
-                                        screens[:,i],
-                                        players[:,i],
-                                        None,
-                                        last_actions[:,i],
-                                        hiddens,
-                                        curr_action=None,
-                                        unrolling=True)
-            irrelevant_mask = relevant_frames[:,i] == 0
-            hiddens[irrelevant_mask] = self.init_hidden(batch_size=torch.sum(irrelevant_mask), device=self.device)
-        t2 = time.time()
-        action_logits, arg_logits, spatial_logits, _, values, _ = self.forward(
-                                                                                minimaps[:,-1],
-                                                                                screens[:,-1],
-                                                                                players[:,-1],
-                                                                                avail_actions,
-                                                                                last_actions[:,-1],
-                                                                                hiddens,
-                                                                                curr_action=curr_actions
-                                                                            )
-        t3 = time.time()
-        #print("Unroll time: %f. Regular forward time: %f. Total: %f" % (t2-t1, t3-t2, t3-t1))
-        return action_logits, arg_logits, spatial_logits, _, values, _
-
-
-    def init_hidden(self, batch_size=1, use_torch=True, device="cuda:0"):
-        return self.convLSTM.init_hidden_state(batch_size=batch_size, use_torch=use_torch, device=device)
-
-    def embed_inputs(self, inputs, net_config):
-        return multi_embed(inputs, self.state_embeddings, self.state_embedding_indices)
-
-
-    def sample_func(self, probs):
-        probs = probs.detach().cpu().numpy().astype(np.float64)
-        probs = probs / np.sum(probs)
-        return np.argmax(np.random.multinomial(1, probs))
-
-    def sample_action(self, action_logits):
-        action = self.sample_func(action_logits[0])
-        return action
-
-    """
-        arg_logit_inputs: (N, num_args) shape
-    """
-    def sample_arg(self, arg_logits, action):
-        arg_out = np.zeros(self.arg_depth, dtype=np.int64)
-        arg_types = self.action_to_nonspatial_args(action)
-        for i in arg_types:
-            arg_out[i-3] = self.sample_func(arg_logits[0,i-3])
-        return arg_out
-
-    def sample_spatial(self, spatial_logits, action):
-        spatial_arg_out = np.zeros((self.spatial_depth, 2), dtype=np.int64)
-        arg_types = self.action_to_spatial_args(action)
-
-        for i in arg_types:
-            spatial_probs_flat = spatial_logits[0,i].flatten()
-            arg_index = self.sample_func(spatial_probs_flat)
-            spatial_arg_out[i] = np.array([int(arg_index / self.spatial_size),
-                                            arg_index % self.spatial_size])
-        return spatial_arg_out
-
-    def generate_arg_logits(self, arg_logit_inputs):
-        initial_logits = F.softmax(arg_logit_inputs) * self.valid_args
-        final_logits = initial_logits / torch.sum(initial_logits, dim=-1).unsqueeze(2)
-        return final_logits
-
-    def generate_spatial_logits(self, spatial_logits_in):
-        (N, D, H, W) = spatial_logits_in.shape
-        x = spatial_logits_in.flatten(start_dim=-2, end_dim=-1)
-        logits = F.softmax(x, dim=-1)
-        logits = logits.reshape((N, D, H, W))
-        return logits
-
-    def action_to_nonspatial_args(self, action):
-        args = get_action_args(action)
-        args = [i for i in args if not is_spatial_arg(i)]
-        return args
-
-    def action_to_spatial_args(self, action):
-        args = get_action_args(action)
-        args = [i for i in args if is_spatial_arg(i)]
-        return args
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#############################
