@@ -41,7 +41,7 @@ def main():
         "inputs2d_size": 64,
         "inputs3d_width": 8,
         "relational_features": 32,
-        "relational_depth": 1,
+        "relational_depth": 3,
         "relational_heads": 1,
         "spatial_out_depth": 64,
         "channels3": 16,
@@ -59,10 +59,10 @@ def main():
     history_size=20
 
 
-    num_episodes = 1000000
+    num_episodes = 10000000
     num_epochs = 2
     batch_size = 32
-    train_every = 2048
+    train_every = 1024
     save_every = 10240
     graph_every = 50
     averaging_window = 100
@@ -93,11 +93,11 @@ def main():
     train_settings = {
         "discount_factor": 0.99,
         "lambda": 0.95,
-        "hist_size": 12,
+        "hist_size": history_size,
         "device": device,
         "eps_denom": 1e-6,
         "c1": 0.1,
-        "c2": 0.05,
+        "c2": 0.1,
         "c3": 0.01,
         "c4": 0.01,
         "clip_param": 0.1,

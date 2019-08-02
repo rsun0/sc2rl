@@ -299,5 +299,5 @@ class BaseAgent(Agent):
         self.target_model.eval()
 
     def entropy(self, x):
-        output = torch.log(x) * x
-        return torch.log(x) * x
+        output = torch.log(x + self.train_settings["eps_denom"]) * x
+        return output
