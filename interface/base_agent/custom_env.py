@@ -7,6 +7,9 @@ from base_agent.process_state import state_processor
 from base_agent.process_action import action_to_pysc2
 from base_agent.sc2env_utils import env_config
 
+from pysc2.lib.actions import FUNCTIONS
+from base_agent.sc2env_utils import env_config
+
 """
     Generalized environment that uses a preprocessed version of the full state,
     and the full action space. Currently only supports single agent maps.
@@ -79,3 +82,66 @@ class FullStateActionEnvironment(CustomEnvironment):
                 [raw_action])[0]  # get obs for 1st agent
         except protocol.ConnectionError:
             self._curr_frame = self._env.reset()[0]
+
+
+class RandomEnvironment(CustomEnvironment):
+    """
+    An environment that returns random states for testing purposes
+    """
+    
+    def __init__(self, num_players=1, min_episode_len=1, max_episode_len=100,
+            max_state_value=100):
+        self.num_players = num_players
+        self.min_episode_len = min_episode_len
+        self.max_episode_len = max_episode_len
+        self.max_state_value = max_state_value
+        self.reset()
+
+    def reset(self):
+        self.steps_to_terminal = np.random.randint(self.min_episode_len,
+            self.max_episode_len + 1)
+        states = [self._gen_state() for i in range(self.num_players)]
+        rewards = [self._gen_reward() for i in range(self.num_players)]
+        return states, rewards, self.steps_to_terminal <= 0, None
+        
+    def step(self):
+        self.steps_to_terminal -= 1
+        states = [self._gen_state() for i in range(self.num_players)]
+        rewards = [self._gen_reward() for i in range(self.num_players)]
+        return states, rewards, self.steps_to_terminal <= 0, None
+
+    def _gen_reward(self):
+        """
+        80%: 0
+        10%: 10
+        10%: -1
+        """
+        rng = np.random.random()
+        if rng < 0.8:
+            return 0
+        elif rng < 0.9:
+            return 10
+        else:
+            return -1
+
+    def _gen_state(self):
+        """
+        Generates random arrays with the same shapes as returned by
+        FullStateActionEnvironment.
+        """
+
+        minimap_shape = (1, env_config['raw_minimap'],
+            env_config['minimap_width'], env_config['minimap_width'])
+        minimap = np.random.randint(self.max_state_value, size=minimap_shape)
+
+        screen_shape = (1, env_config['raw_screen'],
+            env_config['screen_width'], env_config['screen_width'])
+        screen = np.random.randint(self.max_state_value, size=screen_shape)
+
+        player_shape = (1, env_config['raw_player'])
+        player = np.random.randint(self.max_state_value, size=player_shape)
+
+        # Mark all actions as available
+        avail_actions = np.ones(len(FUNCTIONS))
+
+        return np.array([minimap, screen, player, avail_actions])
