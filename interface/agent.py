@@ -100,6 +100,7 @@ class AgentSettings():
         self.epsilon_max = epsilon_max
         self.epsilon_min = epsilon_min
         self.epsilon_duration = epsilon_duration
+        self.verbose = verbose
 
     def get_epsilon(self, frame_num):
         """
