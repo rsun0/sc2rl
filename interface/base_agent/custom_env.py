@@ -104,7 +104,7 @@ class RandomEnvironment(CustomEnvironment):
         rewards = [self._gen_reward() for i in range(self.num_players)]
         return states, rewards, self.steps_to_terminal <= 0, None
         
-    def step(self):
+    def step(self, _action):
         self.steps_to_terminal -= 1
         states = [self._gen_state() for i in range(self.num_players)]
         rewards = [self._gen_reward() for i in range(self.num_players)]
@@ -132,16 +132,17 @@ class RandomEnvironment(CustomEnvironment):
 
         minimap_shape = (1, env_config['raw_minimap'],
             env_config['minimap_width'], env_config['minimap_width'])
-        minimap = np.random.randint(self.max_state_value, size=minimap_shape)
+        minimap = np.random.randint(self.max_state_value + 1, size=minimap_shape)
 
         screen_shape = (1, env_config['raw_screen'],
             env_config['screen_width'], env_config['screen_width'])
-        screen = np.random.randint(self.max_state_value, size=screen_shape)
+        screen = np.random.randint(self.max_state_value + 1, size=screen_shape)
 
         player_shape = (1, env_config['raw_player'])
-        player = np.random.randint(self.max_state_value, size=player_shape)
+        player = np.random.randint(self.max_state_value + 1, size=player_shape)
 
         # Mark all actions as available
         avail_actions = np.ones(len(FUNCTIONS))
-
-        return np.array([minimap, screen, player, avail_actions])
+        
+        state = np.array([minimap, screen, player, avail_actions])
+        return state
