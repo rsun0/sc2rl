@@ -28,6 +28,7 @@ from torch.nn.utils import clip_grad_norm_
 import torch.optim as optim
 import numpy as np
 import time
+import math
 
 import copy
 
@@ -89,6 +90,12 @@ class BaseAgent(Agent):
             for j in range(num_iters):
 
                 d_pol, d_vf, d_ent = self.train_step(batch_size)
+                if (math.isnan(d_pol) or math.isnan(d_vf) or math.isnan(d_ent)):
+                    print("Canceling training -- NaN's encountered")
+                    print("Reloading model from previous save")
+                    self.load()
+                    self.update_target_net()
+                    return
                 pol_loss += d_pol
                 vf_loss += d_vf
                 ent_total += d_ent

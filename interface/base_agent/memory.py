@@ -123,6 +123,21 @@ class ReplayMemory(object):
             self.memory[i][5] = gae_t + self.memory[i][4]  # advantage + value
             prev_gae_t = gae_t
 
+    """
+        row: *state, *action, reward, done, value, v_return, advantage
+            state: *minimap, *screen, player, avail_actions, *hidden_state, *old_hidden_state,
+                    prev_actions, relevant_states
+
+        starred items are transformable
+    """
+    def random_transform(self, row):
+        state, action, _, _, _, _, _ = row
+        transform = np.random.randint(0,8)
+        if transform == 0:
+            return row
+
+
+
 
     def __len__(self):
         return len(self.memory)
