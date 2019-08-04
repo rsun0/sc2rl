@@ -1,7 +1,7 @@
 import sys
 sys.path.insert(0, "../../interface/")
 
-from base_agent.custom_env import FullStateActionEnvironment
+from base_agent.custom_env import FullStateActionEnvironment, RandomEnvironment
 from RRLNetwork import RRLModel
 from base_agent.base_agent import BaseAgent
 from abstract_core import Experiment, RunSettings

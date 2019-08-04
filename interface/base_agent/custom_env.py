@@ -90,7 +90,7 @@ class RandomEnvironment(CustomEnvironment):
     """
     
     def __init__(self, num_players=1, min_episode_len=1, max_episode_len=100,
-            max_state_value=100):
+            max_state_value=1):
         self.num_players = num_players
         self.min_episode_len = min_episode_len
         self.max_episode_len = max_episode_len
