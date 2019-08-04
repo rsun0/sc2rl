@@ -116,7 +116,7 @@ class BaseAgent(Agent):
 
     def train_step(self, batch_size):
 
-        t1 = time.time()
+        start_time = time.time()
 
         device = self.train_settings['device']
         eps_denom = self.train_settings['eps_denom']
@@ -125,7 +125,7 @@ class BaseAgent(Agent):
         clip_param = self.train_settings['clip_param']
 
         mini_batch = self.memory.sample_mini_batch(self.frame_count)
-        t2 = time.time()
+        load_time = time.time()
         n = len(mini_batch)
         mini_batch = np.array(mini_batch).transpose()
 
@@ -156,7 +156,7 @@ class BaseAgent(Agent):
         advantages = torch.from_numpy(advantages).float().to(self.device)
         v_returns = torch.from_numpy(v_returns).float().to(self.device)
         dones = torch.from_numpy(dones.astype(np.uint8)).byte().to(self.device)
-        t3 = time.time()
+        preprocessing_time = time.time()
 
         # minimaps, screens, players, avail_actions, last_actions, hiddens, curr_actions, relevant_frames
         action_probs, arg_probs, spatial_probs, _, values, _ = self.model.unroll_forward(
@@ -180,7 +180,7 @@ class BaseAgent(Agent):
             base_actions,
             relevant_states[:,[-1]]
         )
-        t4 = time.time()
+        forward_time = time.time()
 
         gathered_actions = action_probs[range(n), base_actions]
         old_gathered_actions = old_action_probs[range(n), base_actions]
@@ -219,7 +219,7 @@ class BaseAgent(Agent):
             num_args[i] += len(curr_args)
 
         denominator = denominator.detach()
-        t5 = time.time()
+        entropy_time = time.time()
 
         #print(numerator, denominator, num_args)
 
@@ -231,7 +231,7 @@ class BaseAgent(Agent):
         pol_avg = - ((torch.min(ratio_adv, bounded_adv)).mean())
         value_loss = self.loss(values.squeeze(1), v_returns.detach())
         ent = entropy.mean()
-        t6 = time.time()
+        loss_time = time.time()
 
         total_loss = pol_avg + c1 * value_loss + c2 * ent
         #total_loss = value_loss
@@ -240,11 +240,19 @@ class BaseAgent(Agent):
         total_loss.backward()
         clip_grad_norm_(self.model.parameters(), 100.0)
         self.optimizer.step()
-        t7 = time.time()
+        backward_time = time.time()
         pol_loss = pol_avg.detach().item()
         vf_loss = value_loss.detach().item()
         ent_total = ent.detach().item()
-        #print("%f %f %f %f %f %f, total: %f" % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t7-t1))
+        if self.settings.verbose:
+            print("--- Timing ---")
+            print("Memory sample loading: {}".format(load_time - start_time))
+            print("Tensor preprocessing: {}".format(preprocessing_time - load_time))
+            print("Forward: {}".format(forward_time - preprocessing_time))
+            print("Entropy computation: {}".format(entropy_time - forward_time))
+            print("Loss computation: {}".format(loss_time - entropy_time))
+            print("Backward: {}".format(backward_time - loss_time))
+            print("Total: {}".format(backward_time - start_time))
 
         return pol_loss, vf_loss, -ent_total
 

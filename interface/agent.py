@@ -86,13 +86,14 @@ class Model():
 
 class AgentSettings():
     def __init__(self, optimizer, learning_rate,
-            epsilon_max, epsilon_min, epsilon_duration):
+            epsilon_max, epsilon_min, epsilon_duration, verbose=False):
         """
         :param optimizer: A class from torch.optim (instantiated later)
         :param learning_rate: The learning rate for the network
         :param epsilon_max: The starting epsilon
         :param epsilon_min: The final epsilon
         :param epsilon_duration: The number of frames to reach the final epsilon
+        :param verbose: Enable logging printouts
         """
         self.optimizer = optimizer
         self.learning_rate = learning_rate
