@@ -88,7 +88,7 @@ class RandomEnvironment(CustomEnvironment):
     """
     An environment that returns random states for testing purposes
     """
-    
+
     def __init__(self, num_players=1, min_episode_len=1, max_episode_len=100,
             max_state_value=1):
         self.num_players = num_players
@@ -103,7 +103,7 @@ class RandomEnvironment(CustomEnvironment):
         states = [self._gen_state() for i in range(self.num_players)]
         rewards = [self._gen_reward() for i in range(self.num_players)]
         return states, rewards, self.steps_to_terminal <= 0, None
-        
+
     def step(self, _action):
         self.steps_to_terminal -= 1
         states = [self._gen_state() for i in range(self.num_players)]
@@ -143,6 +143,6 @@ class RandomEnvironment(CustomEnvironment):
 
         # Mark all actions as available
         avail_actions = np.ones(len(FUNCTIONS))
-        
+
         state = np.array([minimap, screen, player, avail_actions])
         return state

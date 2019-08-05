@@ -27,6 +27,9 @@ class ConvLSTM(nn.Module):
         self.input_to_output = nn.Conv2d(input_size, hidden_size, kernel_size=3, stride=1, padding=1)
         self.hidden_to_output = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, stride=1, padding=1)
 
+
+
+
     """
         input: torch tensor of shape (N, D, H, W)
         hidden_state: torch tensor of shape (N, 2, D, H, W)
