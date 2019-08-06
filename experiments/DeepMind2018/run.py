@@ -95,7 +95,7 @@ def main():
         "lambda": 0.95,
         "hist_size": history_size,
         "device": device,
-        "eps_denom": 1e-6,
+        "eps_denom": 1e-8,
         "c1": 0.1,
         "c2": 0.1,
         "c3": 0.01,
