@@ -238,6 +238,7 @@ class BaseAgent(Agent):
         #total_loss = ent
         self.optimizer.zero_grad()
         total_loss.backward()
+        self.process_gradients(self.model)
         clip_grad_norm_(self.model.parameters(), 100.0)
         self.optimizer.step()
         t7 = time.time()
@@ -308,3 +309,14 @@ class BaseAgent(Agent):
     def entropy(self, x):
         output = torch.log(x + self.train_settings["eps_denom"]) * x
         return output
+
+
+    ### Network processing functions
+
+    def process_gradients(self, network, clip=1.0):
+        grad_sum = 0
+        for param in network.parameters():
+            if param.grad is None:
+                continue
+            grad_sum += torch.sum(param.grad.data ** 2)
+        print(grad_sum)

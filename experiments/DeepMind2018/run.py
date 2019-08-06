@@ -63,7 +63,7 @@ def main():
     num_epochs = 2
     batch_size = 32
     train_every = 1024
-    save_every = 10240
+    save_every = 20480
     graph_every = 50
     averaging_window = 100
 
