@@ -29,6 +29,7 @@ import torch.optim as optim
 import numpy as np
 import time
 import math
+import matplotlib.pyplot as plt
 
 import copy
 
@@ -129,10 +130,19 @@ class BaseAgent(Agent):
         n = len(mini_batch)
         mini_batch = np.array(mini_batch).transpose()
 
-
         states = np.stack(mini_batch[0], axis=0)
-        minimaps = torch.from_numpy(np.stack(states[:,0], axis=0).squeeze(2)).float().to(self.device)
-        screens = torch.from_numpy(np.stack(states[:,1], axis=0).squeeze(2)).float().to(self.device)
+        actions = np.stack(np.array(mini_batch[1]), axis=0)
+        minimaps = np.stack(states[:,0], axis=0).squeeze(2)
+        screens = np.stack(states[:,1], axis=0).squeeze(2)
+        spatial_args = np.stack(actions[:,2], 0).astype(np.int64)
+        minimaps, screens, spatial_args = self.memory.batch_random_transform(minimaps, screens, spatial_args)
+
+
+
+
+
+        minimaps = torch.from_numpy(minimaps.copy()).float().to(self.device)
+        screens = torch.from_numpy(screens.copy()).float().to(self.device)
         players = torch.from_numpy(np.stack(states[:,2], axis=0).squeeze(2)).float().to(self.device)
         avail_actions = torch.from_numpy(np.stack(states[:,3], axis=0)).byte().to(self.device)
         hidden_states = torch.from_numpy(np.concatenate(states[:,4], axis=0)).float().to(self.device)
@@ -141,11 +151,8 @@ class BaseAgent(Agent):
         relevant_states = torch.from_numpy(np.stack(states[:,7], axis=0)).byte().to(self.device)
 
 
-
-        actions = np.stack(np.array(mini_batch[1]), axis=0)
         base_actions = np.stack(actions[:,0], 0).astype(np.int64).squeeze(1)
         args = np.stack(actions[:,1], 0).astype(np.int64)
-        spatial_args = np.stack(actions[:,2], 0).astype(np.int64)
 
         rewards = np.array(list(mini_batch[2]))
         dones = mini_batch[3]
@@ -154,6 +161,7 @@ class BaseAgent(Agent):
 
         rewards = torch.from_numpy(rewards).float().to(self.device)
         advantages = torch.from_numpy(advantages).float().to(self.device)
+        advantages = (advantages - advantages.mean()) / advantages.std()
         v_returns = torch.from_numpy(v_returns).float().to(self.device)
         dones = torch.from_numpy(dones.astype(np.uint8)).byte().to(self.device)
         t3 = time.time()
@@ -238,8 +246,8 @@ class BaseAgent(Agent):
         #total_loss = ent
         self.optimizer.zero_grad()
         total_loss.backward()
-        self.process_gradients(self.model)
-        clip_grad_norm_(self.model.parameters(), 100.0)
+        #self.process_gradients(self.model)
+        clip_grad_norm_(self.model.parameters(), 30.0)
         self.optimizer.step()
         t7 = time.time()
         pol_loss = pol_avg.detach().item()

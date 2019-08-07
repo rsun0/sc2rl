@@ -3,6 +3,7 @@ import numpy as np
 import random
 import copy
 from base_agent.sc2env_utils import env_config
+import matplotlib.pyplot as plt
 
 class ReplayMemory(object):
     def __init__(self, mem_cap, batch_size, hist_size=1):
@@ -97,6 +98,8 @@ class ReplayMemory(object):
             row[0] = np.array([minimap_sample, screen_sample, player_sample, avail_sample[-1], hidden_sample[0], hidden_sample[-1], prev_action_sample, relevant_frame])
             row[1][0] = np.array([row[1][0]])
             row[1] = np.array(row[1])
+            #state, action, _, _, _, _, _, _ = row
+            #print(state[0].shape, state[1].shape, state[2].shape)
             mini_batch.append(row)
 
 
@@ -124,19 +127,48 @@ class ReplayMemory(object):
             prev_gae_t = gae_t
 
     """
-        row: *state, *action, reward, done, value, v_return, advantage
-            state: *minimap, *screen, player, avail_actions, *hidden_state, *old_hidden_state,
-                    prev_actions, relevant_states
-
-        starred items are transformable
+        Performs random equivalent reorientation of state
     """
-    def random_transform(self, row):
-        state, action, _, _, _, _, _ = row
-        transform = np.random.randint(0,8)
-        if transform == 0:
-            return row
+    def random_transform(self, minimap, screen, action, transform):
+        #minimap, screen = state[:, :2]
+        #print(state.shape, minimap.shape, screen.shape)
+        spatial_args = action
+        new_spatial_action = np.copy(spatial_args)
+        spatial_w = env_config["spatial_action_size"]
 
+        #transform = np.random.randint(0,8)
 
+        # Rotations
+        if transform >= 2 and transform < 4:
+            minimap = np.rot90(minimap, k=1, axes=(-2,-1))
+            screen = np.rot90(screen, k=1, axes=(-2,-1))
+            new_spatial_action[:,0] = (spatial_w - 1) - spatial_args[:,1]
+            new_spatial_action[:,1] = spatial_args[:,0]
+        if transform >= 4 and transform < 6:
+            minimap = np.rot90(minimap, k=2, axes=(-2,-1))
+            screen = np.rot90(screen, k=2, axes=(-2,-1))
+            new_spatial_action[:,0] = (spatial_w - 1) - spatial_args[:,0]
+            new_spatial_action[:,1] = (spatial_w - 1) - spatial_args[:,1]
+        elif transform >= 6 and transform < 8:
+            minimap = np.rot90(minimap, k=3, axes=(-2,-1))
+            screen = np.rot90(screen, k=3, axes=(-2,-1))
+            new_spatial_action[:,0] = spatial_args[:,1]
+            new_spatial_action[:,1] = (spatial_w - 1) - spatial_args[:,0]
+
+        # Reflection
+        if transform % 2 == 1:
+            minimap = np.flip(minimap, -1)
+            screen = np.flip(screen, -1)
+            new_spatial_action[:,1] = (spatial_w - 1) - new_spatial_action[:,1]
+
+        action = new_spatial_action
+        return minimap, screen, action
+
+    def batch_random_transform(self, minimaps, screens, actions):
+        for i in range(len(minimaps)):
+            transform = i % 8
+            minimaps[i], screens[i], actions[i] = self.random_transform(minimaps[i], screens[i], actions[i], transform)
+        return minimaps, screens, actions
 
 
     def __len__(self):
