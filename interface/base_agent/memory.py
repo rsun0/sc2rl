@@ -129,7 +129,7 @@ class ReplayMemory(object):
     """
         Performs random equivalent reorientation of state
     """
-    def random_transform(self, minimap, screen, action, transform):
+    def random_transform(self, minimap, screen, hidden, action, transform):
         #minimap, screen = state[:, :2]
         #print(state.shape, minimap.shape, screen.shape)
         spatial_args = action
@@ -142,16 +142,19 @@ class ReplayMemory(object):
         if transform >= 2 and transform < 4:
             minimap = np.rot90(minimap, k=1, axes=(-2,-1))
             screen = np.rot90(screen, k=1, axes=(-2,-1))
+            hidden = np.rot90(hidden, k=1, axes=(-2,-1))
             new_spatial_action[:,0] = (spatial_w - 1) - spatial_args[:,1]
             new_spatial_action[:,1] = spatial_args[:,0]
         if transform >= 4 and transform < 6:
             minimap = np.rot90(minimap, k=2, axes=(-2,-1))
             screen = np.rot90(screen, k=2, axes=(-2,-1))
+            hidden = np.rot90(hidden, k=2, axes=(-2,-1))
             new_spatial_action[:,0] = (spatial_w - 1) - spatial_args[:,0]
             new_spatial_action[:,1] = (spatial_w - 1) - spatial_args[:,1]
         elif transform >= 6 and transform < 8:
             minimap = np.rot90(minimap, k=3, axes=(-2,-1))
             screen = np.rot90(screen, k=3, axes=(-2,-1))
+            hidden = np.rot90(hidden, k=3, axes=(-2,-1))
             new_spatial_action[:,0] = spatial_args[:,1]
             new_spatial_action[:,1] = (spatial_w - 1) - spatial_args[:,0]
 
@@ -159,16 +162,17 @@ class ReplayMemory(object):
         if transform % 2 == 1:
             minimap = np.flip(minimap, -1)
             screen = np.flip(screen, -1)
+            hidden = np.flip(hidden, -1)
             new_spatial_action[:,1] = (spatial_w - 1) - new_spatial_action[:,1]
 
         action = new_spatial_action
-        return minimap, screen, action
+        return minimap, screen, hidden,  action
 
-    def batch_random_transform(self, minimaps, screens, actions):
+    def batch_random_transform(self, minimaps, screens, hiddens, actions):
         for i in range(len(minimaps)):
-            transform = i % 8
-            minimaps[i], screens[i], actions[i] = self.random_transform(minimaps[i], screens[i], actions[i], transform)
-        return minimaps, screens, actions
+            transform = np.random.randint(0,8)
+            minimaps[i], screens[i], hiddens[i], actions[i] = self.random_transform(minimaps[i], screens[i], hiddens[i], actions[i], transform)
+        return minimaps, screens, hiddens, actions
 
 
     def __len__(self):

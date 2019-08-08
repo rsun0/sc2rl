@@ -134,8 +134,9 @@ class BaseAgent(Agent):
         actions = np.stack(np.array(mini_batch[1]), axis=0)
         minimaps = np.stack(states[:,0], axis=0).squeeze(2)
         screens = np.stack(states[:,1], axis=0).squeeze(2)
+        hiddens = np.concatenate(states[:,4], axis=0)
         spatial_args = np.stack(actions[:,2], 0).astype(np.int64)
-        minimaps, screens, spatial_args = self.memory.batch_random_transform(minimaps, screens, spatial_args)
+        minimaps, screens, hiddens, spatial_args = self.memory.batch_random_transform(minimaps, screens, hiddens, spatial_args)
 
 
 
@@ -145,7 +146,7 @@ class BaseAgent(Agent):
         screens = torch.from_numpy(screens.copy()).float().to(self.device)
         players = torch.from_numpy(np.stack(states[:,2], axis=0).squeeze(2)).float().to(self.device)
         avail_actions = torch.from_numpy(np.stack(states[:,3], axis=0)).byte().to(self.device)
-        hidden_states = torch.from_numpy(np.concatenate(states[:,4], axis=0)).float().to(self.device)
+        hidden_states = torch.from_numpy(hiddens.copy()).float().to(self.device)
         old_hidden_states = torch.from_numpy(np.concatenate(states[:,5], axis=0)).float().to(self.device)
         prev_actions = torch.from_numpy(np.stack(states[:,6], axis=0)).long().to(self.device).squeeze(1)
         relevant_states = torch.from_numpy(np.stack(states[:,7], axis=0)).byte().to(self.device)
