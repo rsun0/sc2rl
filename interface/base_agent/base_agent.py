@@ -139,9 +139,6 @@ class BaseAgent(Agent):
         minimaps, screens, hiddens, spatial_args = self.memory.batch_random_transform(minimaps, screens, hiddens, spatial_args)
 
 
-
-
-
         minimaps = torch.from_numpy(minimaps.copy()).float().to(self.device)
         screens = torch.from_numpy(screens.copy()).float().to(self.device)
         players = torch.from_numpy(np.stack(states[:,2], axis=0).squeeze(2)).float().to(self.device)
