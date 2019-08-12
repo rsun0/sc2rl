@@ -45,8 +45,8 @@ env_config = {
     "raw_screen": len(SCREEN_FEATURES), #int, number of features in screen image
     "raw_player": len(Player), #int, number of features in player variable
 
-    "minimap_shape": (len(MINIMAP_FEATURES), 64, 64)
-    "screen_shape": (len(SCREEN_FEATURES), 64, 64)
+    "minimap_shape": (len(MINIMAP_FEATURES), 64, 64),
+    "screen_shape": (len(SCREEN_FEATURES), 64, 64),
 
     "minimap_width": 64,
     "screen_width": 64,

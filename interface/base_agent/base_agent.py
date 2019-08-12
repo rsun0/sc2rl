@@ -138,7 +138,6 @@ class BaseAgent(Agent):
         spatial_args = np.stack(actions[:,2], 0).astype(np.int64)
         minimaps, screens, hiddens, spatial_args = self.memory.batch_random_transform(minimaps, screens, hiddens, spatial_args)
 
-
         minimaps = torch.from_numpy(minimaps.copy()).float().to(self.device)
         screens = torch.from_numpy(screens.copy()).float().to(self.device)
         players = torch.from_numpy(np.stack(states[:,2], axis=0).squeeze(2)).float().to(self.device)
@@ -254,6 +253,142 @@ class BaseAgent(Agent):
         #print("%f %f %f %f %f %f, total: %f" % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t7-t1))
 
         return pol_loss, vf_loss, -ent_total
+
+    def train_step_sequential(self, batch_size):
+
+        t1 = time.time()
+
+        device = self.train_settings['device']
+        eps_denom = self.train_settings['eps_denom']
+        c1 = self.train_settings['c1']
+        c2 = self.train_settings['c2']
+        clip_param = self.train_settings['clip_param']
+
+        states, mini_batch = self.memory.sample_mini_batch(self.frame_count)
+        t2 = time.time()
+        n = len(mini_batch)
+        mini_batch = np.array(mini_batch).transpose()
+
+        actions = np.stack(np.array(mini_batch[0]), axis=0)
+        minimaps = states[0]
+        screens = states[1]
+        hiddens = states[4]
+        spatial_args = np.stack(actions[:,2], 0).astype(np.int64)
+        minimaps, screens, hiddens, spatial_args = self.memory.batch_random_transform(minimaps, screens, hiddens, spatial_args)
+
+        avail_actions = states[3]
+        old_hidden_states = hiddens[-(batch_size+1):-1]
+        prev_actions = states[5]
+        relevant_states = states[6]
+        hidden_states = hiddens[:batch_size]
+
+
+        base_actions = np.stack(actions[:,0], 0).astype(np.int64).squeeze(1)
+        args = np.stack(actions[:,1], 0).astype(np.int64)
+
+        rewards = np.array(list(mini_batch[1]))
+        dones = mini_batch[2]
+        v_returns = mini_batch[4].astype(np.float32)
+        advantages = mini_batch[5].astype(np.float32)
+
+        rewards = torch.from_numpy(rewards).float().to(self.device)
+        advantages = torch.from_numpy(advantages).float().to(self.device)
+        advantages = (advantages - advantages.mean()) / advantages.std()
+        v_returns = torch.from_numpy(v_returns).float().to(self.device)
+        dones = torch.from_numpy(dones.astype(np.uint8)).byte().to(self.device)
+        t3 = time.time()
+
+        # minimaps, screens, players, avail_actions, last_actions, hiddens, curr_actions, relevant_frames
+        action_probs, arg_probs, spatial_probs, _, values, _ = self.model.unroll_forward(
+            minimaps,
+            screens,
+            players,
+            avail_actions,
+            prev_actions,
+            hidden_states,
+            base_actions,
+            relevant_states
+        )
+
+        old_action_probs, old_arg_probs, old_spatial_probs, _, _, _ = self.target_model.unroll_forward(
+            minimaps[:,[-1]],
+            screens[:,[-1]],
+            players[:,[-1]],
+            avail_actions,
+            prev_actions[:,[-1]],
+            old_hidden_states,
+            base_actions,
+            relevant_states[:,[-1]]
+        )
+        t4 = time.time()
+
+        gathered_actions = action_probs[range(n), base_actions]
+        old_gathered_actions = old_action_probs[range(n), base_actions]
+
+        gathered_args, old_gathered_args = self.index_args(arg_probs, old_arg_probs, args)
+
+        gathered_spatial_args, old_gathered_spatial_args = self.index_spatial(spatial_probs,
+                                                                            old_spatial_probs,
+                                                                            spatial_args)
+
+        action_args = batch_get_action_args(base_actions)
+        """
+        numerator = torch.zeros((n,)).float().to(self.device)
+        denominator = torch.zeros((n,)).float().to(self.device)
+        entropy = torch.zeros((n,)).float().to(self.device)
+        """
+
+        numerator = torch.log(gathered_actions)
+        denominator = torch.log(old_gathered_actions + eps_denom)
+        entropy = self.entropy(gathered_actions)
+        num_args = torch.ones(n,).to(self.device)
+
+
+
+        for i in range(n):
+            curr_args = action_args[i]
+            for j in curr_args:
+                if is_spatial_arg(j):
+                    numerator[i] = numerator[i] + torch.log(gathered_spatial_args[i][j])
+                    denominator[i] = denominator[i] + torch.log(old_gathered_spatial_args[i][j] + eps_denom)
+                    entropy[i] = entropy[i] + torch.mean(self.entropy(gathered_spatial_args[i][j]))
+                else:
+                    numerator[i] = numerator[i] + torch.log(gathered_args[i][j-3])
+                    denominator[i] = denominator[i] + torch.log(old_gathered_args[i][j-3] + eps_denom)
+                    entropy[i] = entropy[i] + torch.mean(self.entropy(gathered_args[i][j-3]))
+            num_args[i] += len(curr_args)
+
+        denominator = denominator.detach()
+        t5 = time.time()
+
+        #print(numerator, denominator, num_args)
+
+        ratio = torch.exp((numerator - denominator) * (1 / num_args))
+        ratio_adv = ratio * advantages.detach()
+        bounded_adv = torch.clamp(ratio, 1-clip_param, 1+clip_param)
+        bounded_adv = bounded_adv * advantages.detach()
+
+        pol_avg = - ((torch.min(ratio_adv, bounded_adv)).mean())
+        value_loss = self.loss(values.squeeze(1), v_returns.detach())
+        ent = entropy.mean()
+        t6 = time.time()
+
+        total_loss = pol_avg + c1 * value_loss + c2 * ent
+        #total_loss = value_loss
+        #total_loss = ent
+        self.optimizer.zero_grad()
+        total_loss.backward()
+        #self.process_gradients(self.model)
+        clip_grad_norm_(self.model.parameters(), 30.0)
+        self.optimizer.step()
+        t7 = time.time()
+        pol_loss = pol_avg.detach().item()
+        vf_loss = value_loss.detach().item()
+        ent_total = ent.detach().item()
+        #print("%f %f %f %f %f %f, total: %f" % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t7-t1))
+
+        return pol_loss, vf_loss, -ent_total
+
 
 
 
