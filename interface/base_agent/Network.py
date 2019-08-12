@@ -89,6 +89,50 @@ class BaseNetwork(nn.Module, Model):
         return action_logits, arg_logits, spatial_logits, _, values, _
 
 
+    def unroll_forward_sequential(self, minimaps, screens, players, avail_actions, last_actions, hiddens, curr_actions, relevant_frames, batch_size=32):
+        t1 = time.time()
+        N = minimaps.shape[0]
+        hist_size = N - batch_size
+        processed_minimaps, processed_screens = self.process_states(minimaps, screens)
+        hiddens = hiddens[:batch_size]
+        for i in range(hist_size-1):
+            hiddens = self.forward(processed_minimaps[i:i+batch_size],
+                                        processed_screens[i:i+batch_size],
+                                        players[i:i+batch_size],
+                                        None,
+                                        last_actions[i:i+batch_size],
+                                        hiddens,
+                                        curr_action=None,
+                                        unrolling=True,
+                                        process_inputs=False
+                                        )
+            irrelevant_mask = relevant_frames[i:i+batch_size] == 0
+            hiddens[irrelevant_mask] = self.init_hidden(batch_size=torch.sum(irrelevant_mask), device=self.device)
+
+        t2 = time.time()
+        action_logits, arg_logits, spatial_logits, _, values, _ = self.forward(
+                                                                                processed_minimaps[-batch_size:],
+                                                                                processed_screens[-batch_size:],
+                                                                                players[-batch_size:],
+                                                                                avail_actions[-batch_size:],
+                                                                                last_actions[-batch_size:],
+                                                                                hiddens,
+                                                                                curr_action=actions[-batch_size:]
+                                                                            )
+        t3 = time.time()
+        #print("Unroll time: %f. Regular forward time: %f. Total: %f" % (t2-t1, t3-t2, t3-t1))
+        return action_logits, arg_logits, spatial_logits, _, values, _
+
+    def process_states(self, minimaps, screens):
+
+        [minimap, screen] = self.embed_inputs(inputs, self.net_config)
+        [minimap, screen] = [minimap.to(self.device), screen.to(self.device)]
+
+        processed_minimap = self.down_layers_minimap(minimap)
+        processed_screen = self.down_layers_screen(screen)
+
+        return processed_minimap, processed_screen
+
     def init_hidden(self, batch_size=1, use_torch=True, device="cuda:0"):
         return self.convLSTM.init_hidden_state(batch_size=batch_size, use_torch=use_torch, device=device)
 

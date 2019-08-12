@@ -125,7 +125,7 @@ class RRLModel(BaseNetwork):
 
         D is a placeholder for feature dimensions.
     """
-    def forward(self, minimap, screen, player, avail_actions, last_action, hidden, curr_action=None, choosing=False, unrolling=False):
+    def forward(self, minimap, screen, player, avail_actions, last_action, hidden, curr_action=None, choosing=False, unrolling=False, process_inputs=True):
         if (choosing):
             assert (curr_action is None)
         if (not choosing and not unrolling):
@@ -143,12 +143,17 @@ class RRLModel(BaseNetwork):
 
         t1 = time.time()
         inputs = [minimap, screen]
-        [minimap, screen] = self.embed_inputs(inputs, self.net_config)
-        [minimap, screen] = [minimap.to(self.device), screen.to(self.device)]
-        t2 = time.time()
-        processed_minimap = self.down_layers_minimap(minimap)
-        processed_screen = self.down_layers_screen(screen)
+
+        if process_inputs:
+            [minimap, screen] = self.embed_inputs(inputs, self.net_config)
+            [minimap, screen] = [minimap.to(self.device), screen.to(self.device)]
+
+            processed_minimap = self.down_layers_minimap(minimap)
+            processed_screen = self.down_layers_screen(screen)
+            
         curr_coordinates = self.coordinates.expand((N,) + self.coordinates.shape[1:])
+
+        t2 = time.time()
 
         inputs3d = torch.cat([processed_minimap, processed_screen, curr_coordinates], dim=1)
         t3 = time.time()

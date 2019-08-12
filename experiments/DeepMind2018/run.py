@@ -5,7 +5,7 @@ from base_agent.custom_env import FullStateActionEnvironment
 from RRLNetwork import RRLModel
 from base_agent.base_agent import BaseAgent
 from abstract_core import Experiment, RunSettings
-from base_agent.memory import ReplayMemory
+from base_agent.memory import ReplayMemory, SequentialMemory
 from agent import AgentSettings
 from base_agent.sc2env_utils import env_config
 import torch
@@ -62,7 +62,7 @@ def main():
     num_episodes = 10000000
     num_epochs = 2
     batch_size = 32
-    train_every = 1024
+    train_every = 256
     save_every = 10240
     graph_every = 50
     averaging_window = 100
@@ -88,7 +88,7 @@ def main():
                                 graph_every,
                                 averaging_window)
 
-    memory = ReplayMemory(train_every, batch_size, hist_size=history_size)
+    memory = SequentialMemory(train_every, batch_size, hist_size=history_size)
 
     train_settings = {
         "discount_factor": 0.99,

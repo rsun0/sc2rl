@@ -7,7 +7,7 @@ from base_agent.sc2env_utils import env_config
 import matplotlib.pyplot as plt
 
 
-device = torch.cuda.is_available()
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 class SequentialMemory(object):
     def __init__(self, mem_cap, batch_size, hist_size=1, hidden_shape=(96,8,8)):
@@ -15,7 +15,7 @@ class SequentialMemory(object):
         self.screens = torch.zeros((mem_cap,) + env_config["screen_shape"]).float().to(device)
         self.players = torch.zeros((mem_cap,) + (env_config["raw_player"],)).float().to(device)
         self.available = torch.zeros((mem_cap,) + (env_config["action_space"],)).float().to(device)
-        self.hiddens = torch.zeros((mem_cap,) + hidden_shape).float().to(device)
+        self.hiddens = torch.zeros((mem_cap, 2) + hidden_shape).float().to(device)
 
         self.memory = deque(maxlen=mem_cap)
         self.access_num = 0
@@ -34,7 +34,7 @@ class SequentialMemory(object):
         self.players[self.push_index] = torch.from_numpy(player).to(device)
         self.available[self.push_index] = torch.from_numpy(avail).to(device)
         self.hiddens[self.push_index] = torch.from_numpy(hidden).to(device)
-        self.memory.append([action, reward, done, vtag, ret, adv, step])
+        self.memory.append([action, reward, done, vtarg, ret, adv, step])
         self.push_index = (self.push_index + 1) % self.memory_capacity
 
     def update_indices(self):
@@ -45,7 +45,7 @@ class SequentialMemory(object):
     def __len__(self):
         return len(self.indices)
 
-    def sample_mini_batch(self, frame, hist_size=self.history_size):
+    def sample_mini_batch(self, frame, hist_size=1):
 
         index = self.indices[frame]
         upper = index + self.batch_size + hist_size

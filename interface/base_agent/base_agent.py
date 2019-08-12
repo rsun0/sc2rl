@@ -90,7 +90,7 @@ class BaseAgent(Agent):
 
             for j in range(num_iters):
 
-                d_pol, d_vf, d_ent = self.train_step(batch_size)
+                d_pol, d_vf, d_ent = self.train_step_sequential(batch_size)
                 if (math.isnan(d_pol) or math.isnan(d_vf) or math.isnan(d_ent)):
                     print("Canceling training -- NaN's encountered")
                     print("Reloading model from previous save")
@@ -264,7 +264,7 @@ class BaseAgent(Agent):
         c2 = self.train_settings['c2']
         clip_param = self.train_settings['clip_param']
 
-        states, mini_batch = self.memory.sample_mini_batch(self.frame_count)
+        states, mini_batch = self.memory.sample_mini_batch(self.frame_count, self.train_settings["hist_size"])
         t2 = time.time()
         n = len(mini_batch)
         mini_batch = np.array(mini_batch).transpose()
@@ -299,7 +299,7 @@ class BaseAgent(Agent):
         t3 = time.time()
 
         # minimaps, screens, players, avail_actions, last_actions, hiddens, curr_actions, relevant_frames
-        action_probs, arg_probs, spatial_probs, _, values, _ = self.model.unroll_forward(
+        action_probs, arg_probs, spatial_probs, _, values, _ = self.model.unroll_forward_sequential(
             minimaps,
             screens,
             players,
@@ -310,7 +310,7 @@ class BaseAgent(Agent):
             relevant_states
         )
 
-        old_action_probs, old_arg_probs, old_spatial_probs, _, _, _ = self.target_model.unroll_forward(
+        old_action_probs, old_arg_probs, old_spatial_probs, _, _, _ = self.target_model.unroll_forward_sequential(
             minimaps[:,[-1]],
             screens[:,[-1]],
             players[:,[-1]],
