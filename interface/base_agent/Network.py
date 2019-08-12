@@ -117,7 +117,8 @@ class BaseNetwork(nn.Module, Model):
                                                                                 avail_actions[-batch_size:],
                                                                                 last_actions[-batch_size:],
                                                                                 hiddens,
-                                                                                curr_action=actions[-batch_size:]
+                                                                                curr_action=curr_actions[-batch_size:],
+                                                                                process_inputs=False
                                                                             )
         t3 = time.time()
         #print("Unroll time: %f. Regular forward time: %f. Total: %f" % (t2-t1, t3-t2, t3-t1))
@@ -125,6 +126,7 @@ class BaseNetwork(nn.Module, Model):
 
     def process_states(self, minimaps, screens):
 
+        inputs = [minimaps, screens]
         [minimap, screen] = self.embed_inputs(inputs, self.net_config)
         [minimap, screen] = [minimap.to(self.device), screen.to(self.device)]
 

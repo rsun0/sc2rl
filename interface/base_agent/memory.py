@@ -43,10 +43,11 @@ class SequentialMemory(object):
         random.shuffle(self.indices)
 
     def __len__(self):
-        return len(self.indices)
+        return self.memory_capacity
 
     def sample_mini_batch(self, frame, hist_size=1):
 
+        frame = min(self.access_num, len(self.indices)-1)
         index = self.indices[frame]
         upper = index + self.batch_size + hist_size
         idx_sample = range(index, upper)
@@ -63,28 +64,29 @@ class SequentialMemory(object):
 
         for i in idx_sample:
 
-            row = self.memory[i]
+            row = copy.deepcopy(self.memory[i])
             prev_action = self.memory[i-1][0][0]
 
             prev_action_sample.append(prev_action)
             if (row[2]):
-                relevant_frame.append(1)
-            else:
                 relevant_frame.append(0)
+            else:
+                relevant_frame.append(1)
 
+            row[0][0] = np.array([row[0][0]])
             row[0] = np.array(row[0])
             #state, action, _, _, _, _, _, _ = row
             #print(state[0].shape, state[1].shape, state[2].shape)
             mini_batch.append(row)
 
-        prev_action_sample = np.array([prev_action_sample])
-        relevant_frame = np.array(relevant_frame)
+        prev_action_sample = torch.from_numpy(np.array(prev_action_sample)).to(device)
+        relevant_frame = torch.from_numpy(np.array(relevant_frame)).to(device)
 
         self.access_num = (self.access_num + 1) % self.reset_num
         if (self.access_num == 0):
             self.update_indices()
 
-        states = np.array([minimap, screen, player, avail, hidden, prev_action_sample, relevant_frame])
+        states = [minimap, screen, player, avail, hidden, prev_action_sample, relevant_frame]
         mini_batch = np.array(mini_batch)
 
         return states, mini_batch
@@ -114,34 +116,35 @@ class SequentialMemory(object):
         spatial_args = action
         new_spatial_action = np.copy(spatial_args)
         spatial_w = env_config["spatial_action_size"]
+        num_dims = len(minimap.shape) - 1
 
         #transform = np.random.randint(0,8)
 
         # Rotations
         if transform >= 2 and transform < 4:
-            minimap = np.rot90(minimap, k=1, axes=(-2,-1))
-            screen = np.rot90(screen, k=1, axes=(-2,-1))
-            hidden = np.rot90(hidden, k=1, axes=(-2,-1))
+            minimap = minimap.transpose(-2,-1).flip(num_dims-1)
+            screen = screen.transpose(-2,-1).flip(num_dims-1)
+            hidden = hidden.transpose(-2,-1).flip(num_dims-1)
             new_spatial_action[:,0] = (spatial_w - 1) - spatial_args[:,1]
             new_spatial_action[:,1] = spatial_args[:,0]
         if transform >= 4 and transform < 6:
-            minimap = np.rot90(minimap, k=2, axes=(-2,-1))
-            screen = np.rot90(screen, k=2, axes=(-2,-1))
-            hidden = np.rot90(hidden, k=2, axes=(-2,-1))
+            minimap = minimap.flip(num_dims-1, num_dims)
+            screen = screen.flip(num_dims-1, num_dims)
+            hidden = hidden.flip(num_dims-1, num_dims)
             new_spatial_action[:,0] = (spatial_w - 1) - spatial_args[:,0]
             new_spatial_action[:,1] = (spatial_w - 1) - spatial_args[:,1]
         elif transform >= 6 and transform < 8:
-            minimap = np.rot90(minimap, k=3, axes=(-2,-1))
-            screen = np.rot90(screen, k=3, axes=(-2,-1))
-            hidden = np.rot90(hidden, k=3, axes=(-2,-1))
+            minimap = minimap.transpose(-2,-1).flip(num_dims)
+            screen = screen.transpose(-2,-1).flip(num_dims)
+            hidden = hidden.transpose(-2,-1).flip(num_dims)
             new_spatial_action[:,0] = spatial_args[:,1]
             new_spatial_action[:,1] = (spatial_w - 1) - spatial_args[:,0]
 
         # Reflection
         if transform % 2 == 1:
-            minimap = np.flip(minimap, -1)
-            screen = np.flip(screen, -1)
-            hidden = np.flip(hidden, -1)
+            minimap = minimap.flip(num_dims)
+            screen = screen.flip(num_dims)
+            hidden = hidden.flip(num_dims)
             new_spatial_action[:,1] = (spatial_w - 1) - new_spatial_action[:,1]
 
         action = new_spatial_action

@@ -272,16 +272,16 @@ class BaseAgent(Agent):
         actions = np.stack(np.array(mini_batch[0]), axis=0)
         minimaps = states[0]
         screens = states[1]
+        players = states[2]
         hiddens = states[4]
         spatial_args = np.stack(actions[:,2], 0).astype(np.int64)
         minimaps, screens, hiddens, spatial_args = self.memory.batch_random_transform(minimaps, screens, hiddens, spatial_args)
 
-        avail_actions = states[3]
-        old_hidden_states = hiddens[-(batch_size+1):-1]
+        avail_actions = states[3].byte()
+        old_hidden_states = hiddens[-batch_size:]
         prev_actions = states[5]
-        relevant_states = states[6]
+        relevant_states = states[6].byte()
         hidden_states = hiddens[:batch_size]
-
 
         base_actions = np.stack(actions[:,0], 0).astype(np.int64).squeeze(1)
         args = np.stack(actions[:,1], 0).astype(np.int64)
@@ -311,19 +311,22 @@ class BaseAgent(Agent):
         )
 
         old_action_probs, old_arg_probs, old_spatial_probs, _, _, _ = self.target_model.unroll_forward_sequential(
-            minimaps[:,[-1]],
-            screens[:,[-1]],
-            players[:,[-1]],
-            avail_actions,
-            prev_actions[:,[-1]],
+            minimaps[-batch_size:],
+            screens[-batch_size:],
+            players[-batch_size:],
+            avail_actions[-batch_size:],
+            prev_actions[-batch_size:],
             old_hidden_states,
-            base_actions,
-            relevant_states[:,[-1]]
+            base_actions[-batch_size:],
+            relevant_states[-batch_size:]
         )
         t4 = time.time()
 
-        gathered_actions = action_probs[range(n), base_actions]
-        old_gathered_actions = old_action_probs[range(n), base_actions]
+        gathered_actions = action_probs[range(batch_size), base_actions[-batch_size:]]
+        old_gathered_actions = old_action_probs[range(batch_size), base_actions[-batch_size:]]
+
+        args = args[-batch_size:]
+        spatial_args = spatial_args[-batch_size:]
 
         gathered_args, old_gathered_args = self.index_args(arg_probs, old_arg_probs, args)
 
@@ -331,7 +334,7 @@ class BaseAgent(Agent):
                                                                             old_spatial_probs,
                                                                             spatial_args)
 
-        action_args = batch_get_action_args(base_actions)
+        action_args = batch_get_action_args(base_actions[-batch_size:])
         """
         numerator = torch.zeros((n,)).float().to(self.device)
         denominator = torch.zeros((n,)).float().to(self.device)
@@ -341,11 +344,11 @@ class BaseAgent(Agent):
         numerator = torch.log(gathered_actions)
         denominator = torch.log(old_gathered_actions + eps_denom)
         entropy = self.entropy(gathered_actions)
-        num_args = torch.ones(n,).to(self.device)
+        num_args = torch.ones(batch_size,).to(self.device)
 
 
 
-        for i in range(n):
+        for i in range(batch_size):
             curr_args = action_args[i]
             for j in curr_args:
                 if is_spatial_arg(j):
@@ -364,12 +367,12 @@ class BaseAgent(Agent):
         #print(numerator, denominator, num_args)
 
         ratio = torch.exp((numerator - denominator) * (1 / num_args))
-        ratio_adv = ratio * advantages.detach()
+        ratio_adv = ratio * advantages.detach()[-batch_size:]
         bounded_adv = torch.clamp(ratio, 1-clip_param, 1+clip_param)
-        bounded_adv = bounded_adv * advantages.detach()
+        bounded_adv = bounded_adv * advantages.detach()[-batch_size:]
 
         pol_avg = - ((torch.min(ratio_adv, bounded_adv)).mean())
-        value_loss = self.loss(values.squeeze(1), v_returns.detach())
+        value_loss = self.loss(values.squeeze(1), v_returns[-batch_size:].detach())
         ent = entropy.mean()
         t6 = time.time()
 

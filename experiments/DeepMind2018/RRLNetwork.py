@@ -150,7 +150,10 @@ class RRLModel(BaseNetwork):
 
             processed_minimap = self.down_layers_minimap(minimap)
             processed_screen = self.down_layers_screen(screen)
-            
+        else:
+            processed_minimap = minimap
+            processed_screen = screen
+
         curr_coordinates = self.coordinates.expand((N,) + self.coordinates.shape[1:])
 
         t2 = time.time()
@@ -173,7 +176,6 @@ class RRLModel(BaseNetwork):
         relational_spatial = self.attention_blocks(outputs2d)
         relational_nonspatial = self.relational_processor(relational_spatial)
         t6 = time.time()
-
         shared_features = torch.cat([inputs2d, relational_nonspatial], dim=-1)
         value = self.value_MLP(shared_features)
         action_logits_in = self.action_MLP(shared_features)

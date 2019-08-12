@@ -60,9 +60,9 @@ def main():
 
 
     num_episodes = 10000000
-    num_epochs = 2
+    num_epochs = 3
     batch_size = 32
-    train_every = 256
+    train_every = 1024
     save_every = 10240
     graph_every = 50
     averaging_window = 100
@@ -105,7 +105,7 @@ def main():
     }
 
     agent = BaseAgent(model, agent_settings, memory, train_settings)
-    agent.load()
+    #agent.load()
     experiment = Experiment([agent], env, run_settings)
 
     experiment.train()
