@@ -297,6 +297,7 @@ class BaseAgent(Agent):
         v_returns = torch.from_numpy(v_returns).float().to(self.device)
         dones = torch.from_numpy(dones.astype(np.uint8)).byte().to(self.device)
         t3 = time.time()
+        base_actions = torch.from_numpy(base_actions).to(self.device)
 
         # minimaps, screens, players, avail_actions, last_actions, hiddens, curr_actions, relevant_frames
         action_probs, arg_probs, spatial_probs, _, values, _ = self.model.unroll_forward_sequential(
@@ -382,7 +383,7 @@ class BaseAgent(Agent):
         self.optimizer.zero_grad()
         total_loss.backward()
         #self.process_gradients(self.model)
-        clip_grad_norm_(self.model.parameters(), 30.0)
+        clip_grad_norm_(self.model.parameters(), 100.0)
         self.optimizer.step()
         t7 = time.time()
         pol_loss = pol_avg.detach().item()

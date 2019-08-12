@@ -64,6 +64,7 @@ class BaseNetwork(nn.Module, Model):
         t1 = time.time()
         hist_size = minimaps.shape[1]
         for i in range(hist_size-1):
+            t5 = time.time()
             hiddens = self.forward(minimaps[:,i],
                                         screens[:,i],
                                         players[:,i],
@@ -72,8 +73,11 @@ class BaseNetwork(nn.Module, Model):
                                         hiddens,
                                         curr_action=None,
                                         unrolling=True)
+            t6 = time.time()
             irrelevant_mask = relevant_frames[:,i] == 0
             hiddens[irrelevant_mask] = self.init_hidden(batch_size=torch.sum(irrelevant_mask), device=self.device)
+            t7 = time.time()
+
         t2 = time.time()
         action_logits, arg_logits, spatial_logits, _, values, _ = self.forward(
                                                                                 minimaps[:,-1],
@@ -93,9 +97,11 @@ class BaseNetwork(nn.Module, Model):
         t1 = time.time()
         N = minimaps.shape[0]
         hist_size = N - batch_size
-        processed_minimaps, processed_screens = self.process_states(minimaps, screens)
+        processed_minimaps, processed_screens, inputs2d = self.process_states(minimaps, screens, players, last_actions)
         hiddens = hiddens[:batch_size]
+        t2 = time.time()
         for i in range(hist_size-1):
+            t5 = time.time()
             hiddens = self.forward(processed_minimaps[i:i+batch_size],
                                         processed_screens[i:i+batch_size],
                                         players[i:i+batch_size],
@@ -104,12 +110,20 @@ class BaseNetwork(nn.Module, Model):
                                         hiddens,
                                         curr_action=None,
                                         unrolling=True,
-                                        process_inputs=False
+                                        process_inputs=False,
+                                        inputs2d=inputs2d[i:i+batch_size]
                                         )
+            t6 = time.time()
+            
             irrelevant_mask = relevant_frames[i:i+batch_size] == 0
+            t7 = time.time()
+            #print(irrelevant_mask)
             hiddens[irrelevant_mask] = self.init_hidden(batch_size=torch.sum(irrelevant_mask), device=self.device)
+            t8 = time.time()
 
-        t2 = time.time()
+            #print("forward: %f" % (t6-t5))
+
+        t3 = time.time()
         action_logits, arg_logits, spatial_logits, _, values, _ = self.forward(
                                                                                 processed_minimaps[-batch_size:],
                                                                                 processed_screens[-batch_size:],
@@ -118,13 +132,14 @@ class BaseNetwork(nn.Module, Model):
                                                                                 last_actions[-batch_size:],
                                                                                 hiddens,
                                                                                 curr_action=curr_actions[-batch_size:],
-                                                                                process_inputs=False
+                                                                                process_inputs=False,
+                                                                                inputs2d=inputs2d[-batch_size:]
                                                                             )
-        t3 = time.time()
-        #print("Unroll time: %f. Regular forward time: %f. Total: %f" % (t2-t1, t3-t2, t3-t1))
+        t4 = time.time()
+        #print("Preprocess time: %f. Unroll time: %f. Regular forward time: %f. Total: %f" % (t2-t1, t3-t2, t4-t3, t4-t1))
         return action_logits, arg_logits, spatial_logits, _, values, _
 
-    def process_states(self, minimaps, screens):
+    def process_states(self, minimaps, screens, players, last_actions):
 
         inputs = [minimaps, screens]
         [minimap, screen] = self.embed_inputs(inputs, self.net_config)
@@ -133,7 +148,11 @@ class BaseNetwork(nn.Module, Model):
         processed_minimap = self.down_layers_minimap(minimap)
         processed_screen = self.down_layers_screen(screen)
 
-        return processed_minimap, processed_screen
+        embedded_last_actions = self.action_embedding(last_actions).to(self.device)
+        nonspatial_concat = torch.cat([players, embedded_last_actions], dim=-1)
+        inputs2d = self.inputs2d_MLP(nonspatial_concat)
+
+        return processed_minimap, processed_screen, inputs2d
 
     def init_hidden(self, batch_size=1, use_torch=True, device="cuda:0"):
         return self.convLSTM.init_hidden_state(batch_size=batch_size, use_torch=use_torch, device=device)

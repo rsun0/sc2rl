@@ -29,8 +29,8 @@ class RRLModel(BaseNetwork):
             env_config["minimap_categorical_indices"],
             env_config["screen_categorical_indices"]
         ]
-        self.action_embedding = FastEmbedding(env_config["action_space"], net_config["action_embedding_size"]).to(self.device)
-
+        #self.action_embedding = FastEmbedding(env_config["action_space"], net_config["action_embedding_size"]).to(self.device)
+        self.action_embedding = nn.Embedding(env_config["action_space"], net_config["action_embedding_size"]).to(self.device)
         self.down_layers_minimap = Downsampler(self.minimap_features, net_config)
         self.down_layers_screen = Downsampler(self.screen_features, net_config)
 
@@ -125,7 +125,7 @@ class RRLModel(BaseNetwork):
 
         D is a placeholder for feature dimensions.
     """
-    def forward(self, minimap, screen, player, avail_actions, last_action, hidden, curr_action=None, choosing=False, unrolling=False, process_inputs=True):
+    def forward(self, minimap, screen, player, avail_actions, last_action, hidden, curr_action=None, choosing=False, unrolling=False, process_inputs=True, inputs2d=None):
         if (choosing):
             assert (curr_action is None)
         if (not choosing and not unrolling):
@@ -160,9 +160,11 @@ class RRLModel(BaseNetwork):
 
         inputs3d = torch.cat([processed_minimap, processed_screen, curr_coordinates], dim=1)
         t3 = time.time()
-        embedded_last_action = self.action_embedding(last_action).to(self.device)
-        nonspatial_concat = torch.cat([player, embedded_last_action], dim=-1)
-        inputs2d = self.inputs2d_MLP(nonspatial_concat)
+        if process_inputs:
+            embedded_last_action = self.action_embedding(last_action).to(self.device)
+            nonspatial_concat = torch.cat([player, embedded_last_action], dim=-1)
+            inputs2d = self.inputs2d_MLP(nonspatial_concat)
+
         t4 = time.time()
 
         expanded_inputs2d = inputs2d.unsqueeze(2).unsqueeze(3).expand(inputs2d.shape + (self.net_config["inputs3d_width"], self.net_config["inputs3d_width"]))
@@ -182,16 +184,17 @@ class RRLModel(BaseNetwork):
         action_logits_in = action_logits_in.masked_fill(1-avail_actions, float('-inf'))
         action_logits = F.softmax(action_logits_in)
         #action_logits = action_logits / torch.sum(action_logits, axis=-1)
-
         choice = None
         if (choosing):
             action = self.sample_action(action_logits)
             processed_action = torch.from_numpy(np.array(action)).unsqueeze(0).long().to(self.device)
         else:
             action = curr_action
-            processed_action = torch.from_numpy(action).long().to(self.device)
+            processed_action = action
+            #processed_action = torch.from_numpy(action).long().to(self.device)
 
         embedded_action = self.action_embedding(processed_action)
+        t7 = time.time()
         shared_conditioned = torch.cat([shared_features, embedded_action], dim=-1)
         arg_logit_inputs = self.arg_MLP(shared_conditioned)
         arg_logit_inputs = arg_logit_inputs.reshape((N, self.arg_depth, self.arg_size))
@@ -214,9 +217,9 @@ class RRLModel(BaseNetwork):
             spatial = self.sample_spatial(spatial_logits, action)
 
         choice = [action, args, spatial]
-        t7 = time.time()
+        t8 = time.time()
 
-        #print("full forward times\n embedding: %f, down layers: %f, inputs2dmlp: %f, lstm: %f. relational: %f. Selection: %f. Total: %f" % (t2-t1,t3-t2,t4-t3,t5-t4, t6-t5, t7-t6,t7-t1))
+        #print("full forward times\n embedding: %f, down layers: %f, inputs2dmlp: %f, lstm: %f. relational: %f. value: %f. Selection: %f. Total: %f" % (t2-t1,t3-t2,t4-t3,t5-t4, t6-t5, t7-t6, t8-t7, t8-t1))
 
 
         return action_logits, arg_logits, spatial_logits, hidden, value, choice

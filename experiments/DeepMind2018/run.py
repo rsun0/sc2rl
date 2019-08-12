@@ -17,7 +17,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 def main():
 
-    map_name = "DefeatRoaches"
+    map_name = "DefeatZerglingsAndBanelings"
     render = False
     step_mul = 8
 
@@ -42,7 +42,7 @@ def main():
         "inputs3d_width": 8,
         "relational_features": 32,
         "relational_depth": 3,
-        "relational_heads": 3,
+        "relational_heads": 1,
         "spatial_out_depth": 64,
         "channels3": 16,
         "device": device
@@ -56,7 +56,7 @@ def main():
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=1e5
-    history_size=20
+    history_size=50
 
 
     num_episodes = 10000000
