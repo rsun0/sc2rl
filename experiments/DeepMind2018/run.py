@@ -18,7 +18,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 def main():
 
     map_name = "DefeatZerglingsAndBanelings"
-    render = False
+    render = True
     step_mul = 8
 
 
@@ -56,7 +56,7 @@ def main():
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=1e5
-    history_size=50
+    history_size=20
 
 
     num_episodes = 10000000
@@ -98,14 +98,14 @@ def main():
         "eps_denom": 1e-8,
         "c1": 0.1,
         "c2": 0.1,
-        "c3": 0.01,
-        "c4": 0.01,
+        "c3": 0.1,
+        "c4": 0.1,
         "clip_param": 0.1,
         "map": map_name
     }
 
     agent = BaseAgent(model, agent_settings, memory, train_settings)
-    #agent.load()
+    agent.load()
     experiment = Experiment([agent], env, run_settings)
 
     experiment.train()

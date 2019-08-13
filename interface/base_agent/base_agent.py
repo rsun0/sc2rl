@@ -262,6 +262,8 @@ class BaseAgent(Agent):
         eps_denom = self.train_settings['eps_denom']
         c1 = self.train_settings['c1']
         c2 = self.train_settings['c2']
+        c3 = self.train_settings['c3']
+        c4 = self.train_settings['c4']
         clip_param = self.train_settings['clip_param']
 
         states, mini_batch = self.memory.sample_mini_batch(self.frame_count, self.train_settings["hist_size"])
@@ -355,11 +357,11 @@ class BaseAgent(Agent):
                 if is_spatial_arg(j):
                     numerator[i] = numerator[i] + torch.log(gathered_spatial_args[i][j])
                     denominator[i] = denominator[i] + torch.log(old_gathered_spatial_args[i][j] + eps_denom)
-                    entropy[i] = entropy[i] + torch.mean(self.entropy(gathered_spatial_args[i][j]))
+                    entropy[i] = entropy[i] + c3 * torch.mean(self.entropy(gathered_spatial_args[i][j]))
                 else:
                     numerator[i] = numerator[i] + torch.log(gathered_args[i][j-3])
                     denominator[i] = denominator[i] + torch.log(old_gathered_args[i][j-3] + eps_denom)
-                    entropy[i] = entropy[i] + torch.mean(self.entropy(gathered_args[i][j-3]))
+                    entropy[i] = entropy[i] + c4 * torch.mean(self.entropy(gathered_args[i][j-3]))
             num_args[i] += len(curr_args)
 
         denominator = denominator.detach()
