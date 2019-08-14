@@ -264,7 +264,8 @@ class BaseAgent(Agent):
         c2 = self.train_settings['c2']
         c3 = self.train_settings['c3']
         c4 = self.train_settings['c4']
-        clip_param = self.train_settings['clip_param']
+        clip, clip_min, clip_decay = self.train_settings['clip_param'], self.train_settings['min_clip_param'], self.train_settings['clip_decay']
+        clip_param = max(clip - (clip - clip_min) * (self.epochs_trained / clip_decay), clip_min)
 
         states, mini_batch = self.memory.sample_mini_batch(self.frame_count, self.train_settings["hist_size"])
         t2 = time.time()
