@@ -60,7 +60,7 @@ def main():
 
 
     num_episodes = 10000000
-    num_epochs = 3
+    num_epochs = 2
     batch_size = 32
     train_every = 1024
     save_every = 10240
@@ -95,12 +95,12 @@ def main():
         "lambda": 0.95,
         "hist_size": history_size,
         "device": device,
-        "eps_denom": 1e-8,
+        "eps_denom": 1e-7,
         "c1": 0.1,
-        "c2": 0.01,
-        "c3": 1.0,
-        "c4": 1.0,
-        "clip_param": 0.1,
+        "c2": 0.1,
+        "c3": 0.3,
+        "c4": 0.3,
+        "clip_param": 0.05,
         "min_clip_param": 0.01,
         "clip_decay": 10000,
         "map": map_name

@@ -296,7 +296,7 @@ class BaseAgent(Agent):
 
         rewards = torch.from_numpy(rewards).float().to(self.device)
         advantages = torch.from_numpy(advantages).float().to(self.device)
-        advantages = (advantages - advantages.mean()) / advantages.std()
+        #advantages = (advantages - advantages.mean()) / advantages.std()
         v_returns = torch.from_numpy(v_returns).float().to(self.device)
         dones = torch.from_numpy(dones.astype(np.uint8)).byte().to(self.device)
         t3 = time.time()
@@ -370,7 +370,8 @@ class BaseAgent(Agent):
 
         #print(numerator, denominator, num_args)
 
-        ratio = torch.exp((numerator - denominator) * (1 / num_args))
+        #ratio = torch.exp((numerator - denominator) * (1 / num_args))
+        ratio = torch.exp(numerator - denominator)
         ratio_adv = ratio * advantages.detach()[-batch_size:]
         bounded_adv = torch.clamp(ratio, 1-clip_param, 1+clip_param)
         bounded_adv = bounded_adv * advantages.detach()[-batch_size:]
@@ -463,8 +464,12 @@ class BaseAgent(Agent):
 
     def process_gradients(self, network, clip=1.0):
         grad_sum = 0
+        max_param = -np.inf
+        min_param = np.inf
         for param in network.parameters():
+            print(torch.max(param), torch.min(param))
             if param.grad is None:
                 continue
             grad_sum += torch.sum(param.grad.data ** 2)
+        print(max_param, min_param)
         print(grad_sum)
