@@ -388,11 +388,13 @@ class BaseAgent(Agent):
         self.optimizer.zero_grad()
         total_loss.backward()
         #self.process_gradients(self.model)
+        """
         print("actions: ", torch.max(gathered_actions).item(), torch.min(gathered_actions).item())
         print("args: ", torch.max(gathered_args).item(), torch.min(gathered_args).item())
         print("spatial args: ", torch.max(gathered_spatial_args).item(), torch.min(gathered_spatial_args).item())
         print("ratio: ", torch.max(ratio).item(), torch.min(ratio).item())
         print()
+        """
         self.process_network(self.model)
         clip_grad_norm_(self.model.parameters(), 100.0)
         self.optimizer.step()
@@ -482,11 +484,11 @@ class BaseAgent(Agent):
         nan_denom = 0.
         grad_nan_denom = 0.
         for param in network.parameters():
-            nan_sum += torch.sum(torch.isnan(param))
-            grad_nan_sum += torch.sum(torch.isnan(param.grad.data))
-            nan_denom += param.numel()
-            grad_nan_denom += param.numel()
-        print(nan_sum / nan_denom, grad_nan_sum / grad_nan_denom)
-        if (nan_sum > 0 or grad_nan_sum > 0):
-            self.save()
-            sys.exit(0)
+            nan_mask = torch.isnan(param)
+            grad_nan_mask = torch.isnan(param.grad.data)
+            if (torch.sum(nan_mask) > 0):
+                print("Resetting parameters -- NaN encountered")
+                param[nan_mask] = 0.0
+            if (torch.sum(grad_nan_mask) > 0):
+                print("Resetting gradients -- NaN encountered")
+                param.grad.data[grad_nan_mask] = 0

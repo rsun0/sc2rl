@@ -98,7 +98,7 @@ def main():
         "eps_denom": 1e-8,
         "c1": 0.1,
         "c2": 0.1,
-        "c3": 0.01,
+        "c3": 0.1,
         "c4": 0.1,
         "clip_param": 0.1,
         "min_clip_param": 0.01,
