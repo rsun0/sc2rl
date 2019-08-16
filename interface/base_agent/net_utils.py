@@ -199,7 +199,7 @@ class Downsampler(nn.Module):
                 kernel_size=(4,4),
                 stride=2,
                 padding=1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
 
             ResnetBlock(net_config['down_conv_features'],
                             net_config['relational_depth']),
@@ -213,7 +213,7 @@ class Downsampler(nn.Module):
                 kernel_size=(4,4),
                 stride=2,
                 padding=1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
 
             ResnetBlock(2*net_config['down_conv_features'],
                             net_config['relational_depth']),
@@ -227,7 +227,7 @@ class Downsampler(nn.Module):
                 kernel_size=(4,4),
                 stride=2,
                 padding=1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
 
             ResnetBlock(4*net_config['down_conv_features'],
                             net_config['relational_depth']),
@@ -252,7 +252,7 @@ class SpatialUpsampler(nn.Module):
                 stride=2,
                 padding=1
             ),
-            nn.ReLU()
+            nn.LeakyReLU()
         )
 
         self.tconv2 = nn.Sequential(
@@ -263,7 +263,7 @@ class SpatialUpsampler(nn.Module):
                 stride=2,
                 padding=1
             ),
-            nn.ReLU()
+            nn.LeakyReLU()
         )
 
         self.conv_out = nn.Sequential(
@@ -272,8 +272,7 @@ class SpatialUpsampler(nn.Module):
                                         kernel_size=1,
                                         stride=1,
                                         padding=0
-            ),
-            nn.ReLU()
+            )
         )
 
     def forward(self, x):

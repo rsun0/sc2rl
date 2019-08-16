@@ -30,7 +30,7 @@ import numpy as np
 import time
 import math
 import matplotlib.pyplot as plt
-
+import sys
 import copy
 
 
@@ -94,6 +94,7 @@ class BaseAgent(Agent):
                 if (math.isnan(d_pol) or math.isnan(d_vf) or math.isnan(d_ent)):
                     print("Canceling training -- NaN's encountered")
                     print("Reloading model from previous save")
+                    sys.exit(0)
                     self.load()
                     self.update_target_net()
                     return
@@ -387,6 +388,12 @@ class BaseAgent(Agent):
         self.optimizer.zero_grad()
         total_loss.backward()
         #self.process_gradients(self.model)
+        print("actions: ", torch.max(gathered_actions).item(), torch.min(gathered_actions).item())
+        print("args: ", torch.max(gathered_args).item(), torch.min(gathered_args).item())
+        print("spatial args: ", torch.max(gathered_spatial_args).item(), torch.min(gathered_spatial_args).item())
+        print("ratio: ", torch.max(ratio).item(), torch.min(ratio).item())
+        print()
+        self.process_network(self.model)
         clip_grad_norm_(self.model.parameters(), 100.0)
         self.optimizer.step()
         t7 = time.time()
@@ -394,7 +401,6 @@ class BaseAgent(Agent):
         vf_loss = value_loss.detach().item()
         ent_total = ent.detach().item()
         #print("%f %f %f %f %f %f, total: %f" % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t7-t1))
-
         return pol_loss, vf_loss, -ent_total
 
 
@@ -464,12 +470,23 @@ class BaseAgent(Agent):
 
     def process_gradients(self, network, clip=1.0):
         grad_sum = 0
-        max_param = -np.inf
-        min_param = np.inf
         for param in network.parameters():
-            print(torch.max(param), torch.min(param))
             if param.grad is None:
                 continue
             grad_sum += torch.sum(param.grad.data ** 2)
-        print(max_param, min_param)
         print(grad_sum)
+
+    def process_network(self, network):
+        nan_sum = 0
+        grad_nan_sum = 0
+        nan_denom = 0.
+        grad_nan_denom = 0.
+        for param in network.parameters():
+            nan_sum += torch.sum(torch.isnan(param))
+            grad_nan_sum += torch.sum(torch.isnan(param.grad.data))
+            nan_denom += param.numel()
+            grad_nan_denom += param.numel()
+        print(nan_sum / nan_denom, grad_nan_sum / grad_nan_denom)
+        if (nan_sum > 0 or grad_nan_sum > 0):
+            self.save()
+            sys.exit(0)

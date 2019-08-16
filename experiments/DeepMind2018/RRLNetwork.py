@@ -43,7 +43,7 @@ class RRLModel(BaseNetwork):
         self.inputs2d_MLP = nn.Sequential(
             nn.Linear(self.player_features + net_config["action_embedding_size"],
                         128),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(128, net_config["inputs2d_size"])
         )
 
@@ -67,21 +67,21 @@ class RRLModel(BaseNetwork):
             Squeeze(),
             nn.Linear(net_config['relational_heads'] * net_config['relational_features'],
                         512),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(512, 512),
-            nn.ReLU()
+            nn.LeakyReLU()
         )
 
 
         self.value_MLP = nn.Sequential(
             nn.Linear(512 + net_config["inputs2d_size"], 512),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(512, 1)
         )
 
         self.action_MLP = nn.Sequential(
             nn.Linear(512 + net_config["inputs2d_size"], 512),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(512, env_config["action_space"])
         )
 
@@ -182,6 +182,7 @@ class RRLModel(BaseNetwork):
         value = self.value_MLP(shared_features)
         action_logits_in = self.action_MLP(shared_features)
         action_logits_in = action_logits_in.masked_fill(1-avail_actions, float('-inf'))
+        #print("actions: ", torch.max(action_logits_in, dim=-1))
         action_logits = F.softmax(action_logits_in)
         #action_logits = action_logits / torch.sum(action_logits, axis=-1)
         choice = None
@@ -199,6 +200,7 @@ class RRLModel(BaseNetwork):
         arg_logit_inputs = self.arg_MLP(shared_conditioned)
         arg_logit_inputs = arg_logit_inputs.reshape((N, self.arg_depth, self.arg_size))
         arg_logits = self.generate_arg_logits(arg_logit_inputs)
+        #print("args: ", torch.sum(arg_logit_inputs, dim=-1))
 
         args = None
         if (choosing):
@@ -210,6 +212,7 @@ class RRLModel(BaseNetwork):
         spatial_input = torch.cat([relational_spatial, embedded_action], dim=1)
         spatial_logits_in = self.spatial_upsampler(spatial_input)
         spatial_logits = self.generate_spatial_logits(spatial_logits_in)
+        #print("spatial: ", torch.sum(spatial_logits_in, dim=(-1,-2)))
 
 
         spatial = None

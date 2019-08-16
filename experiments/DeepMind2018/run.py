@@ -52,15 +52,15 @@ def main():
     print(model)
 
 
-    lr = 1e-4
+    lr = 5e-4
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=1e5
-    history_size=20
+    history_size=30
 
 
     num_episodes = 10000000
-    num_epochs = 2
+    num_epochs = 3
     batch_size = 32
     train_every = 1024
     save_every = 10240
@@ -95,12 +95,12 @@ def main():
         "lambda": 0.95,
         "hist_size": history_size,
         "device": device,
-        "eps_denom": 1e-7,
+        "eps_denom": 1e-8,
         "c1": 0.1,
         "c2": 0.1,
-        "c3": 0.3,
-        "c4": 0.3,
-        "clip_param": 0.05,
+        "c3": 0.01,
+        "c4": 0.1,
+        "clip_param": 0.1,
         "min_clip_param": 0.01,
         "clip_decay": 10000,
         "map": map_name

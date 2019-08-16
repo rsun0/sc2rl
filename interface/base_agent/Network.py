@@ -114,7 +114,7 @@ class BaseNetwork(nn.Module, Model):
                                         inputs2d=inputs2d[i:i+batch_size]
                                         )
             t6 = time.time()
-            
+
             irrelevant_mask = relevant_frames[i:i+batch_size] == 0
             t7 = time.time()
             #print(irrelevant_mask)
@@ -163,6 +163,7 @@ class BaseNetwork(nn.Module, Model):
 
     def sample_func(self, probs):
         probs = probs.detach().cpu().numpy().astype(np.float64)
+        assert (np.sum(probs) > 0)
         probs = probs / np.sum(probs)
         return np.argmax(np.random.multinomial(1, probs))
 
