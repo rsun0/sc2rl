@@ -77,7 +77,7 @@ class BaseAgent(Agent):
     def train(self, run_settings):
         self.memory.compute_vtargets_adv(self.train_settings['discount_factor'],
                                             self.train_settings['lambda'])
-
+        self.model.train()
         batch_size = run_settings.batch_size
         num_iters = int(len(self.memory) / batch_size)
         epochs = run_settings.num_epochs
@@ -113,6 +113,7 @@ class BaseAgent(Agent):
                             ent_total)
                             )
         self.update_target_net()
+        self.model.eval()
 
         print("\n\n ------- Training sequence ended ------- \n\n")
 

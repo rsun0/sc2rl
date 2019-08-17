@@ -71,6 +71,7 @@ class ResnetBlock(nn.Module):
                 "residual" + str(i+1),
                 nn.Sequential(
                     nn.Conv2d(num_features, num_features, kernel_size=3, stride=1, padding=1),
+                    nn.BatchNorm2d(num_features),
                     self.activation()
                 )
             )
@@ -199,6 +200,7 @@ class Downsampler(nn.Module):
                 kernel_size=(4,4),
                 stride=2,
                 padding=1),
+            nn.BatchNorm2d(net_config['down_conv_features']),
             nn.LeakyReLU(),
 
             ResnetBlock(net_config['down_conv_features'],
@@ -213,6 +215,7 @@ class Downsampler(nn.Module):
                 kernel_size=(4,4),
                 stride=2,
                 padding=1),
+            nn.BatchNorm2d(2*net_config['down_conv_features']),
             nn.LeakyReLU(),
 
             ResnetBlock(2*net_config['down_conv_features'],
@@ -227,6 +230,7 @@ class Downsampler(nn.Module):
                 kernel_size=(4,4),
                 stride=2,
                 padding=1),
+            nn.BatchNorm2d(4*net_config['down_conv_features']),
             nn.LeakyReLU(),
 
             ResnetBlock(4*net_config['down_conv_features'],
@@ -252,6 +256,7 @@ class SpatialUpsampler(nn.Module):
                 stride=2,
                 padding=1
             ),
+            nn.BatchNorm2d(net_config['up_conv_features']),
             nn.LeakyReLU()
         )
 
@@ -263,6 +268,7 @@ class SpatialUpsampler(nn.Module):
                 stride=2,
                 padding=1
             ),
+            nn.BatchNorm2d(int(0.5 * net_config['up_conv_features'])),
             nn.LeakyReLU()
         )
 

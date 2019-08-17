@@ -1,13 +1,14 @@
 class Agent():
     def __init__(self, model, settings, memory):
         self.model = model
+        self.model.eval()
         self.settings = settings
         self.memory = memory
-        
+
         # Instantiate optimizer
         self.optimizer = self.settings.optimizer(
             params=self.model.parameters(), lr=self.settings.learning_rate)
-    
+
     def sample(self, state):
         """
         Calls _sample after wrapping with state_space_converter
@@ -26,10 +27,10 @@ class Agent():
         """
         Returns a personalized state for the agent based on
         the given CustomEnvironment state.
-        Output is same format as input to self._sample and self._forward       
+        Output is same format as input to self._sample and self._forward
         """
         raise NotImplementedError
-        
+
     def action_space_converter(self, personal_action):
         """
         Takes in personalized action, an output from self._sample
@@ -51,13 +52,13 @@ class Agent():
         (usually a probability distribution of actions)
         """
         raise NotImplementedError
-        
+
     def train(self):
         """
         Calls train_step until it has run through memory self.epochs times
         """
         raise NotImplementedError
-        
+
     def train_step(self, batch_size):
         """
         Updates the agent with the experience of going from
@@ -70,14 +71,14 @@ class Agent():
         Saves model and necessary data
         """
         raise NotImplementedError
-        
+
     def push_memory(self, state, action, reward, done):
         """
         Pushes state, action, reward, done, and whatever else the subclass agent
         wants to push to memory
         """
         raise NotImplementedError
-        
+
 
 class Model():
     def parameters(self):
