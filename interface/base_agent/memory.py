@@ -39,8 +39,9 @@ class SequentialMemory(object):
 
     def update_indices(self):
         last_index = self.memory_capacity - self.batch_size - self.history_size
-        self.indices = list(range(0, last_index, self.batch_size)) + [last_index]
+        self.indices = list(range(last_index))
         random.shuffle(self.indices)
+        self.indices = self.indices[:self.batch_size]
 
     def __len__(self):
         return self.memory_capacity
