@@ -67,24 +67,20 @@ class RRLModel(BaseNetwork):
             Squeeze(),
             nn.Linear(net_config['relational_heads'] * net_config['relational_features'],
                         512),
-            nn.BatchNorm1d(512),
             nn.LeakyReLU(),
             nn.Linear(512, 512),
-            nn.BatchNorm1d(512),
             nn.LeakyReLU()
         )
 
 
         self.value_MLP = nn.Sequential(
             nn.Linear(512 + net_config["inputs2d_size"], 512),
-            nn.BatchNorm1d(512),
             nn.LeakyReLU(),
             nn.Linear(512, 1)
         )
 
         self.action_MLP = nn.Sequential(
             nn.Linear(512 + net_config["inputs2d_size"], 512),
-            nn.BatchNorm1d(512),
             nn.LeakyReLU(),
             nn.Linear(512, env_config["action_space"])
         )

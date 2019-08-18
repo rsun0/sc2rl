@@ -396,9 +396,9 @@ class BaseAgent(Agent):
         print("ratio: ", torch.max(ratio).item(), torch.min(ratio).item())
         print()
         """
-        self.process_network(self.model)
         clip_grad_norm_(self.model.parameters(), 100.0)
         self.optimizer.step()
+        self.process_network(self.model)
         t7 = time.time()
         pol_loss = pol_avg.detach().item()
         vf_loss = value_loss.detach().item()
@@ -489,7 +489,11 @@ class BaseAgent(Agent):
             grad_nan_mask = torch.isnan(param.grad.data)
             if (torch.sum(nan_mask) > 0):
                 print("Resetting parameters -- NaN encountered")
-                param[nan_mask] = 0.0
+                with torch.no_grad():
+                    param[nan_mask] = 0.0
+                    param.grad.data[grad_nan_mask] = 0.0
+            """
             if (torch.sum(grad_nan_mask) > 0):
                 print("Resetting gradients -- NaN encountered")
                 param.grad.data[grad_nan_mask] = 0
+            """
