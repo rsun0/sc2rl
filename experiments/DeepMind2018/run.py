@@ -52,11 +52,11 @@ def main():
     print(model)
 
 
-    lr = 5e-4
+    lr = 2e-5
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=1e5
-    history_size=20
+    history_size=30
 
 
     num_episodes = 10000000
