@@ -372,8 +372,8 @@ class BaseAgent(Agent):
 
         #print(numerator, denominator, num_args)
 
-        #ratio = torch.exp((numerator - denominator) * (1 / num_args))
-        ratio = torch.exp(numerator - denominator)
+        ratio = torch.exp((numerator - denominator) * (1 / num_args))
+        #ratio = torch.exp(numerator - denominator)
         ratio_adv = ratio * advantages.detach()[-batch_size:]
         bounded_adv = torch.clamp(ratio, 1-clip_param, 1+clip_param)
         bounded_adv = bounded_adv * advantages.detach()[-batch_size:]

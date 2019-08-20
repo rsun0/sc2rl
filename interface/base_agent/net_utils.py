@@ -71,7 +71,7 @@ class ResnetBlock(nn.Module):
                 "residual" + str(i+1),
                 nn.Sequential(
                     nn.Conv2d(num_features, num_features, kernel_size=3, stride=1, padding=1),
-                    nn.BatchNorm2d(num_features),
+                    #nn.BatchNorm2d(num_features),
                     self.activation()
                 )
             )

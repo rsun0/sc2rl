@@ -107,7 +107,7 @@ def main():
     }
 
     agent = BaseAgent(model, agent_settings, memory, train_settings)
-    #agent.load()
+    agent.load()
     experiment = Experiment([agent], env, run_settings)
 
     experiment.train()
