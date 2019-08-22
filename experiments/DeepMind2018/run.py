@@ -41,7 +41,7 @@ def main():
         "inputs2d_size": 64,
         "inputs3d_width": 8,
         "relational_features": 32,
-        "relational_depth": 2,
+        "relational_depth": 1,
         "relational_heads": 3,
         "spatial_out_depth": 64,
         "channels3": 16,
@@ -52,7 +52,7 @@ def main():
     print(model)
 
 
-    lr = 3e-5
+    lr = 2e-5
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=1e5
@@ -61,7 +61,7 @@ def main():
 
     num_episodes = 10000000
     num_epochs = 2
-    batch_size = 64
+    batch_size = 32
     train_every = 1024
     save_every = 10240
     graph_every = 50
@@ -97,12 +97,14 @@ def main():
         "device": device,
         "eps_denom": 1e-8,
         "c1": 0.1,
-        "c2": 1.5,
+        "c2": 2.0,
         "c3": 0.15,
         "c4": 0.35,
+        "minc2": 0.1,
         "clip_param": 0.2,
         "min_clip_param": 0.01,
         "clip_decay": 10000,
+        "c2_decay": 10000,
         "map": map_name
     }
 

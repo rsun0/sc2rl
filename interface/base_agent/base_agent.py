@@ -264,6 +264,9 @@ class BaseAgent(Agent):
         eps_denom = self.train_settings['eps_denom']
         c1 = self.train_settings['c1']
         c2 = self.train_settings['c2']
+        minc2 = self.train_settings['minc2']
+        c2_decay = self.train_settings['c2_decay']
+        c2 = max(minc2, c2 - (c2 - minc2) * (self.epochs_trained / c2_decay))
         c3 = self.train_settings['c3']
         c4 = self.train_settings['c4']
         clip, clip_min, clip_decay = self.train_settings['clip_param'], self.train_settings['min_clip_param'], self.train_settings['clip_decay']

@@ -125,19 +125,19 @@ class SequentialMemory(object):
         if transform >= 2 and transform < 4:
             minimap = minimap.transpose(-2,-1).flip(num_dims-1)
             screen = screen.transpose(-2,-1).flip(num_dims-1)
-            hidden = hidden.transpose(-2,-1).flip(num_dims-1)
+            hidden = hidden.transpose(-2,-1).flip(num_dims)
             new_spatial_action[:,0] = (spatial_w - 1) - spatial_args[:,1]
             new_spatial_action[:,1] = spatial_args[:,0]
         if transform >= 4 and transform < 6:
             minimap = minimap.flip(num_dims-1, num_dims)
             screen = screen.flip(num_dims-1, num_dims)
-            hidden = hidden.flip(num_dims-1, num_dims)
+            hidden = hidden.flip(num_dims, num_dims+1)
             new_spatial_action[:,0] = (spatial_w - 1) - spatial_args[:,0]
             new_spatial_action[:,1] = (spatial_w - 1) - spatial_args[:,1]
         elif transform >= 6 and transform < 8:
             minimap = minimap.transpose(-2,-1).flip(num_dims)
             screen = screen.transpose(-2,-1).flip(num_dims)
-            hidden = hidden.transpose(-2,-1).flip(num_dims)
+            hidden = hidden.transpose(-2,-1).flip(num_dims+1)
             new_spatial_action[:,0] = spatial_args[:,1]
             new_spatial_action[:,1] = (spatial_w - 1) - spatial_args[:,0]
 
@@ -145,16 +145,18 @@ class SequentialMemory(object):
         if transform % 2 == 1:
             minimap = minimap.flip(num_dims)
             screen = screen.flip(num_dims)
-            hidden = hidden.flip(num_dims)
+            hidden = hidden.flip(num_dims+1)
             new_spatial_action[:,1] = (spatial_w - 1) - new_spatial_action[:,1]
 
         action = new_spatial_action
         return minimap, screen, hidden,  action
 
     def batch_random_transform(self, minimaps, screens, hiddens, actions):
+        transform = np.random.randint(0,8)
         for i in range(len(minimaps)):
-            transform = np.random.randint(0,8)
             minimaps[i], screens[i], hiddens[i], actions[i] = self.random_transform(minimaps[i], screens[i], hiddens[i], actions[i], transform)
+
+
         return minimaps, screens, hiddens, actions
 
 

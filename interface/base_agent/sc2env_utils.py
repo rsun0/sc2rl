@@ -2,7 +2,7 @@ from pysc2.lib.features import SCREEN_FEATURES, MINIMAP_FEATURES, FeatureType, P
 CATEGORICAL = FeatureType.CATEGORICAL
 SCALAR = FeatureType.SCALAR
 from pysc2.lib.actions import FUNCTIONS, TYPES
-from net_utils import FastEmbedding
+from .net_utils import FastEmbedding
 import torch
 import torch.nn as nn
 import numpy as np
