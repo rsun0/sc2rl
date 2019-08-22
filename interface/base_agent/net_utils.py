@@ -15,19 +15,19 @@ class ConvLSTM(nn.Module):
 
         self.input_size, self.hidden_size = input_size, hidden_size
 
-        self.input_to_input = nn.Conv2d(input_size, hidden_size, kernel_size=3, stride=1, padding=1)
-        self.hidden_to_input = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, stride=1, padding=1)
+        self.input_to_input = nn.Conv2d(input_size, hidden_size, kernel_size=3, stride=1, padding=0)
+        self.hidden_to_input = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, stride=1, padding=0)
 
-        self.input_to_forget = nn.Conv2d(input_size, hidden_size, kernel_size=3, stride=1, padding=1)
-        self.hidden_to_forget = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, stride=1, padding=1)
+        self.input_to_forget = nn.Conv2d(input_size, hidden_size, kernel_size=3, stride=1, padding=0)
+        self.hidden_to_forget = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, stride=1, padding=0)
 
-        self.input_to_gate = nn.Conv2d(input_size, hidden_size, kernel_size=3, stride=1, padding=1)
-        self.hidden_to_gate = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, stride=1, padding=1)
+        self.input_to_gate = nn.Conv2d(input_size, hidden_size, kernel_size=3, stride=1, padding=0)
+        self.hidden_to_gate = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, stride=1, padding=0)
 
-        self.input_to_output = nn.Conv2d(input_size, hidden_size, kernel_size=3, stride=1, padding=1)
-        self.hidden_to_output = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, stride=1, padding=1)
+        self.input_to_output = nn.Conv2d(input_size, hidden_size, kernel_size=3, stride=1, padding=0)
+        self.hidden_to_output = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, stride=1, padding=0)
 
-        self.cpad = nn.ReflectionPad2d(1)
+        self.inpad = nn.ReflectionPad2d(1)
         self.hpad = nn.ReflectionPad2d(1)
 
 
@@ -42,6 +42,9 @@ class ConvLSTM(nn.Module):
 
         h_0 = hidden_state[:,0]
         c_0 = hidden_state[:,1]
+        input = self.inpad(input)
+        h_0 = self.hpad(h_0)
+
         i = F.sigmoid(self.input_to_input(input) + self.hidden_to_input(h_0))
         f = F.sigmoid(self.input_to_forget(input) + self.hidden_to_forget(h_0))
         g = F.tanh(self.input_to_gate(input) + self.hidden_to_gate(h_0))
@@ -49,7 +52,7 @@ class ConvLSTM(nn.Module):
         c_t = f * c_0 + i * g
         h_t = o * F.tanh(c_t)
 
-        hidden_state_out = torch.cat([self.hpad(h_t.unsqueeze(1)), self.cpad(c_t.unsqueeze(1))], dim=1)
+        hidden_state_out = torch.cat([h_t.unsqueeze(1), c_t.unsqueeze(1)], dim=1)
 
         return o, hidden_state_out
 
