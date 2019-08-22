@@ -313,7 +313,8 @@ class BaseAgent(Agent):
             prev_actions,
             hidden_states,
             base_actions,
-            relevant_states
+            relevant_states,
+            batch_size=batch_size
         )
 
         old_action_probs, old_arg_probs, old_spatial_probs, _, _, _ = self.target_model.unroll_forward_sequential(
@@ -324,7 +325,8 @@ class BaseAgent(Agent):
             prev_actions[-batch_size:],
             old_hidden_states,
             base_actions[-batch_size:],
-            relevant_states[-batch_size:]
+            relevant_states[-batch_size:],
+            batch_size=batch_size
         )
         t4 = time.time()
 

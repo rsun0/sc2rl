@@ -41,8 +41,8 @@ def main():
         "inputs2d_size": 64,
         "inputs3d_width": 8,
         "relational_features": 32,
-        "relational_depth": 3,
-        "relational_heads": 1,
+        "relational_depth": 2,
+        "relational_heads": 3,
         "spatial_out_depth": 64,
         "channels3": 16,
         "device": device
@@ -52,7 +52,7 @@ def main():
     print(model)
 
 
-    lr = 2e-5
+    lr = 3e-5
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=1e5
@@ -61,7 +61,7 @@ def main():
 
     num_episodes = 10000000
     num_epochs = 2
-    batch_size = 32
+    batch_size = 64
     train_every = 1024
     save_every = 10240
     graph_every = 50

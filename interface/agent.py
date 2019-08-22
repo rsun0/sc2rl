@@ -7,7 +7,7 @@ class Agent():
 
         # Instantiate optimizer
         self.optimizer = self.settings.optimizer(
-            params=self.model.parameters(), lr=self.settings.learning_rate, eps=1e-3)
+            params=self.model.parameters(), lr=self.settings.learning_rate, eps=1e-2)
 
     def sample(self, state):
         """
