@@ -6,6 +6,7 @@ from net_utils import FastEmbedding
 import torch
 import torch.nn as nn
 import numpy as np
+from .process_action import action_to_pysc2
 
 def get_action_args(action):
     base_action_func = FUNCTIONS._func_list[action]
@@ -33,6 +34,9 @@ def categorical_mask(features):
             categorical_sizes.append(scale)
     return categorical_indices, categorical_sizes
 
+def print_action(action):
+    action = action_to_pysc2(action)
+    print(action)
 
 minimap_categorical_indices, minimap_categorical_sizes = categorical_mask(MINIMAP_FEATURES)
 screen_categorical_indices, screen_categorical_sizes = categorical_mask(SCREEN_FEATURES)

@@ -12,6 +12,7 @@ These functions and settings are passed into the Experiment constructor.
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import deque
+import base_agent.sc2env_utils as sc2env_utils
 
 class Experiment:
     def __init__(self, agents, custom_env, run_settings):
@@ -109,6 +110,7 @@ class Experiment:
                     for a in range(len(self.agents))]
                 env_actions = [self.agents[a].action_space_converter(actions[a])
                     for a in range(len(self.agents))]
+                self.print_action(env_actions)
                 # Take environment step
                 env_states, rewards, done, metainfo = self.custom_env.step(env_actions)
                 step += 1
@@ -122,12 +124,13 @@ class Experiment:
 
                     if len(scores) == 1:
                         scores = scores[0]
-                        averages = averages[0]
-                    print("Game {} ended after {} steps. Game score: {}. Averages: {}"
-                        .format(e+1, step, scores, averages))
+                    print("Game {} ended after {} steps. Game score: {}"
+                        .format(e+1, step, scores))
 
-            print("Average game scores: {}".format(running_scores / self.run_settings.test_episodes))
+        print("Average game scores: {}".format(running_scores / self.run_settings.test_episodes))
 
+    def print_action(self, actions):
+        sc2env_utils.print_action(actions)
 
     @staticmethod
     def plot_results(averages):
@@ -170,7 +173,7 @@ class CustomEnvironment():
 
 class RunSettings:
     def __init__(self, num_episodes, num_epochs, batch_size, train_every,
-            save_every, graph_every, averaging_window):
+            save_every, graph_every, averaging_window, test_episodes=20, verbose=True):
         """
         :param num_episodes: The total number of episodes to play
         :param num_epochs: The number of update iterations for each experience set
@@ -188,3 +191,5 @@ class RunSettings:
         self.save_every = save_every
         self.graph_every = graph_every
         self.averaging_window = averaging_window
+        self.test_episodes = test_episodes
+        self.verbose = verbose

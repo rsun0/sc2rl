@@ -97,19 +97,20 @@ def main():
         "device": device,
         "eps_denom": 1e-8,
         "c1": 0.1,
-        "c2": 1.0,
-        "c3": 0.3,
-        "c4": 0.5,
-        "clip_param": 0.1,
+        "c2": 1.5,
+        "c3": 0.15,
+        "c4": 0.35,
+        "clip_param": 0.2,
         "min_clip_param": 0.01,
         "clip_decay": 10000,
         "map": map_name
     }
 
     agent = BaseAgent(model, agent_settings, memory, train_settings)
-    agent.load()
+    #agent.load()
     experiment = Experiment([agent], env, run_settings)
 
+    #experiment.test()
     experiment.train()
 
 
