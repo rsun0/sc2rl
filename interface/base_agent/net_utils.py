@@ -27,6 +27,8 @@ class ConvLSTM(nn.Module):
         self.input_to_output = nn.Conv2d(input_size, hidden_size, kernel_size=3, stride=1, padding=1)
         self.hidden_to_output = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, stride=1, padding=1)
 
+        self.cpad = nn.ReflectionPad2d(1)
+        self.hpad = nn.ReflectionPad2d(1)
 
 
 
@@ -47,7 +49,7 @@ class ConvLSTM(nn.Module):
         c_t = f * c_0 + i * g
         h_t = o * F.tanh(c_t)
 
-        hidden_state_out = torch.cat([h_t.unsqueeze(1), c_t.unsqueeze(1)], dim=1)
+        hidden_state_out = torch.cat([self.hpad(h_t.unsqueeze(1)), self.cpad(c_t.unsqueeze(1))], dim=1)
 
         return o, hidden_state_out
 
