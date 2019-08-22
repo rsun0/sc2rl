@@ -98,7 +98,7 @@ def main():
         "eps_denom": 1e-8,
         "c1": 0.1,
         "c2": 1.0,
-        "c3": 0.3,
+        "c3": 0.4,
         "c4": 0.5,
         "clip_param": 0.1,
         "min_clip_param": 0.01,
@@ -107,7 +107,7 @@ def main():
     }
 
     agent = BaseAgent(model, agent_settings, memory, train_settings)
-    agent.load()
+    #agent.load()
     experiment = Experiment([agent], env, run_settings)
 
     experiment.train()
