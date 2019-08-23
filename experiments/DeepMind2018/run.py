@@ -60,7 +60,7 @@ def main():
 
 
     num_episodes = 10000000
-    num_epochs = 2
+    num_epochs = 5
     batch_size = 32
     train_every = 1024
     save_every = 10240
