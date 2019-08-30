@@ -409,6 +409,7 @@ class BaseAgent(Agent):
         vf_loss = value_loss.detach().item()
         ent_total = ent.detach().item()
         #print("%f %f %f %f %f %f, total: %f" % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t7-t1))
+        #print(values, v_returns, advantages)
         return pol_loss, vf_loss, -ent_total
 
 

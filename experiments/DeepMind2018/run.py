@@ -97,7 +97,7 @@ def main():
         "device": device,
         "eps_denom": 1e-8,
         "c1": 0.1,
-        "c2": 0.1,
+        "c2": 0.03,
         "c3": 0.5,
         "c4": 0.5,
         "minc2": 0.01,

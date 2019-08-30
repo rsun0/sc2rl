@@ -86,7 +86,7 @@ def generate_embeddings(config):
         embed_size = config['state_embedding_size']
 
         for j in range(len(cat_indices)):
-            embeddings[i].append(FastEmbedding(cat_sizes[j]+1, embed_size).to(config["device"]))
+            embeddings[i].append(nn.Embedding(cat_sizes[j]+1, embed_size).to(config["device"]))
 
     return embeddings
 

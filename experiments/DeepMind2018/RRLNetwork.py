@@ -43,7 +43,7 @@ class RRLModel(BaseNetwork):
         self.inputs2d_MLP = nn.Sequential(
             nn.Linear(self.player_features + net_config["action_embedding_size"],
                         128),
-            nn.LeakyReLU(),
+            nn.ReLU(),
             nn.Linear(128, net_config["inputs2d_size"])
         )
 
@@ -67,21 +67,21 @@ class RRLModel(BaseNetwork):
             Squeeze(),
             nn.Linear(net_config['relational_heads'] * net_config['relational_features'],
                         512),
-            nn.LeakyReLU(),
+            nn.ReLU(),
             nn.Linear(512, 512),
-            nn.LeakyReLU()
+            nn.ReLU()
         )
 
 
         self.value_MLP = nn.Sequential(
             nn.Linear(512 + net_config["inputs2d_size"], 512),
-            nn.LeakyReLU(),
+            nn.ReLU(),
             nn.Linear(512, 1)
         )
 
         self.action_MLP = nn.Sequential(
             nn.Linear(512 + net_config["inputs2d_size"], 512),
-            nn.LeakyReLU(),
+            nn.ReLU(),
             nn.Linear(512, env_config["action_space"])
         )
 
@@ -181,7 +181,7 @@ class RRLModel(BaseNetwork):
         shared_features = torch.cat([inputs2d, relational_nonspatial], dim=-1)
         value = self.value_MLP(shared_features)
         action_logits_in = self.action_MLP(shared_features)
-        action_logits_in = action_logits_in.masked_fill(1-avail_actions, float('-inf'))
+        action_logits_in = action_logits_in.masked_fill((1-avail_actions).bool(), float('-inf'))
         #print("actions: ", torch.max(action_logits_in, dim=-1))
         action_logits = F.softmax(action_logits_in)
         #action_logits = action_logits / torch.sum(action_logits, axis=-1)
