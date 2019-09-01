@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+torch.backends.cudnn.benchmarks = True
 import numpy as np
 import time
 
@@ -121,7 +122,7 @@ class BaseNetwork(nn.Module, Model):
             hiddens[irrelevant_mask] = self.init_hidden(batch_size=torch.sum(irrelevant_mask), device=self.device)
             t8 = time.time()
 
-            #print("forward: %f" % (t6-t5))
+            #print("forward: %f. irrelevant: %f. hiddens: %f" % (t6-t5, t7-t6, t8-t7))
 
         t3 = time.time()
         action_logits, arg_logits, spatial_logits, _, values, _ = self.forward(

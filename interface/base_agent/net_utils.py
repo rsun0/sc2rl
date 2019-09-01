@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
+torch.backends.cudnn.benchmarks = True
 import numpy as np
 import math
 
@@ -10,7 +12,7 @@ import math
     Check https://pytorch.org/docs/stable/nn.html#lstm to see reference information
 """
 class ConvLSTM(nn.Module):
-    def __init__(self, input_size, hidden_size):
+    def __init__(self, input_size, hidden_size, width=8, device="cuda:0"):
         super(ConvLSTM, self).__init__()
 
         self.input_size, self.hidden_size = input_size, hidden_size
@@ -30,6 +32,10 @@ class ConvLSTM(nn.Module):
         self.inpad = nn.ReflectionPad2d(1)
         self.hpad = nn.ReflectionPad2d(1)
 
+        self.Wc_input = Variable(torch.zeros(1, hidden_size, width, width)).to(device)
+        self.Wc_forget = Variable(torch.zeros(1, hidden_size, width, width)).to(device)
+        self.Wc_output = Variable(torch.zeros(1, hidden_size, width, width)).to(device)
+
 
 
     """
@@ -45,11 +51,11 @@ class ConvLSTM(nn.Module):
         input = self.inpad(input)
         h_0 = self.hpad(h_0)
 
-        i = F.sigmoid(self.input_to_input(input) + self.hidden_to_input(h_0))
-        f = F.sigmoid(self.input_to_forget(input) + self.hidden_to_forget(h_0))
+        i = F.sigmoid(self.input_to_input(input) + self.hidden_to_input(h_0) + c_0 * self.Wc_input)
+        f = F.sigmoid(self.input_to_forget(input) + self.hidden_to_forget(h_0) + c_0 * self.Wc_forget)
         g = F.tanh(self.input_to_gate(input) + self.hidden_to_gate(h_0))
-        o = F.sigmoid(self.input_to_output(input) + self.hidden_to_output(h_0))
         c_t = f * c_0 + i * g
+        o = F.sigmoid(self.input_to_output(input) + self.hidden_to_output(h_0) + c_t * self.Wc_output)
         h_t = o * F.tanh(c_t)
 
         hidden_state_out = torch.cat([h_t.unsqueeze(1), c_t.unsqueeze(1)], dim=1)

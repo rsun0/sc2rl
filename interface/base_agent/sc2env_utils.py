@@ -5,6 +5,7 @@ from pysc2.lib.actions import FUNCTIONS, TYPES
 from .net_utils import FastEmbedding
 import torch
 import torch.nn as nn
+torch.backends.cudnn.benchmarks = True
 import numpy as np
 from .process_action import action_to_pysc2
 

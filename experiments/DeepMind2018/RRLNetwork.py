@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+torch.backends.cudnn.benchmarks = True
 import numpy as np
 import time
 
@@ -48,7 +49,7 @@ class RRLModel(BaseNetwork):
         )
 
         self.attention_blocks = nn.Sequential(
-            SelfAttentionBlock(net_config['LSTM_hidden_size'],
+            SelfAttentionBlock(net_config['LSTM_hidden_size'] + self.LSTM_in_size,
                                 net_config['relational_features'],
                                 net_config['relational_heads'])
         )
@@ -171,6 +172,7 @@ class RRLModel(BaseNetwork):
         LSTM_in = torch.cat([inputs3d, expanded_inputs2d], dim=1)
 
         outputs2d, hidden = self.convLSTM(LSTM_in, hidden)
+        outputs2d = torch.cat([outputs2d, LSTM_in], dim=1)
         t5 = time.time()
         if unrolling:
             #print("Unrolling times\n embedding: %f, down layers: %f, inputs2dmlp: %f, lstm: %f. Total: %f" % (t2-t1,t3-t2,t4-t3,t5-t4,t5-t1))

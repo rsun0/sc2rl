@@ -13,7 +13,7 @@ import argparse
 
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
+torch.backends.cudnn.benchmarks = True
 
 def main():
 
@@ -52,16 +52,16 @@ def main():
     print(model)
 
 
-    lr = 2e-5
+    lr = 5e-5
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=1e5
-    history_size=30
+    history_size=10
 
 
     num_episodes = 10000000
-    num_epochs = 3
-    batch_size = 32
+    num_epochs = 2
+    batch_size = 160
     train_every = 1024
     save_every = 10240
     graph_every = 50
@@ -97,11 +97,11 @@ def main():
         "device": device,
         "eps_denom": 1e-8,
         "c1": 0.1,
-        "c2": 0.03,
-        "c3": 0.5,
-        "c4": 0.5,
+        "c2": 0.1,
+        "c3": 0.01,
+        "c4": 0.1,
         "minc2": 0.01,
-        "clip_param": 0.05,
+        "clip_param": 0.1,
         "min_clip_param": 0.01,
         "clip_decay": 10000,
         "c2_decay": 10000,

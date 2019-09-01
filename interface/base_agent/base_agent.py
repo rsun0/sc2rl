@@ -25,6 +25,7 @@ from base_agent.sc2env_utils import batch_get_action_args, is_spatial_arg
 import torch
 import torch.nn as nn
 from torch.nn.utils import clip_grad_norm_
+torch.backends.cudnn.benchmarks = True
 import torch.optim as optim
 import numpy as np
 import time
@@ -320,17 +321,18 @@ class BaseAgent(Agent):
             batch_size=batch_size
         )
 
-        old_action_probs, old_arg_probs, old_spatial_probs, _, _, _ = self.target_model.unroll_forward_sequential(
-            minimaps[-batch_size:],
-            screens[-batch_size:],
-            players[-batch_size:],
-            avail_actions[-batch_size:],
-            prev_actions[-batch_size:],
-            old_hidden_states,
-            base_actions[-batch_size:],
-            relevant_states[-batch_size:],
-            batch_size=batch_size
-        )
+        with torch.no_grad():
+            old_action_probs, old_arg_probs, old_spatial_probs, _, _, _ = self.target_model.unroll_forward_sequential(
+                minimaps[-batch_size:],
+                screens[-batch_size:],
+                players[-batch_size:],
+                avail_actions[-batch_size:],
+                prev_actions[-batch_size:],
+                old_hidden_states,
+                base_actions[-batch_size:],
+                relevant_states[-batch_size:],
+                batch_size=batch_size
+            )
         t4 = time.time()
 
         gathered_actions = action_probs[range(batch_size), base_actions[-batch_size:]]
@@ -377,7 +379,7 @@ class BaseAgent(Agent):
 
         #print(numerator, denominator, num_args)
 
-        ratio = torch.exp((numerator - denominator) * (1 / num_args))
+        ratio = torch.exp((numerator - denominator))
         #ratio = torch.exp(numerator - denominator)
         ratio_adv = ratio * advantages.detach()[-batch_size:]
         bounded_adv = torch.clamp(ratio, 1-clip_param, 1+clip_param)
@@ -408,7 +410,7 @@ class BaseAgent(Agent):
         pol_loss = pol_avg.detach().item()
         vf_loss = value_loss.detach().item()
         ent_total = ent.detach().item()
-        #print("%f %f %f %f %f %f, total: %f" % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t7-t1))
+        print("%f %f %f %f %f %f, total: %f" % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t7-t1))
         #print(values, v_returns, advantages)
         return pol_loss, vf_loss, -ent_total
 
