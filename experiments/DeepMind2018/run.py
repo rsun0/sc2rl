@@ -52,7 +52,7 @@ def main():
     print(model)
 
 
-    lr = 5e-5
+    lr = 1e-4
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=1e5
@@ -60,7 +60,7 @@ def main():
 
 
     num_episodes = 10000000
-    num_epochs = 2
+    num_epochs = 3
     batch_size = 160
     train_every = 1024
     save_every = 10240
