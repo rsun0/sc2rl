@@ -55,13 +55,13 @@ def main():
     lr = 1e-4
     eps_max = 0.3
     eps_min = 0.05
-    eps_duration=1e5
+    eps_duration=2e5
     history_size=10
 
 
     num_episodes = 10000000
     num_epochs = 3
-    batch_size = 160
+    batch_size = 146
     train_every = 1024
     save_every = 10240
     graph_every = 50
@@ -97,11 +97,11 @@ def main():
         "device": device,
         "eps_denom": 1e-8,
         "c1": 0.1,
-        "c2": 0.1,
-        "c3": 0.01,
-        "c4": 0.1,
-        "minc2": 0.01,
-        "clip_param": 0.1,
+        "c2": 3.0,
+        "c3": 0.001,
+        "c4": 1.0,
+        "minc2": 0.1,
+        "clip_param": 0.2,
         "min_clip_param": 0.01,
         "clip_decay": 10000,
         "c2_decay": 10000,
