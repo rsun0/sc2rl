@@ -36,6 +36,10 @@ class ConvLSTM(nn.Module):
         self.Wc_forget = Variable(torch.zeros(1, hidden_size, width, width)).to(device)
         self.Wc_output = Variable(torch.zeros(1, hidden_size, width, width)).to(device)
 
+        self.Wc_input.requires_grad = True
+        self.Wc_forget.requires_grad = True
+        self.Wc_output.requires_grad = True
+
 
 
     """
@@ -97,7 +101,8 @@ class RelationalProjection(nn.Module):
         super(RelationalProjection, self).__init__()
         self.layer = nn.Sequential(
             nn.Linear(in_size, num_features),
-            nn.InstanceNorm1d(num_features)
+            nn.InstanceNorm1d(num_features),
+            nn.ReLU()
         )
 
     def forward(self, x):

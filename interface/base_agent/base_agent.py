@@ -396,13 +396,13 @@ class BaseAgent(Agent):
         self.optimizer.zero_grad()
         total_loss.backward()
         #self.process_gradients(self.model)
-        """
+        
         print("actions: ", torch.max(gathered_actions).item(), torch.min(gathered_actions).item())
         print("args: ", torch.max(gathered_args).item(), torch.min(gathered_args).item())
         print("spatial args: ", torch.max(gathered_spatial_args).item(), torch.min(gathered_spatial_args).item())
         print("ratio: ", torch.max(ratio).item(), torch.min(ratio).item())
         print()
-        """
+
         clip_grad_norm_(self.model.parameters(), 100.0)
         self.optimizer.step()
         self.process_network(self.model)
