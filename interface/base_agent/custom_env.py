@@ -48,15 +48,16 @@ class FullStateActionEnvironment(CustomEnvironment):
         self._terminal = self._curr_frame.last()
         agent_obs = self._curr_frame
         info = None
+        reward = np.clip(self._curr_frame.reward, -1, 1)
         return [self.state_modifier_func(self._curr_frame)],  \
-                [self._curr_frame.reward], self._curr_frame.last(), [info]
+                [reward], self._curr_frame.last(), [info]
 
     def step(self, action):
 
         assert (not self._terminal)
         self._run_to_next(action)
         agent_obs = self.state_modifier_func(self._curr_frame)
-        reward = self._curr_frame.reward
+        reward = np.clip(self._curr_frame.reward, -1, 1)
         done = self._curr_frame.last()
         info = None
         return [agent_obs], [reward], done, [info]
