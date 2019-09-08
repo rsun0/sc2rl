@@ -156,7 +156,6 @@ class SequentialMemory(object):
         for i in range(len(minimaps)):
             minimaps[i], screens[i], hiddens[i], actions[i] = self.random_transform(minimaps[i], screens[i], hiddens[i], actions[i], transform)
 
-
         return minimaps, screens, hiddens, actions
 
 

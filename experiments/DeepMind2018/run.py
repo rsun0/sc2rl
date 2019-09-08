@@ -41,8 +41,8 @@ def main():
         "inputs2d_size": 64,
         "inputs3d_width": 8,
         "relational_features": 32,
-        "relational_depth": 2,
-        "relational_heads": 3,
+        "relational_depth": 3,
+        "relational_heads": 1,
         "spatial_out_depth": 64,
         "channels3": 16,
         "device": device
@@ -55,8 +55,8 @@ def main():
     lr = 1e-4
     eps_max = 0.3
     eps_min = 0.05
-    eps_duration=2e5
-    history_size=10
+    eps_duration=1e4
+    history_size=15
 
 
     num_episodes = 10000000
@@ -99,7 +99,7 @@ def main():
         "c1": 0.1,
         "c2": 3.0,
         "c3": 0.001,
-        "c4": 1.0,
+        "c4": 0.1,
         "minc2": 0.1,
         "clip_param": 0.2,
         "min_clip_param": 0.01,
