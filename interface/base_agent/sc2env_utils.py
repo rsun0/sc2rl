@@ -78,7 +78,7 @@ for i in range(10):
 
 def generate_embeddings(config):
 
-    embeddings = [minimap_embeddings, screen_embeddings] = [[], []]
+    embeddings = [minimap_embeddings, screen_embeddings] = [nn.ModuleList(), nn.ModuleList()]
     input_names = ["minimap", "screen"]
     for i in range(len(input_names)):
         base = input_names[i]

@@ -59,6 +59,7 @@ class BaseAgent(Agent):
                                                             player,
                                                             avail_actions,
                                                             np.array([self.action[0]]),
+                                                            self.action[2],
                                                             self.hidden_state,
                                                             choosing=choosing)
         return _, _, value.cpu().data.numpy().item(), self.hidden_state.cpu().data.numpy(), action
@@ -283,13 +284,15 @@ class BaseAgent(Agent):
         screens = states[1]
         players = states[2]
         hiddens = states[4]
+        prev_actions = states[5]
+        prev_base_actions = torch.from_numpy(np.stack(prev_actions[:,0], 0).astype(np.int64)).to(self.device)
+        prev_spatial_actions = np.stack(prev_actions[:,2]).astype(np.int64)
         spatial_args = np.stack(actions[:,2], 0).astype(np.int64)
-        minimaps, screens, hiddens, spatial_args = self.memory.batch_random_transform(minimaps, screens, hiddens, spatial_args)
+        minimaps, screens, hiddens, spatial_args, prev_spatial_actions = self.memory.batch_random_transform(minimaps, screens, hiddens, spatial_args, prev_spatial_actions)
 
         avail_actions = states[3].byte()
         old_hidden_states = hiddens[-batch_size:]
-        prev_actions = states[5]
-        relevant_states = states[6].byte()
+        relevant_states = torch.from_numpy(states[6]).byte().to(self.device)
         hidden_states = hiddens[:batch_size]
 
         base_actions = np.stack(actions[:,0], 0).astype(np.int64).squeeze(1)
@@ -314,7 +317,8 @@ class BaseAgent(Agent):
             screens,
             players,
             avail_actions,
-            prev_actions,
+            prev_base_actions,
+            prev_spatial_actions,
             hidden_states,
             base_actions,
             relevant_states,
@@ -327,7 +331,8 @@ class BaseAgent(Agent):
                 screens[-batch_size:],
                 players[-batch_size:],
                 avail_actions[-batch_size:],
-                prev_actions[-batch_size:],
+                prev_base_actions[-batch_size:],
+                prev_spatial_actions[-batch_size:],
                 old_hidden_states,
                 base_actions[-batch_size:],
                 relevant_states[-batch_size:],
@@ -355,7 +360,7 @@ class BaseAgent(Agent):
         """
 
         numerator = torch.log(gathered_actions)
-        denominator = torch.log(old_gathered_actions + eps_denom)
+        denominator = torch.log(torch.clamp(old_gathered_actions, eps_denom))
         entropy = self.entropy(gathered_actions)
         num_args = torch.ones(batch_size,).to(self.device)
 
@@ -366,11 +371,11 @@ class BaseAgent(Agent):
             for j in curr_args:
                 if is_spatial_arg(j):
                     numerator[i] = numerator[i] + torch.log(gathered_spatial_args[i][j])
-                    denominator[i] = denominator[i] + torch.log(old_gathered_spatial_args[i][j] + eps_denom)
+                    denominator[i] = denominator[i] + torch.log(torch.clamp(old_gathered_spatial_args[i][j], eps_denom))
                     entropy[i] = entropy[i] + c3 * torch.mean(self.entropy(gathered_spatial_args[i][j]))
                 else:
                     numerator[i] = numerator[i] + torch.log(gathered_args[i][j-3])
-                    denominator[i] = denominator[i] + torch.log(old_gathered_args[i][j-3] + eps_denom)
+                    denominator[i] = denominator[i] + torch.log(torch.clamp(old_gathered_args[i][j-3], eps_denom))
                     entropy[i] = entropy[i] + c4 * torch.mean(self.entropy(gathered_args[i][j-3]))
             num_args[i] += len(curr_args)
 
@@ -396,7 +401,7 @@ class BaseAgent(Agent):
         self.optimizer.zero_grad()
         total_loss.backward()
         #self.process_gradients(self.model)
-        
+
         print("actions: ", torch.max(gathered_actions).item(), torch.min(gathered_actions).item())
         print("args: ", torch.max(gathered_args).item(), torch.min(gathered_args).item())
         print("spatial args: ", torch.max(gathered_spatial_args).item(), torch.min(gathered_spatial_args).item())

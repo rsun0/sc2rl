@@ -61,7 +61,7 @@ def main():
 
     num_episodes = 10000000
     num_epochs = 3
-    batch_size = 146
+    batch_size = 32
     train_every = 1024
     save_every = 10240
     graph_every = 50
@@ -98,7 +98,7 @@ def main():
         "eps_denom": 1e-8,
         "c1": 0.1,
         "c2": 3.0,
-        "c3": 0.001,
+        "c3": 0.03,
         "c4": 0.1,
         "minc2": 0.1,
         "clip_param": 0.2,

@@ -66,7 +66,7 @@ class SequentialMemory(object):
         for i in idx_sample:
 
             row = copy.deepcopy(self.memory[i])
-            prev_action = self.memory[i-1][0][0]
+            prev_action = self.memory[i-1][0]
 
             prev_action_sample.append(prev_action)
             if (row[2]):
@@ -80,8 +80,11 @@ class SequentialMemory(object):
             #print(state[0].shape, state[1].shape, state[2].shape)
             mini_batch.append(row)
 
-        prev_action_sample = torch.from_numpy(np.array(prev_action_sample)).to(device)
-        relevant_frame = torch.from_numpy(np.array(relevant_frame)).to(device)
+
+        #prev_action_sample = torch.from_numpy(np.array(prev_action_sample)).to(device)
+        #relevant_frame = torch.from_numpy(np.array(relevant_frame)).to(device)
+        prev_action_sample = np.array(prev_action_sample)
+        relevant_frame = np.array(relevant_frame)
 
         self.access_num = (self.access_num + 1) % self.reset_num
         if (self.access_num == 0):
@@ -111,11 +114,12 @@ class SequentialMemory(object):
     """
         Performs random equivalent reorientation of state
     """
-    def random_transform(self, minimap, screen, hidden, action, transform):
+    def random_transform(self, minimap, screen, hidden, action, prev_action, transform):
         #minimap, screen = state[:, :2]
         #print(state.shape, minimap.shape, screen.shape)
         spatial_args = action
         new_spatial_action = np.copy(spatial_args)
+        new_prev_action = np.copy(prev_action)
         spatial_w = env_config["spatial_action_size"]
         num_dims = len(minimap.shape) - 1
 
@@ -128,18 +132,24 @@ class SequentialMemory(object):
             hidden = hidden.transpose(-2,-1).flip(num_dims)
             new_spatial_action[:,0] = (spatial_w - 1) - spatial_args[:,1]
             new_spatial_action[:,1] = spatial_args[:,0]
+            new_prev_action[:,0] = (spatial_w - 1) - prev_action[:,1]
+            new_prev_action[:,1] = prev_action[:,0]
         if transform >= 4 and transform < 6:
             minimap = minimap.flip(num_dims-1, num_dims)
             screen = screen.flip(num_dims-1, num_dims)
             hidden = hidden.flip(num_dims, num_dims+1)
             new_spatial_action[:,0] = (spatial_w - 1) - spatial_args[:,0]
             new_spatial_action[:,1] = (spatial_w - 1) - spatial_args[:,1]
+            new_prev_action[:,0] = (spatial_w - 1) - prev_action[:,0]
+            new_prev_action[:,1] = (spatial_w - 1) - prev_action[:,1]
         elif transform >= 6 and transform < 8:
             minimap = minimap.transpose(-2,-1).flip(num_dims)
             screen = screen.transpose(-2,-1).flip(num_dims)
             hidden = hidden.transpose(-2,-1).flip(num_dims+1)
             new_spatial_action[:,0] = spatial_args[:,1]
             new_spatial_action[:,1] = (spatial_w - 1) - spatial_args[:,0]
+            new_prev_action[:,0] = prev_action[:,1]
+            new_prev_action[:,1] = (spatial_w - 1) - prev_action[:,0]
 
         # Reflection
         if transform % 2 == 1:
@@ -147,16 +157,17 @@ class SequentialMemory(object):
             screen = screen.flip(num_dims)
             hidden = hidden.flip(num_dims+1)
             new_spatial_action[:,1] = (spatial_w - 1) - new_spatial_action[:,1]
+            new_prev_action[:,1] = (spatial_w - 1) - new_prev_action[:,1]
 
         action = new_spatial_action
-        return minimap, screen, hidden,  action
+        return minimap, screen, hidden, action, new_prev_action
 
-    def batch_random_transform(self, minimaps, screens, hiddens, actions):
+    def batch_random_transform(self, minimaps, screens, hiddens, actions, prev_actions):
         transform = np.random.randint(0,8)
         for i in range(len(minimaps)):
-            minimaps[i], screens[i], hiddens[i], actions[i] = self.random_transform(minimaps[i], screens[i], hiddens[i], actions[i], transform)
+            minimaps[i], screens[i], hiddens[i], actions[i], prev_actions[i] = self.random_transform(minimaps[i], screens[i], hiddens[i], actions[i], prev_actions[i], transform)
 
-        return minimaps, screens, hiddens, actions
+        return minimaps, screens, hiddens, actions, prev_actions
 
 
 

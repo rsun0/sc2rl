@@ -61,7 +61,7 @@ class BaseNetwork(nn.Module, Model):
         #return action_logits, arg_logits, spatial_logits, hidden, value, choice
         raise NotImplementedError
 
-    def unroll_forward(self, minimaps, screens, players, avail_actions, last_actions, hiddens, curr_actions, relevant_frames):
+    def unroll_forward(self, minimaps, screens, players, avail_actions, last_actions, last_spatials, hiddens, curr_actions, relevant_frames):
         t1 = time.time()
         hist_size = minimaps.shape[1]
         for i in range(hist_size-1):
@@ -71,6 +71,7 @@ class BaseNetwork(nn.Module, Model):
                                         players[:,i],
                                         None,
                                         last_actions[:,i],
+                                        last_spatials[:,i],
                                         hiddens,
                                         curr_action=None,
                                         unrolling=True)
@@ -86,6 +87,7 @@ class BaseNetwork(nn.Module, Model):
                                                                                 players[:,-1],
                                                                                 avail_actions,
                                                                                 last_actions[:,-1],
+                                                                                last_spatials[:,-1],
                                                                                 hiddens,
                                                                                 curr_action=curr_actions
                                                                             )
@@ -94,11 +96,11 @@ class BaseNetwork(nn.Module, Model):
         return action_logits, arg_logits, spatial_logits, _, values, _
 
 
-    def unroll_forward_sequential(self, minimaps, screens, players, avail_actions, last_actions, hiddens, curr_actions, relevant_frames, batch_size=32):
+    def unroll_forward_sequential(self, minimaps, screens, players, avail_actions, last_actions, last_spatial_actions, hiddens, curr_actions, relevant_frames, batch_size=32):
         t1 = time.time()
         N = minimaps.shape[0]
         hist_size = N - batch_size
-        processed_minimaps, processed_screens, inputs2d = self.process_states(minimaps, screens, players, last_actions)
+        processed_minimaps, processed_screens, inputs2d = self.process_states(minimaps, screens, players, last_actions, last_spatial_actions)
         hiddens = hiddens[:batch_size]
         t2 = time.time()
         for i in range(hist_size-1):
@@ -108,6 +110,7 @@ class BaseNetwork(nn.Module, Model):
                                         players[i:i+batch_size],
                                         None,
                                         last_actions[i:i+batch_size],
+                                        last_spatial_actions[i:i+batch_size],
                                         hiddens,
                                         curr_action=None,
                                         unrolling=True,
@@ -131,6 +134,7 @@ class BaseNetwork(nn.Module, Model):
                                                                                 players[-batch_size:],
                                                                                 avail_actions[-batch_size:],
                                                                                 last_actions[-batch_size:],
+                                                                                last_spatial_actions[-batch_size:],
                                                                                 hiddens,
                                                                                 curr_action=curr_actions[-batch_size:],
                                                                                 process_inputs=False,
@@ -140,11 +144,12 @@ class BaseNetwork(nn.Module, Model):
         #print("Preprocess time: %f. Unroll time: %f. Regular forward time: %f. Total: %f" % (t2-t1, t3-t2, t4-t3, t4-t1))
         return action_logits, arg_logits, spatial_logits, _, values, _
 
-    def process_states(self, minimaps, screens, players, last_actions):
+    def process_states(self, minimaps, screens, players, last_actions, last_spatial_actions):
 
         inputs = [minimaps, screens]
         [minimap, screen] = self.embed_inputs(inputs, self.net_config)
         [minimap, screen] = [minimap.to(self.device), screen.to(self.device)]
+        [minimap, screen] = self.concat_spatial([minimap, screen], last_actions, last_spatial_actions)
 
         processed_minimap = self.down_layers_minimap(minimap)
         processed_screen = self.down_layers_screen(screen)

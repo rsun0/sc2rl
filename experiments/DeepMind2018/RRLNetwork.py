@@ -7,7 +7,7 @@ import time
 
 from base_agent.Network import BaseNetwork
 
-from base_agent.sc2env_utils import generate_embeddings, multi_embed, valid_args, get_action_args, is_spatial_arg, env_config, processed_feature_dim
+from base_agent.sc2env_utils import generate_embeddings, multi_embed, valid_args, get_action_args, batch_get_action_args, is_spatial_arg, env_config, processed_feature_dim
 from base_agent.net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze, Squeeze, FastEmbedding
 
 class RRLModel(BaseNetwork):
@@ -23,6 +23,7 @@ class RRLModel(BaseNetwork):
 
         #self.minimap_embeddings, self.screen_embeddings = generate_embeddings(net_config)
         self.state_embeddings = generate_embeddings(net_config)
+        self.state_embeddings = nn.ModuleList(self.state_embeddings)
         self.minimap_features = processed_feature_dim(env_config["raw_minimap"], self.state_embeddings[0])
         self.screen_features = processed_feature_dim(env_config["raw_screen"], self.state_embeddings[1])
         self.player_features = env_config["raw_player"]
@@ -32,8 +33,8 @@ class RRLModel(BaseNetwork):
         ]
         #self.action_embedding = FastEmbedding(env_config["action_space"], net_config["action_embedding_size"]).to(self.device)
         self.action_embedding = nn.Embedding(env_config["action_space"], net_config["action_embedding_size"]).to(self.device)
-        self.down_layers_minimap = Downsampler(self.minimap_features, net_config)
-        self.down_layers_screen = Downsampler(self.screen_features, net_config)
+        self.down_layers_minimap = Downsampler(self.minimap_features+1, net_config)
+        self.down_layers_screen = Downsampler(self.screen_features+2, net_config)
 
         self.LSTM_in_size = 2*(4*net_config["down_conv_features"]) + net_config["inputs2d_size"] + 2
         self.convLSTM = ConvLSTM(self.LSTM_in_size,
@@ -105,6 +106,8 @@ class RRLModel(BaseNetwork):
         coordinates = np.stack([x,y])
         self.coordinates = torch.from_numpy(coordinates).float().to(self.device).detach().unsqueeze(0)
         print(x.shape, y.shape, coordinates.shape, self.coordinates.shape)
+        self.minimap_action = torch.zeros((1, 1, env_config["minimap_width"], env_config["minimap_width"])).float().to(self.device)
+        self.screen_action = torch.zeros((1, 2, env_config["screen_width"], env_config["minimap_width"])).float().to(self.device)
 
 
         self.arg_depth = env_config["arg_depth"]
@@ -126,7 +129,7 @@ class RRLModel(BaseNetwork):
 
         D is a placeholder for feature dimensions.
     """
-    def forward(self, minimap, screen, player, avail_actions, last_action, hidden, curr_action=None, choosing=False, unrolling=False, process_inputs=True, inputs2d=None):
+    def forward(self, minimap, screen, player, avail_actions, last_action, last_spatials, hidden, curr_action=None, choosing=False, unrolling=False, process_inputs=True, inputs2d=None):
         if (choosing):
             assert (curr_action is None)
         if (not choosing and not unrolling):
@@ -148,6 +151,7 @@ class RRLModel(BaseNetwork):
         if process_inputs:
             [minimap, screen] = self.embed_inputs(inputs, self.net_config)
             [minimap, screen] = [minimap.to(self.device), screen.to(self.device)]
+            [minimap, screen] = self.concat_spatial([minimap, screen], last_action, last_spatials)
 
             processed_minimap = self.down_layers_minimap(minimap)
             processed_screen = self.down_layers_screen(screen)
@@ -228,3 +232,44 @@ class RRLModel(BaseNetwork):
 
 
         return action_logits, arg_logits, spatial_logits, hidden, value, choice
+
+
+    def concat_spatial(self, inputs, last_action, last_spatials):
+        [minimap, screen] = inputs
+        if (len(last_spatials.shape) == 2):
+            minimap_action = self.minimap_action.clone()
+            screen_action = self.screen_action.clone()
+            ids = get_action_args(last_action)
+            if 0 in ids:
+                idx = 2*last_spatials[0]
+                screen_action[:,0,idx[0], idx[1]] = 1
+            if 1 in ids:
+                idx = 2*last_spatials[1]
+                minimap_action[:,0,idx[0],idx[1]] = 1
+            if 2 in ids:
+                idx = 2*last_spatials[2]
+                screen_action[:,1,idx[0],idx[1]] = 1
+            minimap = torch.cat([minimap, minimap_action], dim=1)
+            screen = torch.cat([screen, screen_action], dim=1)
+
+
+        else:
+            N = minimap.shape[0]
+            minimap_action = self.minimap_action.expand((N,) + self.minimap_action.shape[1:])
+            screen_action = self.screen_action.expand((N,) + self.screen_action.shape[1:])
+            ids = batch_get_action_args(last_action)
+            for i in range(len(ids)):
+                if 0 in ids[i]:
+                    idx = 2*last_spatials[i,0]
+                    screen_action[i,0, idx[0], idx[1]] = 1
+                if 1 in ids[i]:
+                    idx = 2*last_spatials[i,1]
+                    minimap_action[i,0,idx[0],idx[1]] = 1
+                if 2 in ids[i]:
+                    idx = 2*last_spatials[i,2]
+                    screen_action[i,1,idx[0],idx[1]] = 1
+            minimap = torch.cat([minimap, minimap_action], dim=1)
+            screen = torch.cat([screen, screen_action], dim=1)
+
+
+        return [minimap, screen]
