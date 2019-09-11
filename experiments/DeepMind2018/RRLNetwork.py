@@ -7,7 +7,7 @@ import time
 
 from base_agent.Network import BaseNetwork
 
-from base_agent.sc2env_utils import generate_embeddings, multi_embed, valid_args, get_action_args, batch_get_action_args, is_spatial_arg, env_config, processed_feature_dim
+from base_agent.sc2env_utils import generate_embeddings, multi_embed, valid_args, get_action_args, batch_get_action_args, is_spatial_arg, env_config, processed_feature_dim, full_action_space
 from base_agent.net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze, Squeeze, FastEmbedding
 
 class RRLModel(BaseNetwork):
@@ -16,10 +16,11 @@ class RRLModel(BaseNetwork):
         net_config: Specifies parameters for network
         device: "cpu" or "cuda:" + str(put int here)
     """
-    def __init__(self, net_config, device="cpu"):
+    def __init__(self, net_config, device="cpu", action_space=full_action_space):
         super(RRLModel, self).__init__(net_config, device)
         self.net_config = net_config
         self.device = device
+        self.action_space = torch.from_numpy(action_space.reshape(1, -1)).to(device).byte()
 
         #self.minimap_embeddings, self.screen_embeddings = generate_embeddings(net_config)
         self.state_embeddings = generate_embeddings(net_config)
@@ -187,7 +188,7 @@ class RRLModel(BaseNetwork):
         shared_features = torch.cat([inputs2d, relational_nonspatial], dim=-1)
         value = self.value_MLP(shared_features)
         action_logits_in = self.action_MLP(shared_features)
-        action_logits_in = action_logits_in.masked_fill((1-avail_actions).bool(), float('-inf'))
+        action_logits_in = action_logits_in.masked_fill((1-avail_actions*self.action_space).bool(), float('-inf'))
         #print("actions: ", torch.max(action_logits_in, dim=-1))
         action_logits = F.softmax(action_logits_in)
         #action_logits = action_logits / torch.sum(action_logits, axis=-1)

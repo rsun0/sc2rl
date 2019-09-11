@@ -41,7 +41,7 @@ def print_action(action):
 
 minimap_categorical_indices, minimap_categorical_sizes = categorical_mask(MINIMAP_FEATURES)
 screen_categorical_indices, screen_categorical_sizes = categorical_mask(SCREEN_FEATURES)
-
+full_action_space = np.ones(len(FUNCTIONS))
 
 
 

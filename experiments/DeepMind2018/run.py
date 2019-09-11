@@ -7,9 +7,10 @@ from base_agent.base_agent import BaseAgent
 from abstract_core import Experiment, RunSettings
 from base_agent.memory import ReplayMemory, SequentialMemory
 from agent import AgentSettings
-from base_agent.sc2env_utils import env_config
+from base_agent.sc2env_utils import env_config, full_action_space
 import torch
 import argparse
+import numpy as np
 
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -48,7 +49,10 @@ def main():
         "device": device
     }
 
-    model = RRLModel(net_config, device=device).to(device)
+    action_space = np.zeros(full_action_space.shape)
+    action_space[[0, 3, 12, 13, 331, 332]] = 1
+
+    model = RRLModel(net_config, device=device, action_space=action_space).to(device)
     print(model)
 
 
@@ -97,11 +101,11 @@ def main():
         "device": device,
         "eps_denom": 1e-8,
         "c1": 0.1,
-        "c2": 3.0,
+        "c2": 1.0,
         "c3": 0.03,
         "c4": 0.1,
         "minc2": 0.1,
-        "clip_param": 0.2,
+        "clip_param": 0.1,
         "min_clip_param": 0.01,
         "clip_decay": 10000,
         "c2_decay": 10000,
