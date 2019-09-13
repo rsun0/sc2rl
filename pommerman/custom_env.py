@@ -1,4 +1,7 @@
-from interface.abstract_core import CustomEnvironment
+import sys
+sys.path.insert(0, "../interface/")
+
+from abstract_core import CustomEnvironment
 import pommerman
 from pommerman import agents
 
@@ -14,18 +17,20 @@ class PommermanEnvironment(CustomEnvironment):
         self.render = render
 
         agent_list = [
-            agents.BaseAgent(),
+            DummyAgent(), # placeholder for learning agent
             agents.SimpleAgent(),
         ]
         self._env = pommerman.make('OneVsOne-v0', agent_list)
+        self._state = None
 
     def reset(self):
-        self.state = self._env.reset()
-        # TODO extract learning agent's state from state
-        return [self.state], [0], False, [None] 
+        self._state = self._env.reset()
+        return self._state[:1], [0], False, [None] 
 
     def step(self, action):
         if self.render:
             self._env.render()
-            actions = env.act(state)
-            self._env.step(actions)
+        actions = self._env.act(self._state)
+        actions[0] = action
+        self._state, reward, terminal, info = self._env.step(actions)
+        return self._state[:1], reward[:1], terminal, info
