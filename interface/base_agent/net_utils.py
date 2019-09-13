@@ -160,51 +160,22 @@ class SelfAttentionBlock(nn.Module):
 
 class RelationalModule(nn.Module):
 
-    def __init__(self, in_size, num_features, num_heads):
-        super(SelfAttentionBlock, self).__init__()
+    def __init__(self, in_size, num_features, num_heads, encode=True):
+        super(RelationalModule, self).__init__()
+        self.encode = encode
+        self.net_encoding = nn.Conv2d(in_size, num_heads*num_features, kernel_size=1, stride=1, padding=0)
+        self.mhdpa = nn.TransformerEncoderLayer(num_heads*num_features, num_heads, dim_feedforward=num_features)
 
-        self.in_size = in_size
-        self.num_features = num_features
-
-        self.QueryLayer = nn.Sequential(
-            nn.Linear(in_size, num_features),
-            nn.InstanceNorm1d(num_features)
-        )
-
-        self.KeyLayer = nn.Sequential(
-            nn.Linear(in_size, num_features),
-            nn.InstanceNorm1d(num_features)
-        )
-
-        self.ValueLayer = nn.Sequential(
-            nn.Linear(in_size, num_features),
-            nn.InstanceNorm1d(num_features)
-        )
-
-        self.QueryNorm = nn.InstanceNorm1d(num_features)
-        self.KeyNorm = nn.InstanceNorm1d(num_features)
-        self.ValueNorm = nn.InstanceNorm1d(num_features)
-
-    """
-        Take in x of shape (N, D, H, W), perform attention calculations,
-        return processed output of shape (N, num_features, H, W)
-    """
     def forward(self, x):
+        if (self.encode):
+            x = self.net_encoding(x)
         (N, D, H, W) = x.shape
         new_x = x.permute(0, 2, 3, 1)
-        flattened = new_x.flatten(start_dim=1, end_dim=-2)
+        new_x = new_x.flatten(start_dim=1, end_dim=-2)
 
-        Q = self.QueryNorm(self.QueryLayer(flattened))
-        K = self.KeyNorm(self.KeyLayer(flattened))
-        V = self.ValueNorm(self.ValueLayer(flattened))
-
-        numerator = torch.matmul(Q, K.permute(0,2,1))
-        scaled = numerator / math.sqrt(self.num_features)
-        attention_weights = F.softmax(scaled)
-        A = torch.matmul(attention_weights, V)
-        A_out = A.view((N, -1, H, W))
-
-        return A_out
+        output = self.mhdpa(new_x)
+        output = output.permute(0,2,1).contiguous().view((N, -1, H, W))
+        return output
 
 class Downsampler(nn.Module):
     def __init__(self, input_features, net_config):

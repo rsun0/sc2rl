@@ -410,7 +410,7 @@ class BaseAgent(Agent):
 
         clip_grad_norm_(self.model.parameters(), 100.0)
         self.optimizer.step()
-        self.process_network(self.model)
+        #self.process_network(self.model)
         t7 = time.time()
         pol_loss = pol_avg.detach().item()
         vf_loss = value_loss.detach().item()

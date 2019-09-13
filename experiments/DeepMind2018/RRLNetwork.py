@@ -8,7 +8,7 @@ import time
 from base_agent.Network import BaseNetwork
 
 from base_agent.sc2env_utils import generate_embeddings, multi_embed, valid_args, get_action_args, batch_get_action_args, is_spatial_arg, env_config, processed_feature_dim, full_action_space
-from base_agent.net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze, Squeeze, FastEmbedding
+from base_agent.net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze, Squeeze, FastEmbedding, RelationalModule
 
 class RRLModel(BaseNetwork):
 
@@ -49,7 +49,7 @@ class RRLModel(BaseNetwork):
             nn.ReLU(),
             nn.Linear(128, net_config["inputs2d_size"])
         )
-
+        """
         self.attention_blocks = nn.Sequential(
             SelfAttentionBlock(net_config['LSTM_hidden_size'] + self.LSTM_in_size,
                                 net_config['relational_features'],
@@ -63,6 +63,22 @@ class RRLModel(BaseNetwork):
                                                     net_config['relational_heads']
                                                 )
                                             )
+        """
+
+        self.attention_blocks = nn.Sequential(
+            RelationalModule(net_config['LSTM_hidden_size'] + self.LSTM_in_size,
+                                net_config['relational_features'],
+                                net_config['relational_heads'])
+        )
+        for i in range(net_config['relational_depth']-1):
+            self.attention_blocks.add_module(
+                "Block"+str(i+2),
+                RelationalModule(net_config['relational_features'],
+                                net_config['relational_features'],
+                                net_config['relational_heads'],
+                                encode=False)
+            )
+
 
         self.relational_processor = nn.Sequential(
             nn.MaxPool2d(net_config['inputs3d_width']),
@@ -182,8 +198,10 @@ class RRLModel(BaseNetwork):
         if unrolling:
             #print("Unrolling times\n embedding: %f, down layers: %f, inputs2dmlp: %f, lstm: %f. Total: %f" % (t2-t1,t3-t2,t4-t3,t5-t4,t5-t1))
             return hidden
+
         relational_spatial = self.attention_blocks(outputs2d)
         relational_nonspatial = self.relational_processor(relational_spatial)
+
         t6 = time.time()
         shared_features = torch.cat([inputs2d, relational_nonspatial], dim=-1)
         value = self.value_MLP(shared_features)
