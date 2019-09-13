@@ -162,17 +162,19 @@ class RelationalModule(nn.Module):
 
     def __init__(self, in_size, num_features, num_heads, encode=True):
         super(RelationalModule, self).__init__()
+        self.in_size=in_size
+        self.num_features=num_features
+        self.num_heads=num_heads
         self.encode = encode
         self.net_encoding = nn.Conv2d(in_size, num_heads*num_features, kernel_size=1, stride=1, padding=0)
         self.mhdpa = nn.TransformerEncoderLayer(num_heads*num_features, num_heads, dim_feedforward=num_features)
 
     def forward(self, x):
-        if (self.encode):
+        if (self.encode and self.in_size != self.num_heads*self.num_features):
             x = self.net_encoding(x)
         (N, D, H, W) = x.shape
         new_x = x.permute(0, 2, 3, 1)
         new_x = new_x.flatten(start_dim=1, end_dim=-2)
-
         output = self.mhdpa(new_x)
         output = output.permute(0,2,1).contiguous().view((N, -1, H, W))
         return output
