@@ -49,9 +49,9 @@ def main():
         "device": device
     }
 
-    action_space = np.zeros(full_action_space.shape)
-    action_space[[0, 3, 12, 13, 331, 332]] = 1
-
+    #action_space = np.zeros(full_action_space.shape)
+    #action_space[[0, 3, 12, 13, 331, 332]] = 1
+    action_space = np.ones(full_action_space.shape)
     model = RRLModel(net_config, device=device, action_space=action_space).to(device)
     print(model)
 
@@ -59,8 +59,8 @@ def main():
     lr = 1e-4
     eps_max = 0.3
     eps_min = 0.05
-    eps_duration=1e4
-    history_size=15
+    eps_duration=2e4
+    history_size=30
 
 
     num_episodes = 10000000
@@ -102,8 +102,8 @@ def main():
         "eps_denom": 1e-8,
         "c1": 0.1,
         "c2": 1.0,
-        "c3": 0.03,
-        "c4": 0.1,
+        "c3": 0.3,
+        "c4": 0.3,
         "minc2": 0.1,
         "clip_param": 0.1,
         "min_clip_param": 0.01,
