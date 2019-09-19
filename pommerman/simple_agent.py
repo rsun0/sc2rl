@@ -30,7 +30,7 @@ class SimpleAgent(Agent):
         return state
 
     def action_space_converter(self, action):
-        action
+        return action
 
     def train(self):
         pass
