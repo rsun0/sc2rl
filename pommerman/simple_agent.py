@@ -32,7 +32,7 @@ class SimpleAgent(Agent):
     def action_space_converter(self, action):
         return action
 
-    def train(self):
+    def train(self, run_settings):
         pass
 
     def train_step(self, batch_size):

@@ -53,7 +53,7 @@ class Agent():
         """
         raise NotImplementedError
 
-    def train(self):
+    def train(self, run_settings):
         """
         Calls train_step until it has run through memory self.epochs times
         """
