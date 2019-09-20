@@ -23,16 +23,17 @@ def argmax_tiebreaking(Q):
 
 
 class MCTSNode(object):
-    def __init__(self, p):
+    def __init__(self, p, mcts_c_puct):
         # values for 6 actions
         self.Q = np.zeros(NUM_ACTIONS)
         self.W = np.zeros(NUM_ACTIONS)
         self.N = np.zeros(NUM_ACTIONS, dtype=np.uint32)
         assert p.shape == (NUM_ACTIONS,)
         self.P = p
+        self.mcts_c_puct = mcts_c_puct
 
     def action(self):
-        U = args.mcts_c_puct * self.P * np.sqrt(np.sum(self.N)) / (1 + self.N)
+        U = self.mcts_c_puct * self.P * np.sqrt(np.sum(self.N)) / (1 + self.N)
         return argmax_tiebreaking(self.Q + U)
 
     def update(self, action, reward):
@@ -49,16 +50,40 @@ class MCTSNode(object):
             Nt = self.N ** (1.0 / temperature)
             return Nt / np.sum(Nt)
 
+class MCTSWrapperAgent(BaseAgent):
+    def __init__(self, mcts_agent, *args, **kwargs):
+        super(MCTSWrapperAgent, self).__init__(*args, **kwargs) 
+        self.mcts_agent = mcts_agent
+        self.num_episodes = 400
+
+    def act(self, obs, action_space):
+        data = []
+        for i in range(self.num_episodes):
+            # do rollout
+            length, reward, rewards = self.mcts_agent.rollout()
+            # add data samples to log
+            data.append((length, reward, rewards, self.mcts_agent.agent_id))
+
+        #TODO
+
+        assert False
 
 class MCTSAgent(BaseAgent):
 
     def __init__(self, agent_id=0, *args, **kwargs):
+        print('init')
         super(MCTSAgent, self).__init__(*args, **kwargs)
         self.agent_id = 0
         self.env = self.make_env()
         self.reset_tree()
+        self.num_episodes = 400
+        self.mcts_iters = 10
+        self.mcts_c_puct = 1.0
+        self.discount =0.99
+        self.temperature = 0.0
 
     def make_env(self):
+        print('make_env')
         agents = []
         for agent_id in range(NUM_AGENTS):
             if agent_id == self.agent_id:
@@ -69,9 +94,11 @@ class MCTSAgent(BaseAgent):
         return pommerman.make('PommeFFACompetition-v0', agents)
 
     def reset_tree(self):
+        print('reset_tree')
         self.tree = {}
 
     def search(self, root, num_iters, temperature=1):
+        print('search')
         # remember current game state
         self.env._init_game_state = root
         root = str(root)
@@ -99,7 +126,7 @@ class MCTSAgent(BaseAgent):
                     reward = rewards[self.agent_id]
 
                     # add new node to the tree
-                    self.tree[state] = MCTSNode(probs)
+                    self.tree[state] = MCTSNode(probs, self.mcts_c_puct)
 
                     # stop at leaf node
                     break
@@ -120,7 +147,7 @@ class MCTSAgent(BaseAgent):
             # update tree nodes with rollout results
             for node, action in reversed(trace):
                 node.update(action, reward)
-                reward *= args.discount
+                reward *= self.discount
 
         # reset env back where we were
         self.env.set_json_info()
@@ -129,6 +156,7 @@ class MCTSAgent(BaseAgent):
         return self.tree[root].probs(temperature)
 
     def rollout(self):
+        print('rollout')
         # reset search tree in the beginning of each rollout
         self.reset_tree()
 
@@ -140,12 +168,9 @@ class MCTSAgent(BaseAgent):
         length = 0
         done = False
         while not done:
-            if args.render:
-                self.env.render()
-
             root = self.env.get_json_info()
             # do Monte-Carlo tree search
-            pi = self.search(root, args.mcts_iters, args.temperature)
+            pi = self.search(root, self.mcts_iters, self.temperature)
             # sample action from probabilities
             action = np.random.choice(NUM_ACTIONS, p=pi)
 
@@ -165,6 +190,7 @@ class MCTSAgent(BaseAgent):
         return length, reward, rewards
 
     def act(self, obs, action_space):
+        print('act')
         # TODO
         assert False
 
@@ -177,6 +203,7 @@ def runner(id, num_episodes, fifo, _args):
     agent_id = id % NUM_AGENTS
     agent = MCTSAgent(agent_id=agent_id)
 
+    data = []
     for i in range(num_episodes):
         # do rollout
         start_time = time.time()
