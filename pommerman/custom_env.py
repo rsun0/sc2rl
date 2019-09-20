@@ -27,10 +27,10 @@ class PommermanEnvironment(CustomEnvironment):
         self._state = self._env.reset()
         return self._state[:1], [0], False, [None] 
 
-    def step(self, action):
+    def step(self, action_list):
         if self.render:
             self._env.render()
         actions = self._env.act(self._state)
-        actions[0] = action
+        actions[0] = action_list[0]
         self._state, reward, terminal, info = self._env.step(actions)
         return self._state[:1], reward[:1], terminal, info
