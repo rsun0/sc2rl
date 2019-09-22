@@ -8,7 +8,7 @@ import time
 from base_agent.Network import BaseNetwork
 
 from base_agent.sc2env_utils import generate_embeddings, multi_embed, valid_args, get_action_args, batch_get_action_args, is_spatial_arg, env_config, processed_feature_dim, full_action_space
-from base_agent.net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze, Squeeze, FastEmbedding, RelationalModule
+from base_agent.net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze, Squeeze, FastEmbedding, RelationalModule, Flatten
 
 class RRLModel(BaseNetwork):
 
@@ -65,6 +65,7 @@ class RRLModel(BaseNetwork):
                                             )
         """
 
+
         self.attention_blocks = nn.Sequential(
             RelationalModule(net_config['LSTM_hidden_size'],
                                 net_config['relational_features'],
@@ -79,12 +80,18 @@ class RRLModel(BaseNetwork):
                                 encode=False)
             )
 
+        self.baseline_layers = nn.Sequential(
+            nn.Conv2d(net_config['LSTM_hidden_size'], net_config['relational_features'], kernel_size=3, stride=1, padding=1),
+            ResnetBlock(net_config['relational_features'], 3),
+            ResnetBlock(net_config['relational_features'], 3),
+            ResnetBlock(net_config['relational_features'], 3),
+            ResnetBlock(net_config['relational_features'], 3)
+        )
 
         self.relational_processor = nn.Sequential(
-            nn.MaxPool2d(net_config['inputs3d_width']),
-            Squeeze(),
-            Squeeze(),
-            nn.Linear(net_config['relational_heads'] * net_config['relational_features'],
+            nn.MaxPool2d(2),
+            Flatten(1, -1),
+            nn.Linear(net_config['relational_heads'] * net_config['relational_features'] * 16,
                         512),
             nn.ReLU(),
             nn.Linear(512, 512),
@@ -200,6 +207,7 @@ class RRLModel(BaseNetwork):
             return hidden
 
         relational_spatial = self.attention_blocks(outputs2d)
+        #relational_spatial = self.baseline_layers(outputs2d)
         relational_nonspatial = self.relational_processor(relational_spatial)
 
         t6 = time.time()

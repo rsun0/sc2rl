@@ -60,7 +60,7 @@ def main():
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=2e4
-    history_size=30
+    history_size=15
 
 
     num_episodes = 10000000
@@ -101,7 +101,7 @@ def main():
         "device": device,
         "eps_denom": 1e-8,
         "c1": 0.1,
-        "c2": 0.03,
+        "c2": 0.1,
         "c3": 0.3,
         "c4": 0.3,
         "minc2": 0.01,
