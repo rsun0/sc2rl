@@ -1,24 +1,17 @@
-'''The base simple agent use to train agents.
-This agent is also the benchmark for other agents.
-'''
+import sys
+sys.path.insert(0, "../interface/")
+
 from collections import defaultdict
 import queue
 import random
-
 import numpy as np
 
-from . import BaseAgent
-from .. import constants
-from .. import utility
+from agent import Agent
+from pommerman import constants, utility
 
-
-class SimpleAgent(BaseAgent):
-    """This is a baseline agent. After you can beat it, submit your agent to
-    compete.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super(SimpleAgent, self).__init__(*args, **kwargs)
+class SimpleAgent(Agent):
+    def __init__(self):
+        # Intentionally bypassing parent constructor
 
         # Keep track of recently visited uninteresting positions so that we
         # don't keep visiting the same places.
@@ -27,7 +20,31 @@ class SimpleAgent(BaseAgent):
         # Keep track of the previous direction to help with the enemy standoffs.
         self._prev_direction = None
 
-    def act(self, obs, action_space):
+    def _sample(self, state):
+        return self.act(state)
+
+    def _forward(self, state):
+        return self._sample(state)
+
+    def state_space_converter(self, state):
+        return state
+
+    def action_space_converter(self, action):
+        return action
+
+    def train(self, run_settings):
+        pass
+
+    def train_step(self, batch_size):
+        pass
+
+    def save(self):
+        pass
+    
+    def push_memory(self, state, action, reward, done):
+        pass
+
+    def act(self, obs):
         def convert_bombs(bomb_map):
             '''Flatten outs the bomb array'''
             ret = []

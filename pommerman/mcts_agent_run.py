@@ -1,7 +1,7 @@
 '''An example to show how to set up an pommerman game programmatically'''
 import pommerman
 from pommerman import agents
-
+from mcts_agent import MCTSWrapperAgent, MCTSAgent
 
 def main():
     '''Simple function to bootstrap a game.
@@ -11,13 +11,15 @@ def main():
     # Print all possible environments in the Pommerman registry
     print(pommerman.REGISTRY)
 
+    mcts_agent = MCTSWrapperAgent(MCTSAgent(agent_id=0))
+
     # Create a set of agents (exactly four)
     agent_list = [
+        mcts_agent,
         agents.SimpleAgent(),
         agents.RandomAgent(),
         agents.SimpleAgent(),
-        agents.RandomAgent(),
-        # agents.DockerAgent("pommerman/simple-agent", port=12345),
+        # agents.SimpleAgent(),
     ]
     # Make the "Free-For-All" environment using the agent list
     env = pommerman.make('PommeFFACompetition-v0', agent_list)
