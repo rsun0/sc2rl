@@ -243,7 +243,7 @@ class ReplayMemory(object):
                     relevant_frame = [0 for k in relevant_frame]
 
                 state = self.memory[i+j][0]
-                prev_action = self.memory[i+j-1][1][0]
+                prev_action = self.memory[i+j-1][1]
 
                 minimap_sample.append(state[0])
                 screen_sample.append(state[1])

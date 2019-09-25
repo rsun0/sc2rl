@@ -153,7 +153,7 @@ class RRLModel(BaseNetwork):
 
         D is a placeholder for feature dimensions.
     """
-    def forward(self, minimap, screen, player, avail_actions, last_action, last_spatials, hidden, curr_action=None, choosing=False, unrolling=False, process_inputs=True, inputs2d=None):
+    def forward(self, minimap, screen, player, avail_actions, last_action, last_spatials, hidden, curr_action=None, choosing=False, unrolling=False, process_inputs=True, inputs2d=None, format_inputs=True):
         if (choosing):
             assert (curr_action is None)
         if (not choosing and not unrolling):
@@ -173,9 +173,10 @@ class RRLModel(BaseNetwork):
         inputs = [minimap, screen]
 
         if process_inputs:
-            [minimap, screen] = self.embed_inputs(inputs, self.net_config)
-            [minimap, screen] = [minimap.to(self.device), screen.to(self.device)]
-            [minimap, screen] = self.concat_spatial([minimap, screen], last_action, last_spatials)
+            if format_inputs:
+                [minimap, screen] = self.embed_inputs(inputs, self.net_config)
+                [minimap, screen] = [minimap.to(self.device), screen.to(self.device)]
+                [minimap, screen] = self.concat_spatial([minimap, screen], last_action, last_spatials)
 
             processed_minimap = self.down_layers_minimap(minimap)
             processed_screen = self.down_layers_screen(screen)
@@ -186,7 +187,6 @@ class RRLModel(BaseNetwork):
         curr_coordinates = self.coordinates.expand((N,) + self.coordinates.shape[1:])
 
         t2 = time.time()
-
         inputs3d = torch.cat([processed_minimap, processed_screen, curr_coordinates], dim=1)
         t3 = time.time()
         if process_inputs:

@@ -92,7 +92,7 @@ class BaseAgent(Agent):
 
             for j in range(num_iters):
 
-                d_pol, d_vf, d_ent = self.train_step_sequential(batch_size)
+                d_pol, d_vf, d_ent = self.train_step(batch_size)
                 if (math.isnan(d_pol) or math.isnan(d_vf) or math.isnan(d_ent)):
                     print("Canceling training -- NaN's encountered")
                     print("Reloading model from previous save")
@@ -140,7 +140,16 @@ class BaseAgent(Agent):
         screens = np.stack(states[:,1], axis=0).squeeze(2)
         hiddens = np.concatenate(states[:,4], axis=0)
         spatial_args = np.stack(actions[:,2], 0).astype(np.int64)
-        minimaps, screens, hiddens, spatial_args = self.memory.batch_random_transform(minimaps, screens, hiddens, spatial_args)
+
+        T = minimaps.shape[1]
+        prev_actions = np.stack(states[:,6], 0).squeeze(1)
+        stacked_prev = prev_actions.reshape((n * T,) + prev_actions.shape[2:])
+        prev_base_actions = torch.from_numpy(np.stack(stacked_prev[:,0], 0).astype(np.int64)).to(self.device)
+        prev_spatial_actions = np.stack(stacked_prev[:,2], 0).astype(np.int64)
+        prev_base_actions = prev_base_actions.reshape((n, T) + prev_base_actions.shape[1:])
+        prev_spatial_actions = prev_spatial_actions.reshape((n, T) + prev_spatial_actions.shape[1:])
+
+        #minimaps, screens, hiddens, spatial_args, prev_spatial_actions = self.memory.batch_random_transform(minimaps, screens, hiddens, spatial_args, prev_spatial_actions)
 
         minimaps = torch.from_numpy(minimaps.copy()).float().to(self.device)
         screens = torch.from_numpy(screens.copy()).float().to(self.device)
@@ -148,9 +157,9 @@ class BaseAgent(Agent):
         avail_actions = torch.from_numpy(np.stack(states[:,3], axis=0)).byte().to(self.device)
         hidden_states = torch.from_numpy(hiddens.copy()).float().to(self.device)
         old_hidden_states = torch.from_numpy(np.concatenate(states[:,5], axis=0)).float().to(self.device)
-        prev_actions = torch.from_numpy(np.stack(states[:,6], axis=0)).long().to(self.device).squeeze(1)
+        #prev_base_actions = torch.from_numpy(prev_base_actions).long().to(self.device)
+        prev_spatial_actions = torch.from_numpy(prev_spatial_actions).long().to(self.device)
         relevant_states = torch.from_numpy(np.stack(states[:,7], axis=0)).byte().to(self.device)
-
 
         base_actions = np.stack(actions[:,0], 0).astype(np.int64).squeeze(1)
         args = np.stack(actions[:,1], 0).astype(np.int64)
@@ -165,6 +174,7 @@ class BaseAgent(Agent):
         advantages = (advantages - advantages.mean()) / advantages.std()
         v_returns = torch.from_numpy(v_returns).float().to(self.device)
         dones = torch.from_numpy(dones.astype(np.uint8)).byte().to(self.device)
+        base_actions = torch.from_numpy(base_actions).to(self.device)
         t3 = time.time()
 
         # minimaps, screens, players, avail_actions, last_actions, hiddens, curr_actions, relevant_frames
@@ -173,7 +183,8 @@ class BaseAgent(Agent):
             screens,
             players,
             avail_actions,
-            prev_actions,
+            prev_base_actions,
+            prev_spatial_actions,
             hidden_states,
             base_actions,
             relevant_states
@@ -184,7 +195,8 @@ class BaseAgent(Agent):
             screens[:,[-1]],
             players[:,[-1]],
             avail_actions,
-            prev_actions[:,[-1]],
+            prev_base_actions[:,[-1]],
+            prev_spatial_actions[:,[-1]],
             old_hidden_states,
             base_actions,
             relevant_states[:,[-1]]
@@ -248,12 +260,13 @@ class BaseAgent(Agent):
         self.optimizer.zero_grad()
         total_loss.backward()
         #self.process_gradients(self.model)
-        clip_grad_norm_(self.model.parameters(), 30.0)
+        clip_grad_norm_(self.model.parameters(), 100.0)
         self.optimizer.step()
         t7 = time.time()
         pol_loss = pol_avg.detach().item()
         vf_loss = value_loss.detach().item()
         ent_total = ent.detach().item()
+        print("Total train time: %f" % (t7-t1))
         #print("%f %f %f %f %f %f, total: %f" % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t7-t1))
 
         return pol_loss, vf_loss, -ent_total

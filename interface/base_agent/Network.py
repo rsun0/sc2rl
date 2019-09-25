@@ -61,20 +61,45 @@ class BaseNetwork(nn.Module, Model):
         #return action_logits, arg_logits, spatial_logits, hidden, value, choice
         raise NotImplementedError
 
+
+    def stacked_past_forward(self, minimaps, screens, players, avail_actions, last_actions, last_spatials, hiddens, curr_actions, relevant_frames):
+        minimaps, screens, _ = self.process_states(minimaps, screens, players, last_actions, hiddens, curr_actions, relevant_frames)
+        minimaps = minimaps.flatten(1, -1)
+        screens = screens.flatten(1, -1)
+
+        action_logits, arg_logits, spatial_logits, _, values, _ = self.forward(
+            minimaps,
+            screens,
+            players[:,-1],
+            avail_actions,
+            last_actions[:,-1]
+            last_spatials[:,-1],
+            None,
+            curr_action=curr_actions,
+            process_inputs=True,
+            format_inputs=False,
+            inputs2d=inputs2d[:,-1]
+        )
+
+        return action_logits, arg_logits, spatial_logits, _, values, _
+
     def unroll_forward(self, minimaps, screens, players, avail_actions, last_actions, last_spatials, hiddens, curr_actions, relevant_frames):
         t1 = time.time()
+        processed_minimaps, processed_screens, inputs2d = self.process_states(minimaps, screens, players, last_actions, last_spatials, sequential=False)
         hist_size = minimaps.shape[1]
         for i in range(hist_size-1):
             t5 = time.time()
-            hiddens = self.forward(minimaps[:,i],
-                                        screens[:,i],
+            hiddens = self.forward(processed_minimaps[:,i],
+                                        processed_screens[:,i],
                                         players[:,i],
                                         None,
                                         last_actions[:,i],
                                         last_spatials[:,i],
                                         hiddens,
                                         curr_action=None,
-                                        unrolling=True)
+                                        unrolling=True,
+                                        process_inputs=False,
+                                        inputs2d=inputs2d[:,i])
             t6 = time.time()
             irrelevant_mask = relevant_frames[:,i] == 0
             hiddens[irrelevant_mask] = self.init_hidden(batch_size=torch.sum(irrelevant_mask), device=self.device)
@@ -82,14 +107,16 @@ class BaseNetwork(nn.Module, Model):
 
         t2 = time.time()
         action_logits, arg_logits, spatial_logits, _, values, _ = self.forward(
-                                                                                minimaps[:,-1],
-                                                                                screens[:,-1],
+                                                                                processed_minimaps[:,-1],
+                                                                                processed_screens[:,-1],
                                                                                 players[:,-1],
                                                                                 avail_actions,
                                                                                 last_actions[:,-1],
                                                                                 last_spatials[:,-1],
                                                                                 hiddens,
-                                                                                curr_action=curr_actions
+                                                                                curr_action=curr_actions,
+                                                                                process_inputs=False,
+                                                                                inputs2d=inputs2d[:,-1]
                                                                             )
         t3 = time.time()
         #print("Unroll time: %f. Regular forward time: %f. Total: %f" % (t2-t1, t3-t2, t3-t1))
@@ -144,12 +171,31 @@ class BaseNetwork(nn.Module, Model):
         #print("Preprocess time: %f. Unroll time: %f. Regular forward time: %f. Total: %f" % (t2-t1, t3-t2, t4-t3, t4-t1))
         return action_logits, arg_logits, spatial_logits, _, values, _
 
-    def process_states(self, minimaps, screens, players, last_actions, last_spatial_actions):
+    def process_states(self, minimaps, screens, players, last_actions, last_spatial_actions, sequential=True, embeddings_only=False):
+
+
+        if not sequential:
+            minimaps_s = minimaps.shape
+            screens_s = screens.shape
+            players_s = players.shape
+            last_actions_s = last_actions.shape
+            last_spatial_actions_s = last_spatial_actions.shape
+
+            minimaps = minimaps.flatten(0,1)
+            screens = screens.flatten(0,1)
+            players = players.flatten(0,1)
+            last_actions = last_actions.flatten(0,1)
+            last_spatial_actions = last_spatial_actions.flatten(0,1)
 
         inputs = [minimaps, screens]
         [minimap, screen] = self.embed_inputs(inputs, self.net_config)
         [minimap, screen] = [minimap.to(self.device), screen.to(self.device)]
         [minimap, screen] = self.concat_spatial([minimap, screen], last_actions, last_spatial_actions)
+
+        if embeddings_only:
+            processed_minimap = minimap.view(minimaps_s[:2] + minimap.shape[1:])
+            processed_screen = screen.view(screens_s[:2] + screen.shape[1:])
+            return processed_minimap, processed_screen, None
 
         processed_minimap = self.down_layers_minimap(minimap)
         processed_screen = self.down_layers_screen(screen)
@@ -157,6 +203,12 @@ class BaseNetwork(nn.Module, Model):
         embedded_last_actions = self.action_embedding(last_actions).to(self.device)
         nonspatial_concat = torch.cat([players, embedded_last_actions], dim=-1)
         inputs2d = self.inputs2d_MLP(nonspatial_concat)
+
+        if not sequential:
+            processed_minimap = processed_minimap.view(minimaps_s[:2] + processed_minimap.shape[1:])
+            processed_screen = processed_screen.view(screens_s[:2] + processed_screen.shape[1:])
+            inputs2d = inputs2d.view(players_s[:2] + inputs2d.shape[1:])
+
 
         return processed_minimap, processed_screen, inputs2d
 

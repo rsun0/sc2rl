@@ -60,7 +60,7 @@ def main():
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=2e4
-    history_size=15
+    history_size=10
 
 
     num_episodes = 10000000
@@ -92,20 +92,20 @@ def main():
                                 graph_every,
                                 averaging_window)
 
-    memory = SequentialMemory(train_every, batch_size, hist_size=history_size)
+    memory = ReplayMemory(train_every, batch_size, hist_size=history_size)
 
     train_settings = {
         "discount_factor": 0.99,
         "lambda": 0.95,
         "hist_size": history_size,
         "device": device,
-        "eps_denom": 1e-8,
+        "eps_denom": 1e-7,
         "c1": 0.1,
         "c2": 0.1,
         "c3": 0.3,
         "c4": 0.3,
         "minc2": 0.01,
-        "clip_param": 0.1,
+        "clip_param": 0.2,
         "min_clip_param": 0.01,
         "clip_decay": 10000,
         "c2_decay": 10000,
