@@ -57,16 +57,7 @@ class MCTSWrapperAgent(BaseAgent):
         self.num_episodes = 400
 
     def act(self, obs, action_space):
-        data = []
-        for i in range(self.num_episodes):
-            # do rollout
-            length, reward, rewards = self.mcts_agent.rollout()
-            # add data samples to log
-            data.append((length, reward, rewards, self.mcts_agent.agent_id))
-
-        #TODO
-
-        assert False
+        return self.mcts_agent.act(obs, action_space)
 
 class MCTSAgent(BaseAgent):
 
@@ -76,8 +67,8 @@ class MCTSAgent(BaseAgent):
         self.agent_id = 0
         self.env = self.make_env()
         self.reset_tree()
-        self.num_episodes = 400
-        self.mcts_iters = 10
+        self.num_episodes = 4 #400
+        self.mcts_iters = 2 #10
         self.mcts_c_puct = 1.0
         self.discount =0.99
         self.temperature = 0.0
@@ -191,9 +182,8 @@ class MCTSAgent(BaseAgent):
 
     def act(self, obs, action_space):
         print('act')
-        # TODO
-        assert False
-
+        environment = obs['json_info']
+        return self.search(environment, self.mcts_iters, self.temperature)
 
 def runner(id, num_episodes, fifo, _args):
     # make args accessible to MCTSAgent

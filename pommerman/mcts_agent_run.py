@@ -30,6 +30,8 @@ def main():
         done = False
         while not done:
             env.render()
+            # print(env.get_json_info())
+
             actions = env.act(state)
             state, reward, done, info = env.step(actions)
         print('Episode {} finished'.format(i_episode))
