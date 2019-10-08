@@ -8,7 +8,7 @@ import time
 from base_agent.Network import BaseNetwork
 
 from base_agent.sc2env_utils import generate_embeddings, multi_embed, valid_args, get_action_args, batch_get_action_args, is_spatial_arg, env_config, processed_feature_dim, full_action_space
-from base_agent.net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze, Squeeze, FastEmbedding, RelationalModule
+from base_agent.net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze, Squeeze, FastEmbedding, RelationalModule, Flatten
 
 class RRLModel(BaseNetwork):
 
@@ -65,6 +65,7 @@ class RRLModel(BaseNetwork):
                                             )
         """
 
+        """
         self.attention_blocks = nn.Sequential(
             RelationalModule(net_config['LSTM_hidden_size'],
                                 net_config['relational_features'],
@@ -78,13 +79,19 @@ class RRLModel(BaseNetwork):
                                 net_config['relational_heads'],
                                 encode=False)
             )
+        """
 
+        self.baseline_layers = nn.Sequential(
+            ResnetBlock(net_config['LSTM_hidden_size'], 3),
+            ResnetBlock(net_config['LSTM_hidden_size'], 3),
+            ResnetBlock(net_config['LSTM_hidden_size'], 3),
+            ResnetBlock(net_config['LSTM_hidden_size'], 3)
+        )
 
         self.relational_processor = nn.Sequential(
-            nn.MaxPool2d(net_config['inputs3d_width']),
-            Squeeze(),
-            Squeeze(),
-            nn.Linear(net_config['relational_heads'] * net_config['relational_features'],
+            nn.MaxPool2d(2),
+            Flatten(1, -1),
+            nn.Linear(net_config['relational_heads'] * net_config['relational_features'] * 16,
                         512),
             nn.ReLU(),
             nn.Linear(512, 512),
@@ -146,7 +153,7 @@ class RRLModel(BaseNetwork):
 
         D is a placeholder for feature dimensions.
     """
-    def forward(self, minimap, screen, player, avail_actions, last_action, last_spatials, hidden, curr_action=None, choosing=False, unrolling=False, process_inputs=True, inputs2d=None):
+    def forward(self, minimap, screen, player, avail_actions, last_action, last_spatials, hidden, curr_action=None, choosing=False, unrolling=False, process_inputs=True, inputs2d=None, format_inputs=True):
         if (choosing):
             assert (curr_action is None)
         if (not choosing and not unrolling):
@@ -166,9 +173,10 @@ class RRLModel(BaseNetwork):
         inputs = [minimap, screen]
 
         if process_inputs:
-            [minimap, screen] = self.embed_inputs(inputs, self.net_config)
-            [minimap, screen] = [minimap.to(self.device), screen.to(self.device)]
-            [minimap, screen] = self.concat_spatial([minimap, screen], last_action, last_spatials)
+            if format_inputs:
+                [minimap, screen] = self.embed_inputs(inputs, self.net_config)
+                [minimap, screen] = [minimap.to(self.device), screen.to(self.device)]
+                [minimap, screen] = self.concat_spatial([minimap, screen], last_action, last_spatials)
 
             processed_minimap = self.down_layers_minimap(minimap)
             processed_screen = self.down_layers_screen(screen)
@@ -179,7 +187,6 @@ class RRLModel(BaseNetwork):
         curr_coordinates = self.coordinates.expand((N,) + self.coordinates.shape[1:])
 
         t2 = time.time()
-
         inputs3d = torch.cat([processed_minimap, processed_screen, curr_coordinates], dim=1)
         t3 = time.time()
         if process_inputs:
@@ -199,7 +206,8 @@ class RRLModel(BaseNetwork):
             #print("Unrolling times\n embedding: %f, down layers: %f, inputs2dmlp: %f, lstm: %f. Total: %f" % (t2-t1,t3-t2,t4-t3,t5-t4,t5-t1))
             return hidden
 
-        relational_spatial = self.attention_blocks(outputs2d)
+        #relational_spatial = self.attention_blocks(outputs2d)
+        relational_spatial = self.baseline_layers(outputs2d)
         relational_nonspatial = self.relational_processor(relational_spatial)
 
         t6 = time.time()

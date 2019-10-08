@@ -299,3 +299,12 @@ class Unsqueeze(nn.Module):
 class Squeeze(nn.Module):
     def forward(self, x):
         return x.squeeze(-1)
+
+class Flatten(nn.Module):
+    def __init__(self, start, end):
+        super(Flatten, self).__init__()
+        self.start = start
+        self.end = end
+
+    def forward(self, x):
+        return x.flatten(self.start, self.end)
