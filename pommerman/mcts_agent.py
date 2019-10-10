@@ -56,6 +56,36 @@ class MCTSNode(object):
             Nt = self.N ** (1.0 / temperature)
             return Nt / np.sum(Nt)
 
+class MCTSWrapperAgent(Agent):
+    def __init__(self, mcts_agent, *args, **kwargs):
+        super(MCTSWrapperAgent, self).__init__(*args, **kwargs) 
+        self.mcts_agent = mcts_agent
+        self.num_episodes = 400
+
+    def _sample(self, state):
+        self.mcts_agent._sample(state)
+
+    def _forward(self, state):
+        self.mcts_agent._forward(state)
+
+    def state_space_converter(self, state):
+        self.mcts_agent.state_space_converter(state)
+
+    def action_space_converter(self, action):
+        self.mcts_agent.action_space_converter(action)
+
+    def train(self, run_settings):
+        self.mcts_agent.train(run_settings)
+
+    def train_step(self, batch_size):
+        self.mcts_agent.train_step(batch_size)
+
+    def save(self):
+        self.mcts_agent.save()
+    
+    def push_memory(self, state, action, reward, done):
+        self.mcts_agent.push_memory(state, action, reward, done)
+
 class MCTSAgent(BaseAgent, Agent):
 
     def __init__(self, agent_id=0, *args, **kwargs):
