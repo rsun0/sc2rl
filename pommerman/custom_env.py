@@ -7,30 +7,42 @@ from pommerman import agents
 
 
 class DummyAgent(agents.BaseAgent):
+    """
+    Placeholder for learning agent
+    """
     def act(self, obs, action_space):
         return 0
 
 
 class PommermanEnvironment(CustomEnvironment):
 
-    def __init__(self, render=False):
+    def __init__(self, render=False, num_agents=1):
         self.render = render
 
-        agent_list = [
-            DummyAgent(), # placeholder for learning agent
-            agents.SimpleAgent(),
-        ]
+        self.num_agents = num_agents
+        if self.num_agents == 1:
+            agent_list = [
+                DummyAgent(),
+                agents.SimpleAgent(),
+            ]
+        elif self.num_agents == 2:
+            agent_list = [
+                DummyAgent(),
+                DummyAgent(),
+            ]
         self._env = pommerman.make('OneVsOne-v0', agent_list)
         self._state = None
 
     def reset(self):
         self._state = self._env.reset()
-        return self._state[:1], [0], False, [None] 
+        obs = self._state[:self.num_agents]
+        rewards = [0 for i in range(self.num_agents)]
+        return obs, rewards, False, None
 
     def step(self, action_list):
         if self.render:
             self._env.render()
         actions = self._env.act(self._state)
-        actions[0] = action_list[0]
+        actions[:self.num_agents] = action_list
         self._state, reward, terminal, info = self._env.step(actions)
-        return self._state[:1], reward[:1], terminal, info
+        return self._state[:self.num_agents], reward[:self.num_agents], terminal, info
