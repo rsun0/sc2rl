@@ -5,6 +5,7 @@ from abstract_core import Experiment, RunSettings
 from custom_env import PommermanEnvironment
 from simple_agent import SimpleAgent
 from noop_agent import NoopAgent
+from mcts_agent import MCTSAgent
 
 if __name__ == '__main__':
     env = PommermanEnvironment(render=True, num_agents=2)
@@ -20,7 +21,7 @@ if __name__ == '__main__':
     )
 
     agent1 = SimpleAgent()
-    agent2 = NoopAgent()
+    agent2 = MCTSAgent() #NoopAgent()
 
     experiment = Experiment([agent1, agent2], env, run_settings)
     experiment.train()

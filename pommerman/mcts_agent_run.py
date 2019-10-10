@@ -11,7 +11,7 @@ def main():
     # Print all possible environments in the Pommerman registry
     print(pommerman.REGISTRY)
 
-    mcts_agent = MCTSWrapperAgent(MCTSAgent(agent_id=0))
+    mcts_agent = MCTSWrapperAgent(MCTSAgent(agent_id=12))
 
     # Create a set of agents (exactly four)
     agent_list = [
@@ -30,8 +30,6 @@ def main():
         done = False
         while not done:
             env.render()
-            # print(env.get_json_info())
-
             actions = env.act(state)
             state, reward, done, info = env.step(actions)
         print('Episode {} finished'.format(i_episode))

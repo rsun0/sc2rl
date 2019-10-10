@@ -1,4 +1,9 @@
 # https://github.com/tambetm/pommerman-baselines/blob/master/mcts/mcts_agent.py
+import sys
+sys.path.insert(0, "../interface/")
+
+from agent import Agent
+
 import argparse
 import multiprocessing
 from queue import Empty
@@ -8,6 +13,7 @@ import time
 import pommerman
 from pommerman.agents import BaseAgent, SimpleAgent
 from pommerman import constants
+import gym
 
 
 NUM_AGENTS = 4
@@ -50,21 +56,12 @@ class MCTSNode(object):
             Nt = self.N ** (1.0 / temperature)
             return Nt / np.sum(Nt)
 
-class MCTSWrapperAgent(BaseAgent):
-    def __init__(self, mcts_agent, *args, **kwargs):
-        super(MCTSWrapperAgent, self).__init__(*args, **kwargs) 
-        self.mcts_agent = mcts_agent
-        self.num_episodes = 400
-
-    def act(self, obs, action_space):
-        return self.mcts_agent.act(obs, action_space)
-
-class MCTSAgent(BaseAgent):
+class MCTSAgent(Agent):
 
     def __init__(self, agent_id=0, *args, **kwargs):
         print('init')
         super(MCTSAgent, self).__init__(*args, **kwargs)
-        self.agent_id = 0
+        self.agent_id = agent_id
         self.env = self.make_env()
         self.reset_tree()
         self.num_episodes = 4 #400
@@ -92,13 +89,25 @@ class MCTSAgent(BaseAgent):
         print('search')
         # remember current game state
         self.env._init_game_state = root
-        root = str(root)
+        self.env.set_json_info()
+
+        root.pop('intended_actions')
+        temp = self.env.get_json_info()
+        temp.pop('intended_actions')
+        assert str(root) == str(temp)
+
+        self.env.training_agent = self.agent_id
+        str_root = str(root)
+        print('root')
 
         for i in range(num_iters):
             # restore game state to root node
             obs = self.env.reset()
+
             # serialize game state
-            state = str(self.env.get_json_info())
+            temp = self.env.get_json_info()
+            temp.pop('intended_actions')
+            state = str(temp)
 
             trace = []
             done = False
@@ -124,6 +133,7 @@ class MCTSAgent(BaseAgent):
 
                 # ensure we are not called recursively
                 assert self.env.training_agent == self.agent_id
+               
                 # make other agents act
                 actions = self.env.act(obs)
                 # add my action to list of actions
@@ -143,8 +153,9 @@ class MCTSAgent(BaseAgent):
         # reset env back where we were
         self.env.set_json_info()
         self.env._init_game_state = None
+
         # return action probabilities
-        return self.tree[root].probs(temperature)
+        return self.tree[str_root].probs(self.temperature)
 
     def rollout(self):
         print('rollout')
@@ -183,7 +194,34 @@ class MCTSAgent(BaseAgent):
     def act(self, obs, action_space):
         print('act')
         environment = obs['json_info']
-        return self.search(environment, self.mcts_iters, self.temperature)
+        pi = self.search(environment, self.mcts_iters, self.temperature)
+        action = np.random.choice(NUM_ACTIONS, p=pi)
+
+        return action
+
+    def _sample(self, state):
+        return self.act(state, gym.spaces.discrete.Discrete(NUM_ACTIONS))
+
+    def _forward(self, state):
+        return self._sample(state)
+
+    def state_space_converter(self, state):
+        return state
+
+    def action_space_converter(self, action):
+        return action
+
+    def train(self, run_settings):
+        pass
+
+    def train_step(self, batch_size):
+        pass
+
+    def save(self):
+        pass
+    
+    def push_memory(self, state, action, reward, done):
+        pass
 
 def runner(id, num_episodes, fifo, _args):
     # make args accessible to MCTSAgent
