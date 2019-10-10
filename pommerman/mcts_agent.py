@@ -56,7 +56,7 @@ class MCTSNode(object):
             Nt = self.N ** (1.0 / temperature)
             return Nt / np.sum(Nt)
 
-class MCTSAgent(Agent):
+class MCTSAgent(BaseAgent, Agent):
 
     def __init__(self, agent_id=0, *args, **kwargs):
         print('init')
