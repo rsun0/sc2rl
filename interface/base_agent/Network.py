@@ -63,22 +63,21 @@ class BaseNetwork(nn.Module, Model):
 
 
     def stacked_past_forward(self, minimaps, screens, players, avail_actions, last_actions, last_spatials, hiddens, curr_actions, relevant_frames):
-        minimaps, screens, _ = self.process_states(minimaps, screens, players, last_actions, hiddens, curr_actions, relevant_frames)
-        minimaps = minimaps.flatten(1, -1)
-        screens = screens.flatten(1, -1)
-
+        minimaps, screens, inputs2d = self.process_states(minimaps, screens, players[:,-1], last_actions[:,-1], last_spatials, sequential=False)
+        #minimaps = minimaps.flatten(1, -1)
+        #screens = screens.flatten(1, -1)
         action_logits, arg_logits, spatial_logits, _, values, _ = self.forward(
             minimaps,
             screens,
             players[:,-1],
             avail_actions,
-            last_actions[:,-1]
-            last_spatials[:,-1],
+            last_actions[:,-1],
+            last_spatials,
             None,
             curr_action=curr_actions,
-            process_inputs=True,
+            process_inputs=False,
             format_inputs=False,
-            inputs2d=inputs2d[:,-1]
+            inputs2d=inputs2d
         )
 
         return action_logits, arg_logits, spatial_logits, _, values, _
@@ -183,39 +182,47 @@ class BaseNetwork(nn.Module, Model):
 
             minimaps = minimaps.flatten(0,1)
             screens = screens.flatten(0,1)
-            players = players.flatten(0,1)
-            last_actions = last_actions.flatten(0,1)
-            last_spatial_actions = last_spatial_actions.flatten(0,1)
+            #players = players.flatten(0,1)
+            #last_actions = last_actions.flatten(0,1)
+            local_last_spatial_actions = last_spatial_actions.flatten(0,1)
 
         inputs = [minimaps, screens]
-        [minimap, screen] = self.embed_inputs(inputs, self.net_config)
+        [minimap, screen] = self.embed_inputs(inputs)
         [minimap, screen] = [minimap.to(self.device), screen.to(self.device)]
-        [minimap, screen] = self.concat_spatial([minimap, screen], last_actions, last_spatial_actions)
+        [minimap, screen] = self.concat_spatial([minimap, screen], last_actions, local_last_spatial_actions)
+        processed_minimap = minimap.view(minimaps_s[:2] + minimap.shape[1:])
+        processed_screen = screen.view(screens_s[:2] + screen.shape[1:])
+        processed_minimap = processed_minimap.flatten(1,2)
+        processed_screen = processed_screen.flatten(1,2)
 
         if embeddings_only:
-            processed_minimap = minimap.view(minimaps_s[:2] + minimap.shape[1:])
-            processed_screen = screen.view(screens_s[:2] + screen.shape[1:])
             return processed_minimap, processed_screen, None
 
-        processed_minimap = self.down_layers_minimap(minimap)
-        processed_screen = self.down_layers_screen(screen)
+
+
+
+        processed_minimap = self.down_layers_minimap(processed_minimap)
+        processed_screen = self.down_layers_screen(processed_screen)
 
         embedded_last_actions = self.action_embedding(last_actions).to(self.device)
         nonspatial_concat = torch.cat([players, embedded_last_actions], dim=-1)
         inputs2d = self.inputs2d_MLP(nonspatial_concat)
-
+        """
         if not sequential:
             processed_minimap = processed_minimap.view(minimaps_s[:2] + processed_minimap.shape[1:])
             processed_screen = processed_screen.view(screens_s[:2] + processed_screen.shape[1:])
             inputs2d = inputs2d.view(players_s[:2] + inputs2d.shape[1:])
 
-
+            processed_minimap = processed_minimap.flatten(1,2)
+            processed_screen = processed_screen.flatten(1,2)
+            inputs2d = inputs2d.flatten(1,-1)
+        """
         return processed_minimap, processed_screen, inputs2d
 
     def init_hidden(self, batch_size=1, use_torch=True, device="cuda:0"):
         return self.convLSTM.init_hidden_state(batch_size=batch_size, use_torch=use_torch, device=device)
 
-    def embed_inputs(self, inputs, net_config):
+    def embed_inputs(self, inputs):
         return multi_embed(inputs, self.state_embeddings, self.state_embedding_indices)
 
 
@@ -240,7 +247,7 @@ class BaseNetwork(nn.Module, Model):
         return arg_out
 
     def sample_spatial(self, spatial_logits, action):
-        spatial_arg_out = np.zeros((self.spatial_depth, 2), dtype=np.int64)
+        spatial_arg_out = - np.ones((self.spatial_depth, 2), dtype=np.int64)
         arg_types = self.action_to_spatial_args(action)
 
         for i in arg_types:

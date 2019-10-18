@@ -20,7 +20,7 @@
 
 
 from agent import Agent, Model, Memory, AgentSettings
-from base_agent.sc2env_utils import batch_get_action_args, is_spatial_arg
+from base_agent.sc2env_utils import batch_get_action_args, is_spatial_arg, env_config
 
 import torch
 import torch.nn as nn
@@ -50,16 +50,43 @@ class BaseAgent(Agent):
         self.device = train_settings["device"]
         self.loss = nn.MSELoss()
         self.map = train_settings["map"]
+        self.history_size = train_settings["history_size"]
+        self.history = self.init_history()
+
+    def init_history(self):
+        """
+        "raw_player": len(Player), #int, number of features in player variable
+
+        "minimap_shape": (len(MINIMAP_FEATURES), 64, 64),
+        "screen_shape": (len(SCREEN_FEATURES), 64, 64),
+        """
+        m_shape = env_config["minimap_shape"]
+        s_shape = env_config["screen_shape"]
+        init_minimap = np.zeros((1, self.history_size, m_shape[0]) + m_shape[1:]).astype(np.float32)
+        init_screen = np.zeros((1, self.history_size, s_shape[0]) + s_shape[1:]).astype(np.float32)
+        init_spatial_actions = np.zeros((1, self.history_size, 3, 2))
+
+        return init_minimap, init_screen, init_spatial_actions
+
+
 
     def _forward(self, agent_state, choosing=True):
-        (minimap, screen, player, avail_actions) = agent_state
+        (curr_minimap, curr_screen, curr_player, avail_actions) = agent_state
+        #[curr_minimap, curr_screen] = self.model.embed_inputs([curr_minimap, curr_screen])
+        #m_depth, s_depth, p_depth = curr_minimap.shape[1], curr_screen.shape[1], p_depth.shape[1]
+        minimap, screen, spatial_actions = self.history
+        #### @TODO: Rework history to be of (1, history_size, depth, width, height)
+        minimap[0,1:] = minimap[0,:-1]
+        minimap[0,0] = curr_minimap
+        screen[0,1:] = screen[0,:-1]
+        screen[0,0] = curr_screen
         self.prev_hidden_state = copy.deepcopy(self.hidden_state)
         _, _, _, self.hidden_state, value, action = self.model(minimap,
                                                             screen,
-                                                            player,
+                                                            curr_player,
                                                             avail_actions,
                                                             np.array([self.action[0]]),
-                                                            self.action[2],
+                                                            spatial_actions,
                                                             self.hidden_state,
                                                             choosing=choosing)
         return _, _, value.cpu().data.numpy().item(), self.hidden_state.cpu().data.numpy(), action
@@ -178,7 +205,7 @@ class BaseAgent(Agent):
         t3 = time.time()
 
         # minimaps, screens, players, avail_actions, last_actions, hiddens, curr_actions, relevant_frames
-        action_probs, arg_probs, spatial_probs, _, values, _ = self.model.unroll_forward(
+        action_probs, arg_probs, spatial_probs, _, values, _ = self.model.stacked_past_forward(
             minimaps,
             screens,
             players,
@@ -190,16 +217,16 @@ class BaseAgent(Agent):
             relevant_states
         )
 
-        old_action_probs, old_arg_probs, old_spatial_probs, _, _, _ = self.target_model.unroll_forward(
-            minimaps[:,[-1]],
-            screens[:,[-1]],
-            players[:,[-1]],
+        old_action_probs, old_arg_probs, old_spatial_probs, _, _, _ = self.target_model.stacked_past_forward(
+            minimaps,
+            screens,
+            players,
             avail_actions,
-            prev_base_actions[:,[-1]],
-            prev_spatial_actions[:,[-1]],
+            prev_base_actions,
+            prev_spatial_actions,
             old_hidden_states,
             base_actions,
-            relevant_states[:,[-1]]
+            relevant_states
         )
         t4 = time.time()
 

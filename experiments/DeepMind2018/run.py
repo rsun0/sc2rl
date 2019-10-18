@@ -18,7 +18,7 @@ torch.backends.cudnn.benchmarks = True
 
 def main():
 
-    map_name = "DefeatZerglingsAndBanelings"
+    map_name = "DefeatRoaches"
     render = False
     step_mul = 8
 
@@ -29,6 +29,20 @@ def main():
 
     state_embed = 10
     action_embed = 16
+
+    lr = 1e-4
+    eps_max = 0.3
+    eps_min = 0.05
+    eps_duration=2e4
+    history_size=10
+
+    num_episodes = 10000000
+    num_epochs = 2
+    batch_size = 32
+    train_every = 1024
+    save_every = 10240
+    graph_every = 50
+    averaging_window = 100
 
     net_config = {
         "state_embedding_size": state_embed, # number of features output by embeddings
@@ -46,6 +60,7 @@ def main():
         "relational_heads": 3,
         "spatial_out_depth": 64,
         "channels3": 16,
+        "history_size": history_size,
         "device": device
     }
 
@@ -54,22 +69,6 @@ def main():
     action_space = np.ones(full_action_space.shape)
     model = RRLModel(net_config, device=device, action_space=action_space).to(device)
     print(model)
-
-
-    lr = 1e-4
-    eps_max = 0.3
-    eps_min = 0.05
-    eps_duration=2e4
-    history_size=10
-
-
-    num_episodes = 10000000
-    num_epochs = 3
-    batch_size = 32
-    train_every = 1024
-    save_every = 10240
-    graph_every = 50
-    averaging_window = 100
 
     """
         :param optimizer: A class from torch.optim (instantiated later)
@@ -109,7 +108,8 @@ def main():
         "min_clip_param": 0.01,
         "clip_decay": 10000,
         "c2_decay": 10000,
-        "map": map_name
+        "map": map_name,
+        "history_size": history_size
     }
 
     agent = BaseAgent(model, agent_settings, memory, train_settings)

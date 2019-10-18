@@ -96,7 +96,6 @@ def generate_embeddings(config):
     Performs FastEmbedding for categorical features
 """
 def embed(x, embedding_list, embedding_indices):
-
     s = x.shape
     feature_dim = s[1]
     embedding_size = embedding_list[0].embedding_dim
