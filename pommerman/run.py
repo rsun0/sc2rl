@@ -22,7 +22,6 @@ if __name__ == '__main__':
 
     agent1 = SimpleAgent()
     agent2 = MCTSAgent()
-    # agent2 = SimpleAgent()
 
     experiment = Experiment([agent1, agent2], env, run_settings)
     experiment.train()

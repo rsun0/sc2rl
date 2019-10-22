@@ -12,7 +12,13 @@ These functions and settings are passed into the Experiment constructor.
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import deque
-import base_agent.sc2env_utils as sc2env_utils
+try:
+    import base_agent.sc2env_utils as sc2env_utils
+except ModuleNotFoundError:
+    class FakeUtils:
+        def print_action(self, actions):
+            print('sc2env_utils not imported')
+    sc2env_utils = FakeUtils()
 
 class Experiment:
     def __init__(self, agents, custom_env, run_settings):
