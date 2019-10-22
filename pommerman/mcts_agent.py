@@ -15,6 +15,7 @@ from pommerman.agents import BaseAgent, SimpleAgent
 from pommerman import constants
 import gym
 
+import json
 
 NUM_AGENTS = 2
 NUM_ACTIONS = len(constants.Action)
@@ -59,26 +60,26 @@ class MCTSNode(object):
 
 class MCTSAgent(BaseAgent, Agent):
 
-    def __init__(self, agent_id=0, *args, **kwargs):
+    def __init__(self, agent_id=0, opponent=SimpleAgent(), *args, **kwargs):
         print('init')
         super(MCTSAgent, self).__init__(*args, **kwargs)
         self.agent_id = agent_id
-        self.env = self.make_env()
+        self.env = self.make_env(opponent)
         self.reset_tree()
         self.num_episodes = 4 #400
         self.mcts_iters = 2 #10
         self.mcts_c_puct = 1.0
-        self.discount =0.99
+        self.discount = 0.99
         self.temperature = 0.0
 
-    def make_env(self):
+    def make_env(self, opponent):
         print('make_env')
         agents = []
         for agent_id in range(NUM_AGENTS):
             if agent_id == self.agent_id:
                 agents.append(self)
             else:
-                agents.append(SimpleAgent())
+                agents.append(opponent)
 
         return pommerman.make('OneVsOne-v0', agents)
 
@@ -195,15 +196,17 @@ class MCTSAgent(BaseAgent, Agent):
         return length, reward, rewards, my_actions
 
     def act(self, obs, action_space):
-        print('act')
-        environment = obs['json_info']
+        board_info = obs[0]
+        scalar_info = obs[1]
+        environment = obs[2] # 'json_info
+        #print(environment)
         self.env._init_game_state = environment
         self.env.set_json_info()
         
         frequency = dict()
         avg_length = dict()
         avg_reward = dict()
-        for i in range(10):
+        for i in range(50):
             length, reward, _, my_actions = self.rollout()
             a = my_actions[0]
 
@@ -222,9 +225,12 @@ class MCTSAgent(BaseAgent, Agent):
         for action in avg_reward:
             if abs(avg_reward[action] - avg_reward[best_action]) < 1e-5:
                 if avg_length[action] > avg_length[best_action]:
-                    action = best_action
+                    best_action = action
             elif avg_reward[action] > avg_reward[best_action]:
                 best_action = action
+        print(avg_reward)
+        print(avg_length)
+        print('act', best_action)
 
         return best_action
 
@@ -234,8 +240,36 @@ class MCTSAgent(BaseAgent, Agent):
     def _forward(self, state):
         return self._sample(state)
 
-    def state_space_converter(self, state):
-        return state
+    def state_space_converter(self, obs):
+        to_use = [0, 1, 2, 3, 4, 6, 7, 8, 10, 11]
+ 
+        board = obs['board'] # 0-4, 6-8, 10-11 [10 total]
+        bomb_life = obs['bomb_life'] # 11
+        bomb_moving_direction = obs['bomb_moving_direction'] #12
+        flame_life = obs['flame_life'] #13
+
+        state = np.zeros((13, board.shape[0], board.shape[1]))
+        for i in range(len(to_use)):
+            state[i] = (board == to_use[i]).astype(int)
+        state[10] = bomb_life 
+        state[11] = bomb_moving_direction 
+        state[12] = flame_life 
+
+        scalars = []
+        scalar_items = ['ammo', 'blast_strength', 'can_kick']
+        agents = obs['json_info']['agents'] # array of dictionaries as a string
+       
+        i = agents.find('}')
+        agent1 = json.loads(obs['json_info']['agents'][1:i+1])
+        agent2 = json.loads(obs['json_info']['agents'][i+2:-1]) 
+
+        for agent in [agent1, agent2]:
+            for scalar_item in scalar_items:
+                scalars.append(agent[scalar_item])
+
+        scalars = np.array(scalars)
+
+        return state, scalars, obs['json_info']
 
     def action_space_converter(self, action):
         return action
