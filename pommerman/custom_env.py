@@ -16,7 +16,7 @@ class DummyAgent(agents.BaseAgent):
 
 class PommermanEnvironment(CustomEnvironment):
 
-    def __init__(self, render=False, num_agents=1):
+    def __init__(self, render=False, num_agents=1, game_state_file=None):
         self.render = render
 
         self.num_agents = num_agents
@@ -31,6 +31,7 @@ class PommermanEnvironment(CustomEnvironment):
                 DummyAgent(),
             ]
         self._env = pommerman.make('OneVsOne-v0', agent_list)
+        self._env.set_init_game_state(game_state_file)
         self._state = None
 
     def reset(self):

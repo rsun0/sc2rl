@@ -8,7 +8,7 @@ from noop_agent import NoopAgent
 from mcts_agent import MCTSAgent, MCTSWrapperAgent
 
 if __name__ == '__main__':
-    env = PommermanEnvironment(render=True, num_agents=2)
+    env = PommermanEnvironment(render=True, num_agents=2, game_state_file='start.json')
 
     run_settings = RunSettings(
         num_episodes=3,
@@ -21,7 +21,8 @@ if __name__ == '__main__':
     )
 
     agent1 = SimpleAgent()
-    agent2 = MCTSWrapperAgent(MCTSAgent()) #NoopAgent()
+    # agent2 = MCTSWrapperAgent(MCTSAgent())
+    agent2 = SimpleAgent()
 
     experiment = Experiment([agent1, agent2], env, run_settings)
     experiment.train()
