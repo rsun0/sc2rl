@@ -16,7 +16,7 @@ from pommerman import constants
 import gym
 
 
-NUM_AGENTS = 4
+NUM_AGENTS = 2
 NUM_ACTIONS = len(constants.Action)
 NUM_CHANNELS = 18
 
@@ -61,6 +61,9 @@ class MCTSWrapperAgent(BaseAgent, Agent):
         super(MCTSWrapperAgent, self).__init__(*args, **kwargs) 
         self.mcts_agent = mcts_agent
         self.num_episodes = 400
+
+    def act(self, obs, action_space):
+        return self.mcts_agent.act(obs, action_space)    
 
     def _sample(self, state):
         return self.mcts_agent._sample(state)
@@ -109,14 +112,14 @@ class MCTSAgent(BaseAgent, Agent):
             else:
                 agents.append(SimpleAgent())
 
-        return pommerman.make('PommeFFACompetition-v0', agents)
+        return pommerman.make('OneVsOne-v0', agents)
 
     def reset_tree(self):
-        print('reset_tree')
+        # print('reset_tree')
         self.tree = {}
 
     def search(self, root, num_iters, temperature=1):
-        print('search')
+        # print('search', root['step_count'])
         # remember current game state
         self.env._init_game_state = root
         self.env.set_json_info()
@@ -128,7 +131,7 @@ class MCTSAgent(BaseAgent, Agent):
 
         self.env.training_agent = self.agent_id
         str_root = str(root)
-        print('root')
+        # print('root')
 
         for i in range(num_iters):
             # restore game state to root node
@@ -188,7 +191,7 @@ class MCTSAgent(BaseAgent, Agent):
         return self.tree[str_root].probs(self.temperature)
 
     def rollout(self):
-        print('rollout')
+        # print('rollout')
         # reset search tree in the beginning of each rollout
         self.reset_tree()
 
@@ -199,12 +202,14 @@ class MCTSAgent(BaseAgent, Agent):
 
         length = 0
         done = False
+        my_actions = []
         while not done:
             root = self.env.get_json_info()
             # do Monte-Carlo tree search
             pi = self.search(root, self.mcts_iters, self.temperature)
             # sample action from probabilities
             action = np.random.choice(NUM_ACTIONS, p=pi)
+            my_actions.append(action)
 
             # ensure we are not called recursively
             assert self.env.training_agent == self.agent_id
@@ -216,18 +221,44 @@ class MCTSAgent(BaseAgent, Agent):
             obs, rewards, done, info = self.env.step(actions)
             assert self == self.env._agents[self.agent_id]
             length += 1
-            print("Agent:", self.agent_id, "Step:", length, "Actions:", [constants.Action(a).name for a in actions], "Probs:", [round(p, 2) for p in pi], "Rewards:", rewards, "Done:", done)
+            # print("Agent:", self.agent_id, "Step:", length, "Actions:", [constants.Action(a).name for a in actions], "Probs:", [round(p, 2) for p in pi], "Rewards:", rewards, "Done:", done)
 
         reward = rewards[self.agent_id]
-        return length, reward, rewards
+        return length, reward, rewards, my_actions
 
     def act(self, obs, action_space):
         print('act')
         environment = obs['json_info']
-        pi = self.search(environment, self.mcts_iters, self.temperature)
-        action = np.random.choice(NUM_ACTIONS, p=pi)
+        self.env._init_game_state = environment
+        self.env.set_json_info()
+        
+        frequency = dict()
+        avg_length = dict()
+        avg_reward = dict()
+        for i in range(10):
+            length, reward, _, my_actions = self.rollout()
+            a = my_actions[0]
 
-        return action
+            if a in frequency:
+                avg_length[a] = (frequency[a])/(frequency[a] + 1) * avg_length[a] + length / (frequency[a] + 1)
+                avg_reward[a] = (frequency[a])/(frequency[a] + 1) * avg_reward[a] + reward / (frequency[a] + 1)
+                frequency[a] += 1
+            else:
+                avg_length[a] = length
+                avg_reward[a] = reward
+                frequency[a] = 1
+
+        # pi = self.search(environment, self.mcts_iters, self.temperature)
+        # action = np.random.choice(NUM_ACTIONS, p=pi)
+        best_action = list(avg_reward.keys())[0]
+        for action in avg_reward:
+            if abs(avg_reward[action] - avg_reward[best_action]) < 1e-5:
+                if avg_length[action] > avg_length[best_action]:
+                    action = best_action
+            elif avg_reward[action] > avg_reward[best_action]:
+                best_action = action
+
+        return best_action
 
     def _sample(self, state):
         return self.act(state, gym.spaces.discrete.Discrete(NUM_ACTIONS))
