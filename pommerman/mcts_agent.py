@@ -59,26 +59,26 @@ class MCTSNode(object):
 
 class MCTSAgent(BaseAgent, Agent):
 
-    def __init__(self, agent_id=0, *args, **kwargs):
+    def __init__(self, agent_id=0, opponent=SimpleAgent(), *args, **kwargs):
         print('init')
         super(MCTSAgent, self).__init__(*args, **kwargs)
         self.agent_id = agent_id
-        self.env = self.make_env()
+        self.env = self.make_env(opponent)
         self.reset_tree()
         self.num_episodes = 4 #400
         self.mcts_iters = 2 #10
         self.mcts_c_puct = 1.0
-        self.discount =0.99
+        self.discount = 0.99
         self.temperature = 0.0
 
-    def make_env(self):
+    def make_env(self, opponent):
         print('make_env')
         agents = []
         for agent_id in range(NUM_AGENTS):
             if agent_id == self.agent_id:
                 agents.append(self)
             else:
-                agents.append(SimpleAgent())
+                agents.append(opponent)
 
         return pommerman.make('OneVsOne-v0', agents)
 
@@ -195,7 +195,6 @@ class MCTSAgent(BaseAgent, Agent):
         return length, reward, rewards, my_actions
 
     def act(self, obs, action_space):
-        print('act')
         environment = obs['json_info']
         self.env._init_game_state = environment
         self.env.set_json_info()
@@ -203,7 +202,7 @@ class MCTSAgent(BaseAgent, Agent):
         frequency = dict()
         avg_length = dict()
         avg_reward = dict()
-        for i in range(10):
+        for i in range(50):
             length, reward, _, my_actions = self.rollout()
             a = my_actions[0]
 
@@ -222,9 +221,12 @@ class MCTSAgent(BaseAgent, Agent):
         for action in avg_reward:
             if abs(avg_reward[action] - avg_reward[best_action]) < 1e-5:
                 if avg_length[action] > avg_length[best_action]:
-                    action = best_action
+                    best_action = action
             elif avg_reward[action] > avg_reward[best_action]:
                 best_action = action
+        print(avg_reward)
+        print(avg_length)
+        print('act', best_action)
 
         return best_action
 
