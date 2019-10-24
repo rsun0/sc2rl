@@ -330,8 +330,11 @@ class MCTSAgent(BaseAgent, Agent):
             pickle.dump(self.tree, f)
 
     def load(self):
-        with open(SAVE_FILE, 'rb') as f:
-            self.tree = pickle.load(f)
+        try:
+            with open(SAVE_FILE, 'rb') as f:
+                self.tree = pickle.load(f)
+        except FileNotFoundError:
+            pass
     
     def push_memory(self, state, action, reward, done):
         pass
