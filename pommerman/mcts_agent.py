@@ -96,19 +96,12 @@ class MCTSAgent(BaseAgent, Agent):
         start_time = time.time()
         obs = obs[self.agent_id]
 
-        to_use = [0, 1, 2, 3, 4, 6, 7, 8, 10, 11]
- 
-        board = obs['board'] # 0-4, 6-8, 10-11 [10 total]
-        bomb_life = obs['bomb_life'] # 11
-        bomb_moving_direction = obs['bomb_moving_direction'] #12
-        flame_life = obs['flame_life'] #13
-
-        state = np.zeros((13, board.shape[0], board.shape[1]))
-        for i in range(len(to_use)):
-            state[i] = (board == to_use[i]).astype(int)
-        state[10] = bomb_life 
-        state[11] = bomb_moving_direction 
-        state[12] = flame_life 
+        board = obs['board']
+        state = np.zeros((4, board.shape[0], board.shape[1]))
+        state[0] = board
+        state[1] = obs['bomb_life']
+        state[2] = obs['bomb_moving_direction']
+        state[3] = obs['flame_life']
 
         time_elapsed = time.time() - start_time
         total_time['obs_to_state'] += time_elapsed
@@ -331,7 +324,7 @@ class MCTSAgent(BaseAgent, Agent):
         pass
 
     def save(self):
-        print('SAVING')
+        print('Saving {} tree nodes'.format(len(self.tree)))
         with open(SAVE_FILE, 'wb') as f:
             pickle.dump(self.tree, f)
 
