@@ -16,11 +16,14 @@ from pommerman import constants
 import gym
 
 import json
+import time
 
 NUM_AGENTS = 2
 NUM_ACTIONS = len(constants.Action)
 NUM_CHANNELS = 18
 
+total_time = {'obs_to_state': 0.0, 'env_step': 0.0, 'rollout': 0.0, 'search': 0.0}
+total_frequency = {'obs_to_state': 0, 'env_step': 0, 'rollout': 0, 'search': 0} 
 
 def argmax_tiebreaking(Q):
     # find the best action with random tie-breaking
@@ -67,7 +70,7 @@ class MCTSAgent(BaseAgent, Agent):
         self.env = self.make_env(opponent)
         self.reset_tree()
         self.num_episodes = 4 #400
-        self.mcts_iters = 2 #10
+        self.mcts_iters = 5 #2 #10
         self.mcts_c_puct = 1.0
         self.discount = 0.99
         self.temperature = 0.0
@@ -88,6 +91,7 @@ class MCTSAgent(BaseAgent, Agent):
         self.tree = {}
 
     def obs_to_state(self, obs):
+        start_time = time.time()
         obs = obs[self.agent_id]
 
         to_use = [0, 1, 2, 3, 4, 6, 7, 8, 10, 11]
@@ -103,6 +107,10 @@ class MCTSAgent(BaseAgent, Agent):
         state[10] = bomb_life 
         state[11] = bomb_moving_direction 
         state[12] = flame_life 
+
+        time_elapsed = time.time() - start_time
+        total_time['obs_to_state'] += time_elapsed
+        total_frequency['obs_to_state'] += 1
         
         return state.tobytes()
 
@@ -160,7 +168,11 @@ class MCTSAgent(BaseAgent, Agent):
                 # add my action to list of actions
                 actions.insert(self.agent_id, action)
                 # step environment forward
+                env_start_time = time.time()
                 obs, rewards, done, info = self.env.step(actions)
+                env_time_elapsed = time.time() - env_start_time
+                total_time['env_step'] += env_time_elapsed
+                total_frequency['env_step'] += 1
                 reward = rewards[self.agent_id]
 
                 # fetch next state
@@ -194,7 +206,11 @@ class MCTSAgent(BaseAgent, Agent):
         while not done:
             root = self.env.get_json_info()
             # do Monte-Carlo tree search
+            search_start_time = time.time()
             pi = self.search(root, self.mcts_iters, self.temperature)
+            search_time_elapsed = time.time() - search_start_time
+            total_time['search'] += search_time_elapsed
+            total_frequency['search'] += 1
             # sample action from probabilities
             action = np.random.choice(NUM_ACTIONS, p=pi)
             my_actions.append(action)
@@ -206,7 +222,11 @@ class MCTSAgent(BaseAgent, Agent):
             # add my action to list of actions
             actions.insert(self.agent_id, action)
             # step environment
+            env_start_time = time.time()
             obs, rewards, done, info = self.env.step(actions)
+            env_time_elapsed = time.time() - env_start_time
+            total_time['env_step'] += env_time_elapsed
+            total_frequency['env_step'] += 1
             assert self == self.env._agents[self.agent_id]
             length += 1
             # print("Agent:", self.agent_id, "Step:", length, "Actions:", [constants.Action(a).name for a in actions], "Probs:", [round(p, 2) for p in pi], "Rewards:", rewards, "Done:", done)
@@ -226,7 +246,11 @@ class MCTSAgent(BaseAgent, Agent):
         avg_length = dict()
         avg_reward = dict()
         for i in range(50):
+            rollout_start_time = time.time()
             length, reward, _, my_actions = self.rollout()
+            rollout_time_elapsed = time.time() - rollout_start_time
+            total_time['rollout'] += rollout_time_elapsed
+            total_frequency['rollout'] += 1
             a = my_actions[0]
 
             if a in frequency:
@@ -250,6 +274,10 @@ class MCTSAgent(BaseAgent, Agent):
         print(avg_reward)
         print(avg_length)
         print('act', best_action)
+
+        print('timing info')
+        for action in total_time:
+            print(action, total_time[action] / total_frequency[action])
 
         return best_action
 
