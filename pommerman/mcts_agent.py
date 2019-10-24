@@ -71,8 +71,9 @@ class MCTSAgent(BaseAgent, Agent):
         self.agent_id = agent_id
         self.env = self.make_env(opponent)
         self.reset_tree()
-        self.num_episodes = 4 #400
-        self.mcts_iters = 5 #2 #10
+        self.num_episodes = 1
+        self.mcts_iters = 3
+        self.num_rollouts = 50
         self.mcts_c_puct = 1.0
         self.discount = 0.99
         self.temperature = 0.0
@@ -242,7 +243,7 @@ class MCTSAgent(BaseAgent, Agent):
         frequency = dict()
         avg_length = dict()
         avg_reward = dict()
-        for i in range(50):
+        for i in range(self.num_rollouts):
             rollout_start_time = time.time()
             length, reward, _, my_actions = self.rollout()
             rollout_time_elapsed = time.time() - rollout_start_time

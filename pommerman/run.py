@@ -17,7 +17,7 @@ if __name__ == '__main__':
         train_every=1024,
         save_every=64,
         graph_every=1,
-        averaging_window=100,
+        averaging_window=10,
         graph_file='pommerman_results.png'
     )
 
