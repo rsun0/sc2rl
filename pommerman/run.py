@@ -16,7 +16,7 @@ if __name__ == '__main__':
         batch_size=1,
         train_every=1024,
         save_every=256,
-        graph_every=0,
+        graph_every=1,
         averaging_window=100
     )
 
