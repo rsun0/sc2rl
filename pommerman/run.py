@@ -15,13 +15,14 @@ if __name__ == '__main__':
         num_epochs=1,
         batch_size=1,
         train_every=1024,
-        save_every=10240,
+        save_every=256,
         graph_every=0,
         averaging_window=100
     )
 
     agent1 = SimpleAgent()
     agent2 = MCTSAgent()
+    agent2.load()
 
     experiment = Experiment([agent1, agent2], env, run_settings)
     experiment.train()

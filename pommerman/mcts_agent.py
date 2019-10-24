@@ -9,6 +9,7 @@ import multiprocessing
 from queue import Empty
 import numpy as np
 import time
+import pickle
 
 import pommerman
 from pommerman.agents import BaseAgent, SimpleAgent
@@ -21,6 +22,7 @@ import time
 NUM_AGENTS = 2
 NUM_ACTIONS = len(constants.Action)
 NUM_CHANNELS = 18
+SAVE_FILE = 'mct.pickle'
 
 total_time = {'obs_to_state': 0.0, 'env_step': 0.0, 'rollout': 0.0, 'search': 0.0}
 total_frequency = {'obs_to_state': 0, 'env_step': 0, 'rollout': 0, 'search': 0} 
@@ -241,6 +243,7 @@ class MCTSAgent(BaseAgent, Agent):
         #print(environment)
         self.env._init_game_state = environment
         self.env.set_json_info()
+        print('Number of nodes: ', len(self.tree))
         
         frequency = dict()
         avg_length = dict()
@@ -328,7 +331,13 @@ class MCTSAgent(BaseAgent, Agent):
         pass
 
     def save(self):
-        pass
+        print('SAVING')
+        with open(SAVE_FILE, 'wb') as f:
+            pickle.dump(self.tree, f)
+
+    def load(self):
+        with open(SAVE_FILE, 'rb') as f:
+            self.tree = pickle.load(f)
     
     def push_memory(self, state, action, reward, done):
         pass
