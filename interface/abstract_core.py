@@ -145,6 +145,7 @@ class Experiment:
         plt.ylabel("Average score")
         for i in range(len(averages)):
             plt.plot(averages[i])
+        plt.legend(['Agent {}'.format(a) for a in range(len(averages))])
         # Makes graph update nonblocking
         plt.pause(0.005)
         if self.run_settings.graph_file:
