@@ -107,6 +107,7 @@ class MCTSAgent(BaseAgent, Agent):
         total_time['obs_to_state'] += time_elapsed
         total_frequency['obs_to_state'] += 1
         
+        state = state.astype(np.uint8)
         return state.tobytes()
 
     def search(self, root, num_iters, temperature=1):
