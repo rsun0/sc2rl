@@ -87,6 +87,25 @@ class MCTSAgent(BaseAgent, Agent):
         # print('reset_tree')
         self.tree = {}
 
+    def obs_to_state(self, obs):
+        obs = obs[self.agent_id]
+
+        to_use = [0, 1, 2, 3, 4, 6, 7, 8, 10, 11]
+ 
+        board = obs['board'] # 0-4, 6-8, 10-11 [10 total]
+        bomb_life = obs['bomb_life'] # 11
+        bomb_moving_direction = obs['bomb_moving_direction'] #12
+        flame_life = obs['flame_life'] #13
+
+        state = np.zeros((13, board.shape[0], board.shape[1]))
+        for i in range(len(to_use)):
+            state[i] = (board == to_use[i]).astype(int)
+        state[10] = bomb_life 
+        state[11] = bomb_moving_direction 
+        state[12] = flame_life 
+        
+        return state.tobytes()
+
     def search(self, root, num_iters, temperature=1):
         # print('search', root['step_count'])
         # remember current game state
@@ -99,7 +118,8 @@ class MCTSAgent(BaseAgent, Agent):
         assert str(root) == str(temp)
 
         self.env.training_agent = self.agent_id
-        str_root = str(root)
+        obs = self.env.reset()
+        root_state = self.obs_to_state(obs)
         # print('root')
 
         for i in range(num_iters):
@@ -108,8 +128,7 @@ class MCTSAgent(BaseAgent, Agent):
 
             # serialize game state
             temp = self.env.get_json_info()
-            temp.pop('intended_actions')
-            state = str(temp)
+            state = self.obs_to_state(obs)
 
             trace = []
             done = False
@@ -145,7 +164,7 @@ class MCTSAgent(BaseAgent, Agent):
                 reward = rewards[self.agent_id]
 
                 # fetch next state
-                state = str(self.env.get_json_info())
+                state = self.obs_to_state(obs)
 
             # update tree nodes with rollout results
             for node, action in reversed(trace):
@@ -157,12 +176,12 @@ class MCTSAgent(BaseAgent, Agent):
         self.env._init_game_state = None
 
         # return action probabilities
-        return self.tree[str_root].probs(self.temperature)
+        return self.tree[root_state].probs(self.temperature)
 
     def rollout(self):
         # print('rollout')
         # reset search tree in the beginning of each rollout
-        self.reset_tree()
+        # self.reset_tree()
 
         # guarantees that we are not called recursively
         # and episode ends when this agent dies
