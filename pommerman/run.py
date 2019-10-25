@@ -24,8 +24,8 @@ if __name__ == '__main__':
         graph_file='pommerman_results.png'
     )
 
-    agent1 = NoopAgent()
-    agent2 = MCTSAgent(opponent=PommermanNoopAgent())
+    agent1 = RandomAgent()
+    agent2 = MCTSAgent(opponent=pommerman.agents.RandomAgent())
     agent2.load()
 
     experiment = Experiment([agent1, agent2], env, run_settings)
