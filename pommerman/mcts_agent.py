@@ -75,7 +75,7 @@ class MCTSAgent(BaseAgent, Agent):
         self.mcts_iters = 3
         self.num_rollouts = 50
         self.mcts_c_puct = 1.0
-        self.discount = 0.99
+        self.discount = 0.9
         self.temperature = 0.0
 
     def make_env(self, opponent):
@@ -229,6 +229,8 @@ class MCTSAgent(BaseAgent, Agent):
             # print("Agent:", self.agent_id, "Step:", length, "Actions:", [constants.Action(a).name for a in actions], "Probs:", [round(p, 2) for p in pi], "Rewards:", rewards, "Done:", done)
 
         reward = rewards[self.agent_id]
+        # Discount
+        reward = reward * self.discount ** (length - 1)
         return length, reward, rewards, my_actions
 
     def act(self, obs, action_space):
