@@ -6,7 +6,7 @@ import pommerman.agents
 from abstract_core import Experiment, RunSettings
 from custom_env import PommermanEnvironment
 from simple_agent import SimpleAgent
-from noop_agent import NoopAgent
+from noop_agent import NoopAgent, PommermanNoopAgent
 from random_agent import RandomAgent
 from mcts_agent import MCTSAgent
 
@@ -24,8 +24,8 @@ if __name__ == '__main__':
         graph_file='pommerman_results.png'
     )
 
-    agent1 = RandomAgent()
-    agent2 = MCTSAgent(opponent=pommerman.agents.RandomAgent())
+    agent1 = NoopAgent()
+    agent2 = MCTSAgent(opponent=PommermanNoopAgent())
     agent2.load()
 
     experiment = Experiment([agent1, agent2], env, run_settings)

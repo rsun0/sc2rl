@@ -264,10 +264,7 @@ class MCTSAgent(BaseAgent, Agent):
 
         # pi = self.search(environment, self.mcts_iters, self.temperature)
         # action = np.random.choice(NUM_ACTIONS, p=pi)
-        best_action = list(avg_reward.keys())[0]
-        for action in avg_reward:
-            if avg_reward[action] > avg_reward[best_action]:
-                best_action = action
+        best_action = max(avg_reward, key=avg_reward.get)
         print(avg_reward)
         print(avg_length)
         print('act', best_action)

@@ -2,7 +2,7 @@ import sys
 sys.path.insert(0, "../interface/")
 
 from agent import Agent
-from pommerman import constants, utility
+from pommerman import constants, utility, agents
 
 class NoopAgent(Agent):
     def __init__(self):
@@ -32,3 +32,8 @@ class NoopAgent(Agent):
     
     def push_memory(self, state, action, reward, done):
         pass
+
+
+class PommermanNoopAgent(agents.BaseAgent):
+    def act(self, obs, action_space):
+        return constants.Action.Stop
