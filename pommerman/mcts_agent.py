@@ -266,10 +266,7 @@ class MCTSAgent(BaseAgent, Agent):
         # action = np.random.choice(NUM_ACTIONS, p=pi)
         best_action = list(avg_reward.keys())[0]
         for action in avg_reward:
-            if abs(avg_reward[action] - avg_reward[best_action]) < 1e-5:
-                if avg_length[action] > avg_length[best_action]:
-                    best_action = action
-            elif avg_reward[action] > avg_reward[best_action]:
+            if avg_reward[action] > avg_reward[best_action]:
                 best_action = action
         print(avg_reward)
         print(avg_length)
