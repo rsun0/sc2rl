@@ -32,6 +32,9 @@ class PommermanEnvironment(CustomEnvironment):
             ]
         self._env = pommerman.make('OneVsOne-v0', agent_list)
         self._env.set_init_game_state(game_state_file)
+        # For saving initial board
+        # self._env.reset()
+        # self._env.save_json('.')
         self._state = None
 
     def reset(self):

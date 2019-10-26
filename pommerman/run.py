@@ -11,7 +11,11 @@ from random_agent import RandomAgent
 from mcts_agent import MCTSAgent
 
 if __name__ == '__main__':
-    env = PommermanEnvironment(render=True, num_agents=2, game_state_file='start.json')
+    env = PommermanEnvironment(
+        render=True,
+        num_agents=2,
+        game_state_file='start_mini.json',
+    )
 
     run_settings = RunSettings(
         num_episodes=10000,
