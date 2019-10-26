@@ -98,11 +98,12 @@ class MCTSAgent(BaseAgent, Agent):
         obs = obs[self.agent_id]
 
         board = obs['board']
-        state = np.zeros((4, board.shape[0], board.shape[1]))
-        state[0] = board
-        state[1] = obs['bomb_life']
-        state[2] = obs['bomb_moving_direction']
-        state[3] = obs['flame_life']
+        # state = np.zeros((4, board.shape[0], board.shape[1]))
+        # state[0] = board
+        # state[1] = obs['bomb_life']
+        # state[2] = obs['bomb_moving_direction']
+        # state[3] = obs['flame_life']
+        state = board
 
         time_elapsed = time.time() - start_time
         total_time['obs_to_state'] += time_elapsed
