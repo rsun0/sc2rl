@@ -38,7 +38,7 @@ class RRLModel(BaseNetwork):
         self.down_layers_minimap = Downsampler(self.hist_depth*(self.minimap_features+1), net_config)
         self.down_layers_screen = Downsampler(self.hist_depth*(self.screen_features+2), net_config)
 
-        self.LSTM_in_size = 2*(4*net_config["down_conv_features"]) + net_config["inputs2d_size"] + 2
+        self.LSTM_in_size = 2*(2*net_config["down_conv_features"]) + net_config["inputs2d_size"] + 2
         self.convLSTM = ConvLSTM(self.LSTM_in_size,
                                     self.net_config['LSTM_hidden_size'])
 
@@ -66,7 +66,7 @@ class RRLModel(BaseNetwork):
                                             )
         """
 
-        
+
         self.attention_blocks = nn.Sequential(
             RelationalModule(self.LSTM_in_size,
                                 net_config['relational_features'],
@@ -80,7 +80,7 @@ class RRLModel(BaseNetwork):
                                 net_config['relational_heads'],
                                 encode=False)
             )
-        
+
         """
         self.baseline_layers = nn.Sequential(
             nn.Conv2d(self.LSTM_in_size, net_config['LSTM_hidden_size'], kernel_size=3, stride=1, padding=1),

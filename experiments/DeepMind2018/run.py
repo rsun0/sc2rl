@@ -27,17 +27,17 @@ def main():
                                 render=render,
                                 step_multiplier=step_mul)
 
-    state_embed = 10
-    action_embed = 16
+    state_embed = 5
+    action_embed = 8
 
     lr = 1e-4
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=2e4
-    history_size=10
+    history_size=5
 
     num_episodes = 10000000
-    num_epochs = 2
+    num_epochs = 3
     batch_size = 32
     train_every = 1024
     save_every = 10240
@@ -47,7 +47,7 @@ def main():
     net_config = {
         "state_embedding_size": state_embed, # number of features output by embeddings
         "action_embedding_size": action_embed,
-        "down_conv_features": 32,
+        "down_conv_features": 128,
         "up_features": 32,
         "up_conv_features": 128,
         "resnet_features": 128,

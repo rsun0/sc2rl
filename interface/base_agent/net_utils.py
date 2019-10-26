@@ -213,15 +213,15 @@ class Downsampler(nn.Module):
 
         self.block3 = nn.Sequential(
             nn.Conv2d(2*net_config['down_conv_features'],
-                4*net_config['down_conv_features'],
+                2*net_config['down_conv_features'],
                 kernel_size=(4,4),
                 stride=2,
                 padding=1),
             nn.ReLU(),
 
-            ResnetBlock(4*net_config['down_conv_features'],
+            ResnetBlock(2*net_config['down_conv_features'],
                             net_config['relational_depth']),
-            ResnetBlock(4*net_config['down_conv_features'],
+            ResnetBlock(2*net_config['down_conv_features'],
                             net_config['relational_depth'])
         )
 
