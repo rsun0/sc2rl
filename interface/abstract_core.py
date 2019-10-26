@@ -12,7 +12,13 @@ These functions and settings are passed into the Experiment constructor.
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import deque
-import base_agent.sc2env_utils as sc2env_utils
+try:
+    import base_agent.sc2env_utils as sc2env_utils
+except ModuleNotFoundError:
+    class FakeUtils:
+        def print_action(self, actions):
+            print('sc2env_utils not imported')
+    sc2env_utils = FakeUtils()
 
 class Experiment:
     def __init__(self, agents, custom_env, run_settings):
@@ -80,11 +86,9 @@ class Experiment:
                     recent_mean = np.mean(scores_history)
                     print("Game {} ended after {} steps. Game score: {}. Averages: {}"
                         .format(e+1, step, scores, averages))
-            """
             if (self.run_settings.graph_every > 0 and e > 0
                     and e % self.run_settings.graph_every == 0):
                 self.plot_results(averages_history)
-            """
 
     def test(self):
         """
@@ -132,8 +136,7 @@ class Experiment:
     def print_action(self, actions):
         sc2env_utils.print_action(actions)
 
-    @staticmethod
-    def plot_results(averages):
+    def plot_results(self, averages):
         plt.figure(1)
         plt.clf()
         plt.suptitle("Training results")
@@ -142,8 +145,11 @@ class Experiment:
         plt.ylabel("Average score")
         for i in range(len(averages)):
             plt.plot(averages[i])
+        plt.legend(['Agent {}'.format(a) for a in range(len(averages))])
         # Makes graph update nonblocking
         plt.pause(0.005)
+        if self.run_settings.graph_file:
+            plt.savefig(self.run_settings.graph_file)
 
 class CustomEnvironment():
     def step(self, actions):
@@ -173,7 +179,8 @@ class CustomEnvironment():
 
 class RunSettings:
     def __init__(self, num_episodes, num_epochs, batch_size, train_every,
-            save_every, graph_every, averaging_window, test_episodes=20, verbose=True):
+            save_every, graph_every, averaging_window, test_episodes=20,
+            verbose=True, graph_file=None):
         """
         :param num_episodes: The total number of episodes to play
         :param num_epochs: The number of update iterations for each experience set
@@ -193,3 +200,4 @@ class RunSettings:
         self.averaging_window = averaging_window
         self.test_episodes = test_episodes
         self.verbose = verbose
+        self.graph_file = graph_file

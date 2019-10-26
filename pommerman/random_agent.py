@@ -1,16 +1,18 @@
 import sys
 sys.path.insert(0, "../interface/")
 
-from agent import Agent
-from pommerman import constants, utility, agents
+import random
 
-class NoopAgent(Agent):
+from pommerman import constants
+from agent import Agent
+
+class RandomAgent(Agent):
     def __init__(self):
         # Intentionally bypassing parent constructor
         pass
 
     def _sample(self, state):
-        return constants.Action.Stop
+        return random.randrange(0, len(constants.Action))
 
     def _forward(self, state):
         return self._sample(state)
@@ -32,8 +34,3 @@ class NoopAgent(Agent):
     
     def push_memory(self, state, action, reward, done):
         pass
-
-
-class PommermanNoopAgent(agents.BaseAgent):
-    def act(self, obs, action_space):
-        return constants.Action.Stop
