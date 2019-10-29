@@ -114,17 +114,9 @@ class MCTSAgent(BaseAgent, Agent):
 
     def search(self, root, num_iters, temperature=1):
         # print('search', root['step_count'])
-        # remember current game state
-        self.env._init_game_state = root
-        self.env.set_json_info()
-
-        root.pop('intended_actions')
-        temp = self.env.get_json_info()
-        temp.pop('intended_actions')
-        assert str(root) == str(temp)
 
         self.env.training_agent = self.agent_id
-        obs = self.env.reset()
+        obs = self.env.get_observations()
         root_state = self.obs_to_state(obs)
         # print('root')
 
@@ -181,10 +173,6 @@ class MCTSAgent(BaseAgent, Agent):
                 node.update(action, reward)
                 reward *= self.discount
 
-        # reset env back where we were
-        self.env.set_json_info()
-        self.env._init_game_state = None
-
         # return action probabilities
         return self.tree[root_state].probs(self.temperature)
 
@@ -203,28 +191,46 @@ class MCTSAgent(BaseAgent, Agent):
         my_actions = []
         while not done:
             root = self.env.get_json_info()
+            root.pop('intended_actions')
             # do Monte-Carlo tree search
             search_start_time = time.time()
+
+            # remember current game state
+            self.env._init_game_state = root
+            self.env.set_json_info()
+
             pi = self.search(root, self.mcts_iters, self.temperature)
+
+            # reset env back where we were
+            self.env.set_json_info()
+            self.env._init_game_state = None
+
             search_time_elapsed = time.time() - search_start_time
             total_time['search'] += search_time_elapsed
             total_frequency['search'] += 1
+
             # sample action from probabilities
             action = np.random.choice(NUM_ACTIONS, p=pi)
             my_actions.append(action)
 
             # ensure we are not called recursively
             assert self.env.training_agent == self.agent_id
+
             # make other agents act
             actions = self.env.act(obs)
+
             # add my action to list of actions
             actions.insert(self.agent_id, action)
+
             # step environment
             env_start_time = time.time()
+
             obs, rewards, done, info = self.env.step(actions)
+
             env_time_elapsed = time.time() - env_start_time
             total_time['env_step'] += env_time_elapsed
             total_frequency['env_step'] += 1
+
             assert self == self.env._agents[self.agent_id]
             length += 1
             # print("Agent:", self.agent_id, "Step:", length, "Actions:", [constants.Action(a).name for a in actions], "Probs:", [round(p, 2) for p in pi], "Rewards:", rewards, "Done:", done)
@@ -238,6 +244,11 @@ class MCTSAgent(BaseAgent, Agent):
         board_info = obs[0]
         scalar_info = obs[1]
         environment = obs[2] # 'json_info
+
+        if environment['step_count'] == 0:
+            return 5
+
+
         #print(environment)
         self.env._init_game_state = environment
         self.env.set_json_info()
@@ -263,8 +274,6 @@ class MCTSAgent(BaseAgent, Agent):
                 avg_reward[a] = reward
                 frequency[a] = 1
 
-        # pi = self.search(environment, self.mcts_iters, self.temperature)
-        # action = np.random.choice(NUM_ACTIONS, p=pi)
         best_action = max(avg_reward, key=avg_reward.get)
         print(avg_reward)
         print(avg_length)
