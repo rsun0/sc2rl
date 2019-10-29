@@ -199,6 +199,8 @@ class MCTSAgent(BaseAgent, Agent):
             # remember current game state
             self.env._init_game_state = root
             self.env.set_json_info()
+            # XD XD XD XD
+            self.env.render()
 
             pi = self.search(root, self.mcts_iters, self.temperature)
 
@@ -260,13 +262,14 @@ class MCTSAgent(BaseAgent, Agent):
         frequency = dict()
         avg_length = dict()
         avg_reward = dict()
+
         for i in range(self.num_rollouts):
             rollout_start_time = time.time()
             length, reward, _, my_actions, my_policies = self.rollout()
             rollout_time_elapsed = time.time() - rollout_start_time
             total_time['rollout'] += rollout_time_elapsed
             total_frequency['rollout'] += 1
-            print(my_actions[0], my_policies[0])
+            print(my_actions[0], my_policies[0], reward, length, my_actions)
             a = my_actions[0]
 
             if a in frequency:
