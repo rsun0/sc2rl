@@ -76,7 +76,7 @@ class MCTSAgent(BaseAgent, Agent):
         self.num_rollouts = 50
         self.mcts_c_puct = 1.0
         self.discount = 0.9
-        self.temperature = 0.0
+        self.temperature = 1.0
 
     def make_env(self, opponent):
         print('make_env')
@@ -248,9 +248,9 @@ class MCTSAgent(BaseAgent, Agent):
         scalar_info = obs[1]
         environment = obs[2] # 'json_info
 
-        if environment['step_count'] == 0:
+        if int(environment['step_count']) == 0:
+            print('boom boom')
             return 5
-
 
         #print(environment)
         self.env._init_game_state = environment

@@ -28,9 +28,9 @@ if __name__ == '__main__':
         graph_file='pommerman_results.png'
     )
 
-    agent1 = RandomAgent()
-    agent2 = MCTSAgent(opponent=pommerman.agents.RandomAgent())
-    agent2.load()
+    agent1 = MCTSAgent(opponent=pommerman.agents.RandomAgent(), agent_id=0)
+    agent1.load()
+    agent2 = RandomAgent()
 
     experiment = Experiment([agent1, agent2], env, run_settings)
     experiment.train()
