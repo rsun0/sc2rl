@@ -89,6 +89,13 @@ class MCTSAgent(BaseAgent, Agent):
 
         return pommerman.make('OneVsOne-v0', agents)
 
+    def reset_game(self, root):
+        # remember current game state
+        self.env._init_game_state = dict()
+        for key in root:
+            self.env._init_game_state[key] = root[key]
+        self.env.set_json_info()
+
     def reset_tree(self):
         # print('reset_tree')
         self.tree = {}
@@ -118,14 +125,13 @@ class MCTSAgent(BaseAgent, Agent):
         self.env.training_agent = self.agent_id
         obs = self.env.get_observations()
         root_state = self.obs_to_state(obs)
-        # print('root')
 
         for i in range(num_iters):
             # restore game state to root node
-            obs = self.env.reset()
+            self.reset_game(root)
 
             # serialize game state
-            temp = self.env.get_json_info()
+            obs = self.env.get_observations()
             state = self.obs_to_state(obs)
 
             trace = []
@@ -160,6 +166,10 @@ class MCTSAgent(BaseAgent, Agent):
                 # step environment forward
                 env_start_time = time.time()
                 obs, rewards, done, info = self.env.step(actions)
+
+                 # XD XD XD XD
+                # self.env.render()
+
                 env_time_elapsed = time.time() - env_start_time
                 total_time['env_step'] += env_time_elapsed
                 total_frequency['env_step'] += 1
@@ -167,6 +177,7 @@ class MCTSAgent(BaseAgent, Agent):
 
                 # fetch next state
                 state = self.obs_to_state(obs)
+
 
             # update tree nodes with rollout results
             for node, action in reversed(trace):
@@ -184,7 +195,7 @@ class MCTSAgent(BaseAgent, Agent):
         # guarantees that we are not called recursively
         # and episode ends when this agent dies
         self.env.training_agent = self.agent_id
-        obs = self.env.reset()
+        obs = self.env.get_observations()
 
         length = 0
         done = False
@@ -196,19 +207,18 @@ class MCTSAgent(BaseAgent, Agent):
             # do Monte-Carlo tree search
             search_start_time = time.time()
 
-            # remember current game state
-            self.env._init_game_state = root
-            self.env.set_json_info()
-            # XD XD XD XD
-            self.env.render()
+            # load original state
+            # print(root)
+            self.reset_game(root) 
 
+            # print(done, type(done))
+            self.env.render()
             pi = self.search(root, self.mcts_iters, self.temperature)
 
             my_policies.append(pi)
 
             # reset env back where we were
-            self.env.set_json_info()
-            self.env._init_game_state = None
+            self.reset_game(root)
 
             search_time_elapsed = time.time() - search_start_time
             total_time['search'] += search_time_elapsed
@@ -240,6 +250,8 @@ class MCTSAgent(BaseAgent, Agent):
             length += 1
             # print("Agent:", self.agent_id, "Step:", length, "Actions:", [constants.Action(a).name for a in actions], "Probs:", [round(p, 2) for p in pi], "Rewards:", rewards, "Done:", done)
 
+        print('leaving')
+
         reward = rewards[self.agent_id]
         # Discount
         reward = reward * self.discount ** (length - 1)
@@ -254,9 +266,6 @@ class MCTSAgent(BaseAgent, Agent):
             print('boom boom')
             return 5
 
-        #print(environment)
-        self.env._init_game_state = environment
-        self.env.set_json_info()
         print('Number of nodes: ', len(self.tree))
         
         frequency = dict()
@@ -265,6 +274,9 @@ class MCTSAgent(BaseAgent, Agent):
 
         for i in range(self.num_rollouts):
             rollout_start_time = time.time()
+
+            self.reset_game(environment)
+
             length, reward, _, my_actions, my_policies = self.rollout()
             rollout_time_elapsed = time.time() - rollout_start_time
             total_time['rollout'] += rollout_time_elapsed
