@@ -189,6 +189,7 @@ class MCTSAgent(BaseAgent, Agent):
         length = 0
         done = False
         my_actions = []
+        my_policies = []
         while not done:
             root = self.env.get_json_info()
             root.pop('intended_actions')
@@ -200,6 +201,8 @@ class MCTSAgent(BaseAgent, Agent):
             self.env.set_json_info()
 
             pi = self.search(root, self.mcts_iters, self.temperature)
+
+            my_policies.append(pi)
 
             # reset env back where we were
             self.env.set_json_info()
@@ -238,7 +241,7 @@ class MCTSAgent(BaseAgent, Agent):
         reward = rewards[self.agent_id]
         # Discount
         reward = reward * self.discount ** (length - 1)
-        return length, reward, rewards, my_actions
+        return length, reward, rewards, my_actions, my_policies
 
     def act(self, obs, action_space):
         board_info = obs[0]
@@ -259,10 +262,11 @@ class MCTSAgent(BaseAgent, Agent):
         avg_reward = dict()
         for i in range(self.num_rollouts):
             rollout_start_time = time.time()
-            length, reward, _, my_actions = self.rollout()
+            length, reward, _, my_actions, my_policies = self.rollout()
             rollout_time_elapsed = time.time() - rollout_start_time
             total_time['rollout'] += rollout_time_elapsed
             total_frequency['rollout'] += 1
+            print(my_actions[0], my_policies[0])
             a = my_actions[0]
 
             if a in frequency:
