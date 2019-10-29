@@ -212,7 +212,7 @@ class MCTSAgent(BaseAgent, Agent):
             self.reset_game(root) 
 
             # print(done, type(done))
-            self.env.render()
+            # self.env.render()
             pi = self.search(root, self.mcts_iters, self.temperature)
 
             my_policies.append(pi)
@@ -249,8 +249,7 @@ class MCTSAgent(BaseAgent, Agent):
             assert self == self.env._agents[self.agent_id]
             length += 1
             # print("Agent:", self.agent_id, "Step:", length, "Actions:", [constants.Action(a).name for a in actions], "Probs:", [round(p, 2) for p in pi], "Rewards:", rewards, "Done:", done)
-
-        print('leaving')
+        # print('leaving')
 
         reward = rewards[self.agent_id]
         # Discount
