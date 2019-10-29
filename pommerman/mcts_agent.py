@@ -261,10 +261,6 @@ class MCTSAgent(BaseAgent, Agent):
         scalar_info = obs[1]
         environment = obs[2] # 'json_info
 
-        if int(environment['step_count']) == 0:
-            print('boom boom')
-            return 5
-
         print('Number of nodes: ', len(self.tree))
         
         frequency = dict()
