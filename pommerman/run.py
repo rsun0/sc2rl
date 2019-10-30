@@ -20,8 +20,8 @@ if __name__ == '__main__':
     run_settings = RunSettings(
         num_episodes=10000,
         num_epochs=1,
-        batch_size=1,
-        train_every=1024,
+        batch_size=32,
+        train_every=32, # FIXME debugging value
         save_every=32,
         graph_every=1,
         averaging_window=50,

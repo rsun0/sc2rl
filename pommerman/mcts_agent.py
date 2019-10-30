@@ -8,6 +8,7 @@ import argparse
 import multiprocessing
 from queue import Empty
 import numpy as np
+import torch
 import time
 import pickle
 
@@ -75,7 +76,7 @@ class MCTSAgent(BaseAgent, Agent):
         self.reset_tree()
         self.num_episodes = 1
         self.mcts_iters = 3
-        self.num_rollouts = 50
+        self.num_rollouts = 1 # FIXME debugging value
         self.mcts_c_puct = 1.0
         self.discount = 0.9
         self.temperature = 1.0
@@ -150,7 +151,13 @@ class MCTSAgent(BaseAgent, Agent):
                     trace.append((node, action))
                 else:
                     # use unfiform distribution for probs
-                    probs = np.ones(NUM_ACTIONS) / NUM_ACTIONS
+                    # probs = np.ones(NUM_ACTIONS) / NUM_ACTIONS
+
+                    # Use policy network to initialize probs
+                    images, scalars, _ = self.state_space_converter(self.env.get_observations()[self.agent_id])
+                    self.model.eval()
+                    preds = self.model((images[np.newaxis], scalars[np.newaxis]))
+                    probs = torch.nn.functional.softmax(preds).detach().numpy()[0]
 
                     # use current rewards for values
                     rewards = self.env._get_rewards()
@@ -349,6 +356,16 @@ class MCTSAgent(BaseAgent, Agent):
         self.model.train()
         for i in range(0, len(self.experiences), run_settings.batch_size):
             batch = self.experiences[i:i+run_settings.batch_size]
+            states, actions, rewards = zip(*batch)
+            images, scalars = zip(*states)
+
+            images_batch = np.stack(images)
+            scalars_batch = np.stack(scalars)
+            actions_batch = np.array(actions)
+            rewards_batch = np.array(rewards)
+
+            preds = self.model((images_batch, scalars_batch))
+            print('preds: ', preds)
 
     def train_step(self, batch_size):
         pass
@@ -367,7 +384,6 @@ class MCTSAgent(BaseAgent, Agent):
     
     def push_memory(self, state, action, reward, done):
         state = (state[0], state[1])
-        print(state)
         self.current_trajectory.append( (state, action) )
         
         if done:
@@ -382,9 +398,7 @@ class MCTSAgent(BaseAgent, Agent):
             states, actions = zip(*self.current_trajectory)
 
             trajectory = zip(states, actions, rewards)
-            print('trajectory: ', trajectory)
             self.experiences.extend(trajectory)
-            print('experiences: ', self.experiences)
             self.current_trajectory = []
 
 
