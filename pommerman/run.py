@@ -14,7 +14,7 @@ if __name__ == '__main__':
     env = PommermanEnvironment(
         render=True,
         num_agents=2,
-        game_state_file='start_mini.json',
+        game_state_file='start_mini2.json',
     )
 
     run_settings = RunSettings(
