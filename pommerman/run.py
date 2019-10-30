@@ -22,9 +22,9 @@ if __name__ == '__main__':
         num_epochs=1,
         batch_size=1,
         train_every=1024,
-        save_every=64,
+        save_every=32,
         graph_every=1,
-        averaging_window=10,
+        averaging_window=50,
         graph_file='pommerman_results.png'
     )
 
