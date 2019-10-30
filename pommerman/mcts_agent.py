@@ -77,6 +77,8 @@ class MCTSAgent(BaseAgent, Agent):
         self.mcts_c_puct = 1.0
         self.discount = 0.9
         self.temperature = 1.0
+        self.current_trajectory = []
+        self.experiences = []
 
     def make_env(self, opponent):
         print('make_env')
@@ -276,7 +278,7 @@ class MCTSAgent(BaseAgent, Agent):
             rollout_time_elapsed = time.time() - rollout_start_time
             total_time['rollout'] += rollout_time_elapsed
             total_frequency['rollout'] += 1
-            print(my_actions[0], my_policies[0], reward, length, my_actions)
+            # print(my_actions[0], my_policies[0], reward, length, my_actions)
             a = my_actions[0]
 
             if a in frequency:
@@ -358,7 +360,27 @@ class MCTSAgent(BaseAgent, Agent):
             pass
     
     def push_memory(self, state, action, reward, done):
-        pass
+        image, scalars, _ = self.state_space_converter(state)
+        state = (image, scalars)
+        self.current_trajectory.append( (state, action) )
+        
+        if done:
+            trajectory = []
+            rewards = []
+            r = reward
+            for i in range(len(self.current_trajectory)):
+                rewards.append(r)
+                r *= self.discount
+            rewards.reverse()
+
+            states, actions = zip(*self.current_trajectory)
+
+            trajectory = zip(states, actions, rewards)
+            print('trajectory: ', trajectory)
+            self.experiences.extend(trajectory)
+            print('experiences: ', self.experiences)
+            self.current_trajectory = []
+
 
 def runner(id, num_episodes, fifo, _args):
     # make args accessible to MCTSAgent
