@@ -19,6 +19,8 @@ import gym
 import json
 import time
 
+from policy_net import MCTSPolicyNet
+
 NUM_AGENTS = 2
 NUM_ACTIONS = len(constants.Action)
 NUM_CHANNELS = 18
@@ -77,6 +79,8 @@ class MCTSAgent(BaseAgent, Agent):
         self.mcts_c_puct = 1.0
         self.discount = 0.9
         self.temperature = 1.0
+
+        self.model = MCTSPolicyNet(board_size=6, in_channels=13)
         self.current_trajectory = []
         self.experiences = []
 
@@ -342,7 +346,9 @@ class MCTSAgent(BaseAgent, Agent):
         return action
 
     def train(self, run_settings):
-        pass
+        self.model.train()
+        for i in range(0, len(self.experiences), run_settings.batch_size):
+            batch = self.experiences[i:i+run_settings.batch_size]
 
     def train_step(self, batch_size):
         pass
