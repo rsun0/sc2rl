@@ -360,8 +360,8 @@ class MCTSAgent(BaseAgent, Agent):
             pass
     
     def push_memory(self, state, action, reward, done):
-        image, scalars, _ = self.state_space_converter(state)
-        state = (image, scalars)
+        state = (state[0], state[1])
+        print(state)
         self.current_trajectory.append( (state, action) )
         
         if done:
