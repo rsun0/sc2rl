@@ -74,7 +74,7 @@ class MCTSAgent(Agent, BaseAgent):
         self.reset_tree()
         self.num_episodes = 1
         self.mcts_iters = 3
-        self.num_rollouts = 1 # FIXME debugging value
+        self.num_rollouts = 5 # FIXME debugging value
         self.mcts_c_puct = 1.0
         self.discount = 0.9
         self.temperature = 1.0
