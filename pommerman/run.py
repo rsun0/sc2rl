@@ -34,6 +34,7 @@ if __name__ == '__main__':
     agent_settings = AgentSettings(
         optimizer=torch.optim.Adam,
         learning_rate=0.001,
+        opt_eps=1e-8,
         epsilon_max=0,
         epsilon_min=0,
         epsilon_duration=0,

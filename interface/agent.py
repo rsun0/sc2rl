@@ -8,7 +8,10 @@ class Agent():
 
         # Instantiate optimizer
         self.optimizer = self.settings.optimizer(
-            params=self.model.parameters(), lr=self.settings.learning_rate, eps=1e-2)
+            params=self.model.parameters(),
+            lr=self.settings.learning_rate,
+            eps=self.settings.opt_eps,
+        )
 
     def sample(self, state):
         """
@@ -87,8 +90,8 @@ class Model():
 
 
 class AgentSettings():
-    def __init__(self, optimizer, learning_rate,
-            epsilon_max, epsilon_min, epsilon_duration, verbose=False):
+    def __init__(self, optimizer, learning_rate, epsilon_max,
+            epsilon_min, epsilon_duration, opt_eps=1e-8, verbose=False):
         """
         :param optimizer: A class from torch.optim (instantiated later)
         :param learning_rate: The learning rate for the network
@@ -96,9 +99,11 @@ class AgentSettings():
         :param epsilon_min: The final epsilon
         :param epsilon_duration: The number of frames to reach the final epsilon
         :param verbose: Enable logging printouts
+        :param opt_eps: Numerical stabilizer constant for optimizer
         """
         self.optimizer = optimizer
         self.learning_rate = learning_rate
+        self.opt_eps = opt_eps
         self.epsilon_max = epsilon_max
         self.epsilon_min = epsilon_min
         self.epsilon_duration = epsilon_duration

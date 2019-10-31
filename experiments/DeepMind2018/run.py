@@ -31,6 +31,7 @@ def main():
     action_embed = 8
 
     lr = 1e-4
+    opt_eps = 1e-2
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=2e4
@@ -82,7 +83,8 @@ def main():
                                 lr,
                                 eps_max,
                                 eps_min,
-                                eps_duration)
+                                eps_duration,
+                                opt_eps)
 
     run_settings = RunSettings(num_episodes,
                                 num_epochs,
