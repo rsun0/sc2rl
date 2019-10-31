@@ -87,8 +87,8 @@ def generate_embeddings(config):
         embed_size = config['state_embedding_size']
 
         for j in range(len(cat_indices)):
-            embeddings[i].append(nn.Embedding(cat_sizes[j]+1, embed_size).to(config["device"]))
-
+            #embeddings[i].append(nn.Embedding(cat_sizes[j]+1, embed_size).to(config["device"]))
+            embeddings[i].append(FastEmbedding(cat_sizes[j]+1, embed_size).to(config["device"]))
     return embeddings
 
 """
@@ -109,6 +109,7 @@ def embed(x, embedding_list, embedding_indices):
         if (i in embedding_indices):
             upper += embedding_size
             output[:,lower:upper] = embedding_list[embed_count](x[:,i].long()).permute((0,3,1,2))
+            #output[:,lower:upper] = torch.log(output[:,lower:upper]+1.0)
             embed_count += 1
         else:
             upper += 1

@@ -266,7 +266,7 @@ class BaseNetwork(nn.Module, Model):
         (N, D, H, W) = spatial_logits_in.shape
         x = spatial_logits_in.flatten(start_dim=-2, end_dim=-1)
         logits = F.softmax(x, dim=-1)
-        logits = logits.reshape((N, D, H, W))
+        logits = logits.view((N, D, H, W))
         return logits
 
     def action_to_nonspatial_args(self, action):

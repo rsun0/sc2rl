@@ -39,6 +39,7 @@ class RRLModel(BaseNetwork):
         self.down_layers_screen = Downsampler(self.hist_depth*(self.screen_features+2), net_config)
 
         self.LSTM_in_size = 2*(2*net_config["down_conv_features"]) + net_config["inputs2d_size"] + 2
+
         self.convLSTM = ConvLSTM(self.LSTM_in_size,
                                     self.net_config['LSTM_hidden_size'])
 
@@ -66,7 +67,7 @@ class RRLModel(BaseNetwork):
                                             )
         """
 
-
+        """
         self.attention_blocks = nn.Sequential(
             RelationalModule(self.LSTM_in_size,
                                 net_config['relational_features'],
@@ -80,8 +81,8 @@ class RRLModel(BaseNetwork):
                                 net_config['relational_heads'],
                                 encode=False)
             )
-
         """
+
         self.baseline_layers = nn.Sequential(
             nn.Conv2d(self.LSTM_in_size, net_config['LSTM_hidden_size'], kernel_size=3, stride=1, padding=1),
             ResnetBlock(net_config['LSTM_hidden_size'], 3),
@@ -89,7 +90,7 @@ class RRLModel(BaseNetwork):
             ResnetBlock(net_config['LSTM_hidden_size'], 3),
             ResnetBlock(net_config['LSTM_hidden_size'], 3)
         )
-        """
+
         self.relational_processor = nn.Sequential(
             nn.MaxPool2d(2),
             Flatten(1, -1),
@@ -211,8 +212,8 @@ class RRLModel(BaseNetwork):
             #print("Unrolling times\n embedding: %f, down layers: %f, inputs2dmlp: %f, lstm: %f. Total: %f" % (t2-t1,t3-t2,t4-t3,t5-t4,t5-t1))
             return hidden
 
-        relational_spatial = self.attention_blocks(outputs2d)
-        #relational_spatial = self.baseline_layers(outputs2d)
+        #relational_spatial = self.attention_blocks(outputs2d)
+        relational_spatial = self.baseline_layers(outputs2d)
         relational_nonspatial = self.relational_processor(relational_spatial)
 
         t6 = time.time()

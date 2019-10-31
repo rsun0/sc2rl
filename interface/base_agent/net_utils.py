@@ -192,9 +192,7 @@ class Downsampler(nn.Module):
             nn.ReLU(),
 
             ResnetBlock(net_config['down_conv_features'],
-                            net_config['relational_depth']),
-            ResnetBlock(net_config['down_conv_features'],
-                            net_config['relational_depth'])
+                            net_config['down_residual_depth'])
         )
 
         self.block2 = nn.Sequential(
@@ -206,9 +204,7 @@ class Downsampler(nn.Module):
             nn.ReLU(),
 
             ResnetBlock(2*net_config['down_conv_features'],
-                            net_config['relational_depth']),
-            ResnetBlock(2*net_config['down_conv_features'],
-                            net_config['relational_depth'])
+                            net_config['down_residual_depth'])
         )
 
         self.block3 = nn.Sequential(
@@ -220,9 +216,7 @@ class Downsampler(nn.Module):
             nn.ReLU(),
 
             ResnetBlock(2*net_config['down_conv_features'],
-                            net_config['relational_depth']),
-            ResnetBlock(2*net_config['down_conv_features'],
-                            net_config['relational_depth'])
+                            net_config['down_residual_depth'])
         )
 
     def forward(self, input):
@@ -259,9 +253,9 @@ class SpatialUpsampler(nn.Module):
         self.conv_out = nn.Sequential(
             nn.Conv2d(int(0.5 * net_config['up_conv_features']),
                                         output_depth,
-                                        kernel_size=1,
+                                        kernel_size=3,
                                         stride=1,
-                                        padding=0
+                                        padding=1
             )
         )
 
@@ -280,17 +274,18 @@ class FastEmbedding(nn.Module):
 
         self.num_embeddings = num_embeddings
         self.embedding_dim = embedding_dim
-        self.layer = nn.Linear(num_embeddings, embedding_dim).to(device)
-        #self.weight = torch.from_numpy(np.random.uniform(-1,1, (num_embeddings, embedding_dim))).float().to(device)
+        #self.layer = nn.Linear(num_embeddings, embedding_dim).to(device)
+        self.weight = torch.from_numpy(np.random.uniform(-1,1, (num_embeddings, embedding_dim))).float().to(device)
 
     def forward(self, x):
+        """
         one_hot = F.one_hot(x, self.num_embeddings).float()
         return self.layer(one_hot)
         """
         s = x.shape
         values = self.weight[x.view(-1)]
         return values.view(s + (self.embedding_dim,))
-        """
+        
 
 class Unsqueeze(nn.Module):
     def forward(self, x):

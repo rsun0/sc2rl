@@ -123,7 +123,6 @@ class BaseAgent(Agent):
                 if (math.isnan(d_pol) or math.isnan(d_vf) or math.isnan(d_ent)):
                     print("Canceling training -- NaN's encountered")
                     print("Reloading model from previous save")
-                    sys.exit(0)
                     self.load()
                     self.update_target_net()
                     return
@@ -154,6 +153,8 @@ class BaseAgent(Agent):
         eps_denom = self.train_settings['eps_denom']
         c1 = self.train_settings['c1']
         c2 = self.train_settings['c2']
+        c3 = self.train_settings['c3']
+        c4 = self.train_settings['c4']
         clip_param = self.train_settings['clip_param']
 
         mini_batch = self.memory.sample_mini_batch(self.frame_count)
@@ -259,11 +260,11 @@ class BaseAgent(Agent):
                 if is_spatial_arg(j):
                     numerator[i] = numerator[i] + torch.log(gathered_spatial_args[i][j])
                     denominator[i] = denominator[i] + torch.log(old_gathered_spatial_args[i][j] + eps_denom)
-                    entropy[i] = entropy[i] + torch.mean(self.entropy(gathered_spatial_args[i][j]))
+                    entropy[i] = entropy[i] + c3 * torch.mean(self.entropy(gathered_spatial_args[i][j]))
                 else:
                     numerator[i] = numerator[i] + torch.log(gathered_args[i][j-3])
                     denominator[i] = denominator[i] + torch.log(old_gathered_args[i][j-3] + eps_denom)
-                    entropy[i] = entropy[i] + torch.mean(self.entropy(gathered_args[i][j-3]))
+                    entropy[i] = entropy[i] + c4 * torch.mean(self.entropy(gathered_args[i][j-3]))
             num_args[i] += len(curr_args)
 
         denominator = denominator.detach()
@@ -271,7 +272,7 @@ class BaseAgent(Agent):
 
         #print(numerator, denominator, num_args)
 
-        ratio = torch.exp((numerator - denominator) * (1 / num_args))
+        ratio = torch.exp((numerator - denominator))    # * (1 / num_args))
         ratio_adv = ratio * advantages.detach()
         bounded_adv = torch.clamp(ratio, 1-clip_param, 1+clip_param)
         bounded_adv = bounded_adv * advantages.detach()
@@ -286,6 +287,13 @@ class BaseAgent(Agent):
         #total_loss = ent
         self.optimizer.zero_grad()
         total_loss.backward()
+
+        print("actions: ", torch.max(gathered_actions).item(), torch.min(gathered_actions).item())
+        print("args: ", torch.max(gathered_args).item(), torch.min(gathered_args).item())
+        print("spatial args: ", torch.max(gathered_spatial_args).item(), torch.min(gathered_spatial_args).item())
+        print("ratio: ", torch.max(ratio).item(), torch.min(ratio).item())
+
+
         #self.process_gradients(self.model)
         clip_grad_norm_(self.model.parameters(), 100.0)
         self.optimizer.step()
@@ -293,8 +301,8 @@ class BaseAgent(Agent):
         pol_loss = pol_avg.detach().item()
         vf_loss = value_loss.detach().item()
         ent_total = ent.detach().item()
-        #print("Total train time: %f" % (t7-t1))
-        #print("%f %f %f %f %f %f, total: %f" % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t7-t1))
+        print("Total train time: %f" % (t7-t1))
+        print("%f %f %f %f %f %f, total: %f\n" % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t7-t1))
 
         return pol_loss, vf_loss, -ent_total
 
@@ -472,10 +480,11 @@ class BaseAgent(Agent):
 
     def push_memory(self, state, action, reward, done):
         push_state = list(state) + [self.prev_hidden_state]
+        if done:
+            self.value = 0
         self.memory.push(push_state, action, reward, done, self.value, 0, 0, self.step)
         if done:
             self.step = 0
-            self.value = 0
             self.hidden_state = self.model.init_hidden(use_torch=False)
 
     ### Unique RRL functions below this line
