@@ -44,6 +44,8 @@ if __name__ == '__main__':
     agent1 = MCTSAgent(
         opponent=pommerman.agents.RandomAgent(),
         agent_id=0,
+        tree_save_file='mct.pickle',
+        model_save_file='policynet.h5',
         model=mcts_model,
         settings=agent_settings,
         memory=None, # uses a list instead of Memory object

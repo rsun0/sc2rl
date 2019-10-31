@@ -23,7 +23,6 @@ import time
 NUM_AGENTS = 2
 NUM_ACTIONS = len(constants.Action)
 NUM_CHANNELS = 18
-SAVE_FILE = 'mct.pickle'
 
 total_time = {'obs_to_state': 0.0, 'env_step': 0.0, 'rollout': 0.0, 'search': 0.0}
 total_frequency = {'obs_to_state': 0, 'env_step': 0, 'rollout': 0, 'search': 0} 
@@ -66,7 +65,8 @@ class MCTSNode(object):
 
 class MCTSAgent(Agent, BaseAgent):
 
-    def __init__(self, agent_id=0, opponent=SimpleAgent(), *args, **kwargs):
+    def __init__(self, agent_id=0, opponent=SimpleAgent(), tree_save_file=None,
+            model_save_file=None, *args, **kwargs):
         print('init')
         super(MCTSAgent, self).__init__(*args, **kwargs)
         self.agent_id = agent_id
@@ -78,6 +78,9 @@ class MCTSAgent(Agent, BaseAgent):
         self.mcts_c_puct = 1.0
         self.discount = 0.9
         self.temperature = 1.0
+
+        self.tree_save_file = tree_save_file
+        self.model_save_file = model_save_file
 
         self.current_trajectory = []
         self.experiences = []
@@ -383,16 +386,26 @@ class MCTSAgent(Agent, BaseAgent):
         pass
 
     def save(self):
-        print('Saving {} tree nodes'.format(len(self.tree)))
-        with open(SAVE_FILE, 'wb') as f:
-            pickle.dump(self.tree, f)
+        if self.tree_save_file:
+            print('Saving {} tree nodes'.format(len(self.tree)))
+            with open(self.tree_save_file, 'wb') as f:
+                pickle.dump(self.tree, f)
+        if self.model_save_file:
+            print('Saving policy network')
+            torch.save(self.model.state_dict(), self.model_save_file)
 
     def load(self):
-        try:
-            with open(SAVE_FILE, 'rb') as f:
-                self.tree = pickle.load(f)
-        except FileNotFoundError:
-            pass
+        if self.tree_save_file:
+            try:
+                with open(self.tree_save_file, 'rb') as f:
+                    self.tree = pickle.load(f)
+            except FileNotFoundError:
+                print('No tree save file found')
+        if self.model_save_file:
+            try:
+                self.model.load_state_dict(torch.load(self.model_save_file))
+            except FileNotFoundError:
+                print('No policy network save file found')
     
     def push_memory(self, state, action, reward, done):
         state = (state[0], state[1])
