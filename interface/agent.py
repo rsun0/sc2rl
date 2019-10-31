@@ -1,5 +1,6 @@
 class Agent():
-    def __init__(self, model, settings, memory):
+    def __init__(self, model, settings, memory, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.model = model
         self.model.eval()
         self.settings = settings

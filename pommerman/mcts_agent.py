@@ -20,8 +20,6 @@ import gym
 import json
 import time
 
-from policy_net import MCTSPolicyNet
-
 NUM_AGENTS = 2
 NUM_ACTIONS = len(constants.Action)
 NUM_CHANNELS = 18
@@ -66,7 +64,7 @@ class MCTSNode(object):
             return Nt / np.sum(Nt)
 
 
-class MCTSAgent(BaseAgent, Agent):
+class MCTSAgent(Agent, BaseAgent):
 
     def __init__(self, agent_id=0, opponent=SimpleAgent(), *args, **kwargs):
         print('init')
@@ -81,7 +79,6 @@ class MCTSAgent(BaseAgent, Agent):
         self.discount = 0.9
         self.temperature = 1.0
 
-        self.model = MCTSPolicyNet(board_size=6, in_channels=13)
         self.current_trajectory = []
         self.experiences = []
 
@@ -157,7 +154,7 @@ class MCTSAgent(BaseAgent, Agent):
                     images, scalars, _ = self.state_space_converter(self.env.get_observations()[self.agent_id])
                     self.model.eval()
                     preds = self.model((images[np.newaxis], scalars[np.newaxis]))
-                    probs = torch.nn.functional.softmax(preds).detach().numpy()[0]
+                    probs = torch.nn.functional.softmax(preds, dim=1).detach().numpy()[0]
 
                     # use current rewards for values
                     rewards = self.env._get_rewards()
@@ -362,10 +359,25 @@ class MCTSAgent(BaseAgent, Agent):
             images_batch = np.stack(images)
             scalars_batch = np.stack(scalars)
             actions_batch = np.array(actions)
-            rewards_batch = np.array(rewards)
+            rewards_batch = torch.from_numpy(np.array(rewards))
+
+            actions_onehot = np.zeros((actions_batch.shape[0], NUM_ACTIONS))
+            actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
+            actions_onehot = torch.from_numpy(actions_onehot)
 
             preds = self.model((images_batch, scalars_batch))
-            print('preds: ', preds)
+            log_probs = torch.nn.functional.log_softmax(preds, dim=1)
+            log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
+            print('Output log probs for experienced action: ', log_probs_observed)
+            print('Rewards: ', rewards_batch)
+            loss = -torch.sum(log_probs_observed * rewards_batch)
+            print('Loss: ', loss)
+
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+        # Throw away used experiences?
+        # self.experiences = []
 
     def train_step(self, batch_size):
         pass

@@ -2,13 +2,16 @@ import sys
 sys.path.insert(0, "../interface/")
 
 import pommerman.agents
+import torch.optim
 
 from abstract_core import Experiment, RunSettings
+from agent import AgentSettings
 from custom_env import PommermanEnvironment
 from simple_agent import SimpleAgent
 from noop_agent import NoopAgent, PommermanNoopAgent
 from random_agent import RandomAgent
 from mcts_agent import MCTSAgent
+from policy_net import MCTSPolicyNet
 
 if __name__ == '__main__':
     env = PommermanEnvironment(
@@ -28,8 +31,24 @@ if __name__ == '__main__':
         graph_file='pommerman_results.png'
     )
 
-    agent1 = MCTSAgent(opponent=pommerman.agents.RandomAgent(), agent_id=0)
+    agent_settings = AgentSettings(
+        optimizer=torch.optim.Adam,
+        learning_rate=0.001,
+        epsilon_max=0,
+        epsilon_min=0,
+        epsilon_duration=0,
+    )
+
+    mcts_model = MCTSPolicyNet(board_size=6, in_channels=13)
+    agent1 = MCTSAgent(
+        opponent=pommerman.agents.RandomAgent(),
+        agent_id=0,
+        model=mcts_model,
+        settings=agent_settings,
+        memory=None, # uses a list instead of Memory object
+    )
     agent1.load()
+
     agent2 = RandomAgent()
 
     experiment = Experiment([agent1, agent2], env, run_settings)
