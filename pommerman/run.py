@@ -14,23 +14,23 @@ if __name__ == '__main__':
     env = PommermanEnvironment(
         render=True,
         num_agents=2,
-        game_state_file='start_mini.json',
+        game_state_file='start_mini2.json',
     )
 
     run_settings = RunSettings(
         num_episodes=10000,
         num_epochs=1,
-        batch_size=1,
-        train_every=1024,
-        save_every=64,
+        batch_size=32,
+        train_every=32, # FIXME debugging value
+        save_every=32,
         graph_every=1,
-        averaging_window=10,
+        averaging_window=50,
         graph_file='pommerman_results.png'
     )
 
-    agent1 = RandomAgent()
-    agent2 = MCTSAgent(opponent=pommerman.agents.RandomAgent())
-    agent2.load()
+    agent1 = MCTSAgent(opponent=pommerman.agents.RandomAgent(), agent_id=0)
+    agent1.load()
+    agent2 = RandomAgent()
 
     experiment = Experiment([agent1, agent2], env, run_settings)
     experiment.train()

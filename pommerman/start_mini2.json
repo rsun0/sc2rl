@@ -1,0 +1,10 @@
+{
+    "agents": "[{\"agent_id\": 0, \"is_alive\": true, \"position\": [1, 1], \"ammo\": 1, \"blast_strength\": 2, \"can_kick\": false}, {\"agent_id\": 1, \"is_alive\": true, \"position\": [4, 4], \"ammo\": 1, \"blast_strength\": 2, \"can_kick\": false}]",
+    "board": "[[0, 1, 1, 2, 1, 1], [1, 10, 0, 0, 2, 1], [1, 0, 0, 1, 0, 0], [2, 0, 1, 0, 0, 1], [1, 2, 0, 0, 11, 1], [1, 1, 0, 1, 1, 0]]",
+    "board_size": "6",
+    "bombs": "[]",
+    "flames": "[]",
+    "intended_actions": "[]",
+    "items": "[]",
+    "step_count": "0"
+}

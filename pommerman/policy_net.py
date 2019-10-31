@@ -6,7 +6,7 @@ from torch import nn
 
 from agent import Model
 
-class MCTSPolicyNet(nn.module, Model):
+class MCTSPolicyNet(nn.Module, Model):
     def __init__(self, board_size=8, in_channels=13, num_scalars=6, num_actions=6):
         super().__init__()
         self.conv = nn.Sequential(
