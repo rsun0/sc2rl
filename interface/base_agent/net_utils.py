@@ -166,7 +166,7 @@ class RelationalModule(nn.Module):
         self.num_features=num_features
         self.num_heads=num_heads
         self.encode = encode
-        self.net_encoding = nn.Conv2d(in_size, num_heads*num_features, kernel_size=1, stride=1, padding=0)
+        self.net_encoding = nn.Conv2d(in_size, num_heads*num_features, kernel_size=3, stride=1, padding=1)
         self.mhdpa = nn.TransformerEncoderLayer(num_heads*num_features, num_heads, dim_feedforward=num_features)
 
     def forward(self, x):
@@ -285,7 +285,7 @@ class FastEmbedding(nn.Module):
         s = x.shape
         values = self.weight[x.view(-1)]
         return values.view(s + (self.embedding_dim,))
-        
+
 
 class Unsqueeze(nn.Module):
     def forward(self, x):
