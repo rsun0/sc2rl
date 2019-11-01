@@ -248,7 +248,7 @@ class BaseAgent(Agent):
         """
 
         numerator = torch.log(gathered_actions)
-        denominator = torch.log(old_gathered_actions + eps_denom)
+        denominator = torch.log(old_gathered_actions)
         entropy = self.entropy(gathered_actions)
         num_args = torch.ones(n,).to(self.device)
 
@@ -259,11 +259,11 @@ class BaseAgent(Agent):
             for j in curr_args:
                 if is_spatial_arg(j):
                     numerator[i] = numerator[i] + torch.log(gathered_spatial_args[i][j])
-                    denominator[i] = denominator[i] + torch.log(old_gathered_spatial_args[i][j] + eps_denom)
+                    denominator[i] = denominator[i] + torch.log(old_gathered_spatial_args[i][j])
                     entropy[i] = entropy[i] + c3 * torch.mean(self.entropy(gathered_spatial_args[i][j]))
                 else:
                     numerator[i] = numerator[i] + torch.log(gathered_args[i][j-3])
-                    denominator[i] = denominator[i] + torch.log(old_gathered_args[i][j-3] + eps_denom)
+                    denominator[i] = denominator[i] + torch.log(old_gathered_args[i][j-3])
                     entropy[i] = entropy[i] + c4 * torch.mean(self.entropy(gathered_args[i][j-3]))
             num_args[i] += len(curr_args)
 
@@ -271,6 +271,7 @@ class BaseAgent(Agent):
         t5 = time.time()
 
         #print(numerator, denominator, num_args)
+        denominator = torch.clamp(denominator, -24)
 
         ratio = torch.exp((numerator - denominator))    # * (1 / num_args))
         ratio_adv = ratio * advantages.detach()

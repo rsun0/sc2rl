@@ -274,8 +274,9 @@ class FastEmbedding(nn.Module):
 
         self.num_embeddings = num_embeddings
         self.embedding_dim = embedding_dim
-        #self.layer = nn.Linear(num_embeddings, embedding_dim).to(device)
-        self.weight = torch.from_numpy(np.random.uniform(-1,1, (num_embeddings, embedding_dim))).float().to(device)
+        self.layer = nn.Linear(num_embeddings, embedding_dim).to(device)
+        self.weight = torch.zeros(self.layer.weight.transpose(0,1).shape).float().to(device)
+        self.weight.data = self.layer.weight.transpose(0,1).data
 
     def forward(self, x):
         """
@@ -285,6 +286,10 @@ class FastEmbedding(nn.Module):
         s = x.shape
         values = self.weight[x.view(-1)]
         return values.view(s + (self.embedding_dim,))
+
+    def _save_to_state_dict(self, destination, prefix, keep_vars):
+        self.layer.weight.data = self.weight.transpose(0,1).data
+        super(FastEmbedding, self)._save_to_state_dict(destination, prefix, keep_vars)
 
 
 class Unsqueeze(nn.Module):
