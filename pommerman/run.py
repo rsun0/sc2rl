@@ -24,8 +24,8 @@ if __name__ == '__main__':
         num_episodes=10000,
         num_epochs=1,
         batch_size=32,
-        train_every=64,
-        save_every=256,
+        train_every=256,
+        save_every=512,
         graph_every=5,
         averaging_window=50,
         graph_file='pommerman_results.png'
