@@ -27,11 +27,11 @@ def main():
                                 render=render,
                                 step_multiplier=step_mul)
 
-    state_embed = 5
-    action_embed = 8
+    state_embed = 10
+    action_embed = 16
 
     lr = 1e-4
-    opt_eps = 1e-2
+    opt_eps = 1e-8
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=2e4
@@ -58,7 +58,7 @@ def main():
         "inputs2d_size": 64,
         "inputs3d_width": 8,
         "relational_features": 32,
-        "relational_depth": 1,
+        "relational_depth": 5,
         "relational_heads": 3,
         "spatial_out_depth": 64,
         "channels3": 16,
@@ -104,7 +104,7 @@ def main():
         "eps_denom": 1e-5,
         "c1": 0.1,
         "c2": 0.1,
-        "c3": 0.03,
+        "c3": 0.3,
         "c4": 0.3,
         "minc2": 0.01,
         "clip_param": 0.1,
