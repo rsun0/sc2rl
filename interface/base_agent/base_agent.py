@@ -123,9 +123,12 @@ class BaseAgent(Agent):
                 if (math.isnan(d_pol) or math.isnan(d_vf) or math.isnan(d_ent)):
                     print("Canceling training -- NaN's encountered")
                     print("Reloading model from previous save")
+                    sys.exit(0)
+                    """
                     self.load()
                     self.update_target_net()
                     return
+                    """
                 pol_loss += d_pol
                 vf_loss += d_vf
                 ent_total += d_ent
@@ -199,7 +202,7 @@ class BaseAgent(Agent):
 
         rewards = torch.from_numpy(rewards).float().to(self.device)
         advantages = torch.from_numpy(advantages).float().to(self.device)
-        advantages = (advantages - advantages.mean()) / advantages.std()
+        #advantages = (advantages - advantages.mean()) / advantages.std()
         v_returns = torch.from_numpy(v_returns).float().to(self.device)
         dones = torch.from_numpy(dones.astype(np.uint8)).byte().to(self.device)
         base_actions = torch.from_numpy(base_actions).to(self.device)
@@ -248,7 +251,7 @@ class BaseAgent(Agent):
         """
 
         numerator = torch.log(gathered_actions)
-        denominator = torch.log(old_gathered_actions)
+        denominator = torch.log(old_gathered_actions + eps_denom)
         entropy = self.entropy(gathered_actions)
         num_args = torch.ones(n,).to(self.device)
 
@@ -259,19 +262,19 @@ class BaseAgent(Agent):
             for j in curr_args:
                 if is_spatial_arg(j):
                     numerator[i] = numerator[i] + torch.log(gathered_spatial_args[i][j])
-                    denominator[i] = denominator[i] + torch.log(old_gathered_spatial_args[i][j])
+                    denominator[i] = denominator[i] + torch.log(old_gathered_spatial_args[i][j] + eps_denom)
                     entropy[i] = entropy[i] + c3 * torch.mean(self.entropy(gathered_spatial_args[i][j]))
                 else:
                     numerator[i] = numerator[i] + torch.log(gathered_args[i][j-3])
-                    denominator[i] = denominator[i] + torch.log(old_gathered_args[i][j-3])
+                    denominator[i] = denominator[i] + torch.log(old_gathered_args[i][j-3] + eps_denom)
                     entropy[i] = entropy[i] + c4 * torch.mean(self.entropy(gathered_args[i][j-3]))
             num_args[i] += len(curr_args)
 
         denominator = denominator.detach()
         t5 = time.time()
 
-        #print(numerator, denominator, num_args)
-        denominator = torch.clamp(denominator, -24)
+        print(numerator, denominator)
+        denominator = torch.clamp(denominator, -25)
 
         ratio = torch.exp((numerator - denominator))    # * (1 / num_args))
         ratio_adv = ratio * advantages.detach()
