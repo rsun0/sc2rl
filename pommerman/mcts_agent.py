@@ -2,7 +2,7 @@
 import sys
 sys.path.insert(0, "../interface/")
 
-from agent import Agent
+from agent import Agent, Memory
 
 import argparse
 import multiprocessing
@@ -11,6 +11,7 @@ import numpy as np
 import torch
 import time
 import pickle
+import collections
 
 import pommerman
 from pommerman.agents import BaseAgent, SimpleAgent
@@ -32,6 +33,34 @@ def argmax_tiebreaking(Q):
     idx = np.flatnonzero(Q == np.max(Q))
     assert len(idx) > 0, str(Q)
     return np.random.choice(idx)
+
+
+class MCTSMemory(Memory):
+    def __init__(self, buffer_len, discount):
+        self.experiences = collections.deque(maxlen=buffer_len)
+        self.discount = discount
+        self.current_trajectory = []
+
+    def push(self, state, action, reward, done):
+        state = (state[0], state[1])
+        self.current_trajectory.append( (state, action) )
+        
+        if done:
+            rewards = []
+            r = reward
+            for i in range(len(self.current_trajectory)):
+                rewards.append(r)
+                r *= self.discount
+            rewards.reverse()
+
+            states, actions = zip(*self.current_trajectory)
+
+            trajectory = zip(states, actions, rewards)
+            self.experiences.extend(trajectory)
+            self.current_trajectory = []
+
+    def get_data(self):
+        return list(self.experiences)
 
 
 class MCTSNode(object):
@@ -65,8 +94,8 @@ class MCTSNode(object):
 
 class MCTSAgent(Agent, BaseAgent):
 
-    def __init__(self, agent_id=0, opponent=SimpleAgent(), tree_save_file=None,
-            model_save_file=None, *args, **kwargs):
+    def __init__(self, discount, agent_id=0, opponent=SimpleAgent(),
+            tree_save_file=None, model_save_file=None, *args, **kwargs):
         print('init')
         super(MCTSAgent, self).__init__(*args, **kwargs)
         self.agent_id = agent_id
@@ -74,16 +103,13 @@ class MCTSAgent(Agent, BaseAgent):
         self.reset_tree()
         self.num_episodes = 1
         self.mcts_iters = 3
-        self.num_rollouts = 5 # FIXME debugging value
+        self.num_rollouts = 5
         self.mcts_c_puct = 1.0
-        self.discount = 0.9
+        self.discount = discount
         self.temperature = 1.0
 
         self.tree_save_file = tree_save_file
         self.model_save_file = model_save_file
-
-        self.current_trajectory = []
-        self.experiences = []
 
     def make_env(self, opponent):
         print('make_env')
@@ -354,8 +380,9 @@ class MCTSAgent(Agent, BaseAgent):
 
     def train(self, run_settings):
         self.model.train()
-        for i in range(0, len(self.experiences), run_settings.batch_size):
-            batch = self.experiences[i:i+run_settings.batch_size]
+        data = self.memory.get_data()
+        for i in range(0, len(data), run_settings.batch_size):
+            batch = data[i:i+run_settings.batch_size]
             states, actions, rewards = zip(*batch)
             images, scalars = zip(*states)
 
@@ -371,7 +398,7 @@ class MCTSAgent(Agent, BaseAgent):
             preds = self.model((images_batch, scalars_batch))
             log_probs = torch.nn.functional.log_softmax(preds, dim=1)
             log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
-            print('Output log probs for experienced action: ', log_probs_observed)
+            print('Log probs for experienced actions: ', log_probs_observed)
             print('Rewards: ', rewards_batch)
             loss = -torch.sum(log_probs_observed * rewards_batch)
             print('Loss: ', loss)
@@ -408,23 +435,7 @@ class MCTSAgent(Agent, BaseAgent):
                 print('No policy network save file found')
     
     def push_memory(self, state, action, reward, done):
-        state = (state[0], state[1])
-        self.current_trajectory.append( (state, action) )
-        
-        if done:
-            trajectory = []
-            rewards = []
-            r = reward
-            for i in range(len(self.current_trajectory)):
-                rewards.append(r)
-                r *= self.discount
-            rewards.reverse()
-
-            states, actions = zip(*self.current_trajectory)
-
-            trajectory = zip(states, actions, rewards)
-            self.experiences.extend(trajectory)
-            self.current_trajectory = []
+        self.memory.push(state, action, reward, done)
 
 
 def runner(id, num_episodes, fifo, _args):
