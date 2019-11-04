@@ -202,7 +202,7 @@ class BaseAgent(Agent):
 
         rewards = torch.from_numpy(rewards).float().to(self.device)
         advantages = torch.from_numpy(advantages).float().to(self.device)
-        #advantages = (advantages - advantages.mean()) / advantages.std()
+        advantages = (advantages - advantages.mean()) / advantages.std()
         v_returns = torch.from_numpy(v_returns).float().to(self.device)
         dones = torch.from_numpy(dones.astype(np.uint8)).byte().to(self.device)
         base_actions = torch.from_numpy(base_actions).to(self.device)
@@ -252,20 +252,18 @@ class BaseAgent(Agent):
 
         numerator = torch.log(gathered_actions)
         denominator = torch.log(old_gathered_actions + eps_denom)
-        entropy = self.entropy(gathered_actions)
+        entropy = self.entropy(gathered_actions + eps_denom)
         num_args = torch.ones(n,).to(self.device)
-
-
 
         for i in range(n):
             curr_args = action_args[i]
             for j in curr_args:
                 if is_spatial_arg(j):
-                    numerator[i] = numerator[i] + torch.log(gathered_spatial_args[i][j])
+                    numerator[i] = numerator[i] + torch.log(gathered_spatial_args[i][j] + eps_denom)
                     denominator[i] = denominator[i] + torch.log(old_gathered_spatial_args[i][j] + eps_denom)
                     entropy[i] = entropy[i] + c3 * torch.mean(self.entropy(gathered_spatial_args[i][j]))
                 else:
-                    numerator[i] = numerator[i] + torch.log(gathered_args[i][j-3])
+                    numerator[i] = numerator[i] + torch.log(gathered_args[i][j-3] + eps_denom)
                     denominator[i] = denominator[i] + torch.log(old_gathered_args[i][j-3] + eps_denom)
                     entropy[i] = entropy[i] + c4 * torch.mean(self.entropy(gathered_args[i][j-3]))
             num_args[i] += len(curr_args)
