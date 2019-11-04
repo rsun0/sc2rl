@@ -250,9 +250,9 @@ class BaseAgent(Agent):
         entropy = torch.zeros((n,)).float().to(self.device)
         """
 
-        numerator = torch.log(gathered_actions)
+        numerator = torch.log(gathered_actions + eps_denom)
         denominator = torch.log(old_gathered_actions + eps_denom)
-        entropy = self.entropy(gathered_actions + eps_denom)
+        entropy = self.entropy(gathered_actions)
         num_args = torch.ones(n,).to(self.device)
 
         for i in range(n):
@@ -272,7 +272,7 @@ class BaseAgent(Agent):
         t5 = time.time()
 
         print(numerator, denominator)
-        denominator = torch.clamp(denominator, -25)
+        #denominator = torch.clamp(denominator, -25)
 
         ratio = torch.exp((numerator - denominator))    # * (1 / num_args))
         ratio_adv = ratio * advantages.detach()
