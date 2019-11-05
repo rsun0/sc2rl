@@ -271,7 +271,7 @@ class BaseAgent(Agent):
         denominator = denominator.detach()
         t5 = time.time()
 
-        print(numerator, denominator)
+        #print(numerator, denominator)
         #denominator = torch.clamp(denominator, -25)
 
         ratio = torch.exp((numerator - denominator))    # * (1 / num_args))
@@ -293,6 +293,8 @@ class BaseAgent(Agent):
         print("actions: ", torch.max(gathered_actions).item(), torch.min(gathered_actions).item())
         print("args: ", torch.max(gathered_args).item(), torch.min(gathered_args).item())
         print("spatial args: ", torch.max(gathered_spatial_args).item(), torch.min(gathered_spatial_args).item())
+        if len(gathered_spatial_args) == 0:
+            print("No spatial arguments chosen")
         print("ratio: ", torch.max(ratio).item(), torch.min(ratio).item())
 
 
@@ -414,11 +416,13 @@ class BaseAgent(Agent):
         entropy = torch.sum(self.entropy(action_probs), 1)
         num_args = torch.ones(batch_size,).to(self.device)
 
-
+        spatial_inds = []
 
         for i in range(batch_size):
             curr_args = action_args[i]
             for j in curr_args:
+                if i not in spatial_inds:
+                    spatial_inds.append(i)
                 if is_spatial_arg(j):
                     numerator[i] = numerator[i] + torch.log(gathered_spatial_args[i][j])
                     denominator[i] = denominator[i] + torch.log(torch.clamp(old_gathered_spatial_args[i][j], eps_denom))
