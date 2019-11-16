@@ -10,7 +10,7 @@ from custom_env import PommermanEnvironment
 from simple_agent import SimpleAgent
 from noop_agent import NoopAgent, PommermanNoopAgent
 from random_agent import RandomAgent
-from mcts_agent import MCTSAgent, MCTSMemory
+from mcts_agent import MCTSAgent, PolicyNetMemory
 from policy_net import MCTSPolicyNet
 
 if __name__ == '__main__':
@@ -41,7 +41,7 @@ if __name__ == '__main__':
     )
 
     discount = 0.9
-    memory = MCTSMemory(buffer_len=1024, discount=discount)
+    memory = PolicyNetMemory(buffer_len=1024, discount=discount)
 
     mcts_model = MCTSPolicyNet(board_size=6, in_channels=13)
     agent1 = MCTSAgent(

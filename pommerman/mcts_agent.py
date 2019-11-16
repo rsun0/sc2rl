@@ -35,7 +35,7 @@ def argmax_tiebreaking(Q):
     return np.random.choice(idx)
 
 
-class MCTSMemory(Memory):
+class PolicyNetMemory(Memory):
     def __init__(self, buffer_len, discount):
         self.experiences = collections.deque(maxlen=buffer_len)
         self.discount = discount
