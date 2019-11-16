@@ -2,6 +2,7 @@ import json
 
 import torch
 import numpy as np
+import tqdm
 
 import sys
 sys.path.insert(0, "../interface/")
@@ -28,7 +29,9 @@ class PolicyGradientAgent(Agent):
     def train(self, run_settings):
         self.model.train()
         data = self.memory.get_data()
-        for i in range(0, len(data), run_settings.batch_size):
+        running_loss = 0
+        pbar = tqdm(range(0, len(data), run_settings.batch_size))
+        for i in pbar:
             batch = data[i:i+run_settings.batch_size]
             states, actions, rewards = zip(*batch)
             images, scalars = zip(*states)
@@ -45,14 +48,15 @@ class PolicyGradientAgent(Agent):
             preds = self.model((images_batch, scalars_batch))
             log_probs = torch.nn.functional.log_softmax(preds, dim=1)
             log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
-            print('Log probs for experienced actions: ', log_probs_observed)
-            print('Rewards: ', rewards_batch)
             loss = -torch.sum(log_probs_observed * rewards_batch)
-            print('Loss: ', loss)
 
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+
+            running_loss += loss.item()
+            pbar.set_postfix_str("{:.3f}L".format(running_loss / i))
+        pbar.close()
         # Throw away used experiences?
         # self.experiences = []
 
