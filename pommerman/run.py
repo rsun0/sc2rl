@@ -11,6 +11,7 @@ from simple_agent import SimpleAgent
 from noop_agent import NoopAgent, PommermanNoopAgent
 from random_agent import RandomAgent
 from mcts_agent import MCTSAgent, PolicyNetMemory
+from pg_agent import PolicyGradientAgent
 from policy_net import MCTSPolicyNet
 
 if __name__ == '__main__':
@@ -44,12 +45,19 @@ if __name__ == '__main__':
     memory = PolicyNetMemory(buffer_len=1024, discount=discount)
 
     mcts_model = MCTSPolicyNet(board_size=6, in_channels=13)
-    agent1 = MCTSAgent(
-        discount=discount,
-        opponent=pommerman.agents.RandomAgent(),
-        agent_id=0,
-        tree_save_file='mct.pickle',
-        model_save_file='policynet.h5',
+    # agent1 = MCTSAgent(
+    #     discount=discount,
+    #     opponent=pommerman.agents.RandomAgent(),
+    #     agent_id=0,
+    #     tree_save_file='mct.pickle',
+    #     model_save_file='policynet.h5',
+    #     model=mcts_model,
+    #     settings=agent_settings,
+    #     memory=memory,
+    # )
+    # agent1.load()
+    agent1 = PolicyGradientAgent(
+        save_file='policynet.h5',
         model=mcts_model,
         settings=agent_settings,
         memory=memory,

@@ -1,3 +1,5 @@
+import json
+
 import torch
 import numpy as np
 
@@ -63,7 +65,7 @@ class PolicyGradientAgent(Agent):
 
     def load(self):
         try:
-            self.model.load_state_dict(torch.load(self.model_save_file))
+            self.model.load_state_dict(torch.load(self.save_file))
         except FileNotFoundError:
             print('No policy network save file found')
 
