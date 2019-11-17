@@ -2,12 +2,16 @@ import json
 
 import torch
 import numpy as np
-import tqdm
+from tqdm import tqdm
+from pommerman import constants
 
 import sys
 sys.path.insert(0, "../interface/")
 
 from agent import Agent
+
+NUM_ACTIONS = len(constants.Action)
+
 
 class PolicyGradientAgent(Agent):
     def __init__(self, save_file, *args, **kwargs):
@@ -55,7 +59,8 @@ class PolicyGradientAgent(Agent):
             self.optimizer.step()
 
             running_loss += loss.item()
-            pbar.set_postfix_str("{:.3f}L".format(running_loss / i))
+            num_experiences = i + run_settings.batch_size
+            pbar.set_postfix_str("{:.3f}L".format(running_loss / num_experiences))
         pbar.close()
         # Throw away used experiences?
         # self.experiences = []

@@ -16,7 +16,7 @@ from policy_net import MCTSPolicyNet
 
 if __name__ == '__main__':
     env = PommermanEnvironment(
-        render=True,
+        render=False,
         num_agents=2,
         game_state_file='start_mini2.json',
     )
@@ -27,7 +27,7 @@ if __name__ == '__main__':
         batch_size=32,
         train_every=256,
         save_every=512,
-        graph_every=5,
+        graph_every=50,
         averaging_window=50,
         graph_file='pommerman_results.png'
     )
