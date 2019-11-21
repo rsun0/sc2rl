@@ -20,7 +20,7 @@ def main():
 
     map_name = "DefeatRoaches"
     render = False
-    step_mul = 24
+    step_mul = 8
 
 
     env = FullStateActionEnvironment(map_name_=map_name,
@@ -36,12 +36,12 @@ def main():
     eps_max = 0.3
     eps_min = 0.05
     eps_duration=2e4
-    history_size=10
+    history_size=5
 
     num_episodes = 10000000
     num_epochs = 3
     batch_size = 32
-    train_every = 1024
+    train_every = 256
     save_every = 10240
     graph_every = -1
     averaging_window = 100
@@ -104,7 +104,7 @@ def main():
         "device": device,
         "eps_denom": 1e-5,
         "c1": 0.5,
-        "c2": 0.2,
+        "c2": 0.01,
         "c3": 0.5,
         "c4": 0.5,
         "minc2": 0.01,
