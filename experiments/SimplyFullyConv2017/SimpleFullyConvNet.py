@@ -22,6 +22,7 @@ class ConvNet(BaseNetwork):
         self.hist_depth = net_config["history_size"]
 
         self.spatial_depth = env_config["spatial_action_depth"]
+        self.spatial_action_size = env_config["spatial_action_size"]
 
         self.state_embeddings = generate_embedding(net_config)
         self.state_embeddings = nn.ModuleList(self.state_embeddings)
@@ -36,17 +37,25 @@ class ConvNet(BaseNetwork):
         self.action_embedding = nn.Embedding(env_config["action_space"])
 
         self.screen_layers = nn.Sequential(
-            nn.Conv2d(self.hist_depth * (self.screen_features+1), 32, kernel_size=5, stride=1, padding=2),
+            nn.Conv2d(self.hist_depth * (self.screen_features+1), 16, kernel_size=5, stride=1, padding=2),
             nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
         )
 
         self.minimap_layers = nn.Sequential(
-            nn.Conv2d(self.hist_depth * (self.minimap_features+1), 32, kernel_size=5, stride=1, padding=2),
+            nn.Conv2d(self.hist_depth * (self.minimap_features+1), 16, kernel_size=5, stride=1, padding=2),
             nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
         )
 
-        self.spatial_conv = nn.Conv2d(128, self.spatial_depth, kernel_size=1, stride=1, padding=0)
+        self.spatial_conv = nn.Conv2d(64 + env_config["raw_player"], self.spatial_depth, kernel_size=1, stride=1, padding=0)
+
+        self.fc = nn.Sequential(
+            nn.Linear((64+env_config["raw_player"])*(self.spatial_action_size ** 2), 256),
+            nn.ReLU(),
+        )
+
+        self.value_layer = nn.Linear(256, 1)
+        self.base_policy_layer = nn.Linear(256, env_config["action_space"])
