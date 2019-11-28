@@ -486,6 +486,7 @@ class BaseAgent(Agent):
 
     def push_memory(self, state, action, reward, done):
         push_state = list(state) + [self.prev_hidden_state]
+        print(action)
         if done:
             self.value = 0
         self.memory.push(push_state, action, reward, done, self.value, 0, 0, self.step)

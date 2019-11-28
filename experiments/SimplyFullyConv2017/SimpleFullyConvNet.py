@@ -131,7 +131,7 @@ class ConvNet(BaseNetwork):
             args = self.sample_arg(arg_logits, action)
             spatial = self.sample_spatial(spatial_logits, action)
 
-        choice = action, args, spatial
+        choice = [action, args, spatial]
 
         return action_logits, arg_logits, spatial_logits, hidden, value, choice
 
