@@ -61,6 +61,25 @@ class BaseNetwork(nn.Module, Model):
         #return action_logits, arg_logits, spatial_logits, hidden, value, choice
         raise NotImplementedError
 
+    def simple_forward(self, minimaps, screens, players, avail_actions, last_actions, last_spatials, hiddens, curr_actions, relevant_frames):
+        minimaps, screens, inputs2d = self.process_states(minimaps, screens, players[:,-1], last_actions[:,-1], last_spatials, sequential=False, embeddings_only=True)
+        #minimaps = minimaps.flatten(1, -1)
+        #screens = screens.flatten(1, -1)
+        action_logits, arg_logits, spatial_logits, _, values, _ = self.forward(
+            minimaps,
+            screens,
+            players[:,-1],
+            avail_actions,
+            last_actions[:,-1],
+            last_spatials,
+            None,
+            curr_action=curr_actions,
+            process_inputs=False,
+            format_inputs=False,
+            inputs2d=inputs2d
+        )
+
+        return action_logits, arg_logits, spatial_logits, _, values, _
 
     def stacked_past_forward(self, minimaps, screens, players, avail_actions, last_actions, last_spatials, hiddens, curr_actions, relevant_frames):
         minimaps, screens, inputs2d = self.process_states(minimaps, screens, players[:,-1], last_actions[:,-1], last_spatials, sequential=False)
@@ -280,7 +299,7 @@ class BaseNetwork(nn.Module, Model):
         args = [i for i in args if is_spatial_arg(i)]
         return args
 
-    
+
 
 
 

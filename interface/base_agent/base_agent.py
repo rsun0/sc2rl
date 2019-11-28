@@ -209,7 +209,7 @@ class BaseAgent(Agent):
         t3 = time.time()
 
         # minimaps, screens, players, avail_actions, last_actions, hiddens, curr_actions, relevant_frames
-        action_probs, arg_probs, spatial_probs, _, values, _ = self.model.stacked_past_forward(
+        action_probs, arg_probs, spatial_probs, _, values, _ = self.model.simple_forward(
             minimaps,
             screens,
             players,
@@ -221,7 +221,7 @@ class BaseAgent(Agent):
             relevant_states
         )
 
-        old_action_probs, old_arg_probs, old_spatial_probs, _, _, _ = self.target_model.stacked_past_forward(
+        old_action_probs, old_arg_probs, old_spatial_probs, _, _, _ = self.target_model.simple_forward(
             minimaps,
             screens,
             players,
@@ -272,7 +272,7 @@ class BaseAgent(Agent):
         t5 = time.time()
 
         #print(numerator, denominator)
-        #denominator = torch.clamp(denominator, -25)
+        denominator = torch.clamp(denominator, -27)
 
         ratio = torch.exp((numerator - denominator))    # * (1 / num_args))
         ratio_adv = ratio * advantages.detach()
@@ -290,13 +290,14 @@ class BaseAgent(Agent):
         self.optimizer.zero_grad()
         total_loss.backward()
 
+        """
         print("actions: ", torch.max(gathered_actions).item(), torch.min(gathered_actions).item())
         print("args: ", torch.max(gathered_args).item(), torch.min(gathered_args).item())
         print("spatial args: ", torch.max(gathered_spatial_args).item(), torch.min(gathered_spatial_args).item())
         if len(gathered_spatial_args) == 0:
             print("No spatial arguments chosen")
         print("ratio: ", torch.max(ratio).item(), torch.min(ratio).item())
-
+        """
 
         #self.process_gradients(self.model)
         clip_grad_norm_(self.model.parameters(), 100.0)
@@ -305,8 +306,8 @@ class BaseAgent(Agent):
         pol_loss = pol_avg.detach().item()
         vf_loss = value_loss.detach().item()
         ent_total = ent.detach().item()
-        print("Total train time: %f" % (t7-t1))
-        print("%f %f %f %f %f %f, total: %f\n" % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t7-t1))
+        #print("Total train time: %f" % (t7-t1))
+        #print("%f %f %f %f %f %f, total: %f\n" % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t7-t1))
 
         return pol_loss, vf_loss, -ent_total
 
@@ -486,7 +487,6 @@ class BaseAgent(Agent):
 
     def push_memory(self, state, action, reward, done):
         push_state = list(state) + [self.prev_hidden_state]
-        print(action)
         if done:
             self.value = 0
         self.memory.push(push_state, action, reward, done, self.value, 0, 0, self.step)

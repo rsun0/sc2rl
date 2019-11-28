@@ -28,8 +28,8 @@ def main():
                                 step_multiplier=step_mul)
 
 
-    state_embed = 10
-    action_embed = 16
+    state_embed = 5
+    action_embed = 8
 
     lr = 1e-4
     opt_eps = 1e-8
@@ -41,7 +41,7 @@ def main():
     num_episodes = 10000000
     num_epochs = 3
     batch_size = 32
-    train_every = 256
+    train_every = 1024
     save_every = 10240
     graph_every = -1
     averaging_window = 100
@@ -103,8 +103,8 @@ def main():
         "hist_size": history_size,
         "device": device,
         "eps_denom": 1e-5,
-        "c1": 0.5,
-        "c2": 0.01,
+        "c1": 0.1,
+        "c2": 0.1,
         "c3": 0.5,
         "c4": 0.5,
         "minc2": 0.01,

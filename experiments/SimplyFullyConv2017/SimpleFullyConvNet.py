@@ -174,7 +174,7 @@ class ConvNet(BaseNetwork):
         for i in range(len(batch_inds)):
             b = batch_inds[i]
             a = arg_inds[i]
-            idx = 2*last_spatials[b,a]
+            idx = last_spatials[b,a]
             arr = [screen_action, minimap_action][a==1]
             ind = a // 2
             arr[b,ind,idx[0],idx[1]] = 1
