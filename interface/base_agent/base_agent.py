@@ -275,15 +275,15 @@ class BaseAgent(Agent):
         #print(numerator, denominator)
         denominator = torch.clamp(denominator, -27)
 
-        """
+
         ratio = torch.exp((numerator - denominator))    # * (1 / num_args))
         ratio_adv = ratio * advantages.detach()
         bounded_adv = torch.clamp(ratio, 1-clip_param, 1+clip_param)
         bounded_adv = bounded_adv * advantages.detach()
 
         pol_avg = - ((torch.min(ratio_adv, bounded_adv)).mean())
-        """
-        pol_avg = -(numerator * advantages.detach()).mean()
+
+        #pol_avg = -(numerator * advantages.detach()).mean()
         value_loss = self.loss(values.squeeze(1), v_returns.detach())
         ent = entropy.mean()
         t6 = time.time()
@@ -304,15 +304,15 @@ class BaseAgent(Agent):
         print("ratio: ", torch.max(ratio).item(), torch.min(ratio).item())
         """
 
-        #self.process_gradients(self.model)
+        self.process_gradients(self.model)
         clip_grad_norm_(self.model.parameters(), 100.0)
         self.optimizer.step()
         t7 = time.time()
         pol_loss = pol_avg.detach().item()
         vf_loss = value_loss.detach().item()
         ent_total = ent.detach().item()
-        #print("Total train time: %f" % (t7-t1))
-        #print("%f %f %f %f %f %f, total: %f\n" % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t7-t1))
+        print("Total train time: %f" % (t7-t1))
+        print("%f %f %f %f %f %f, total: %f\n" % (t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6, t7-t1))
 
         return pol_loss, vf_loss, -ent_total
 
@@ -547,10 +547,15 @@ class BaseAgent(Agent):
 
     def process_gradients(self, network, clip=1.0):
         grad_sum = 0
+        max_grad = 0
         for param in network.parameters():
             if param.grad is None:
                 continue
             grad_sum += torch.sum(param.grad.data ** 2)
+            x = torch.abs(torch.max(param.grad.data)).item()
+            if (x > max_grad):
+                max_grad = x
+
         print(grad_sum)
 
     def process_network(self, network):

@@ -99,7 +99,7 @@ def main():
 
     train_settings = {
         "discount_factor": 0.99,
-        "lambda": 0.98,
+        "lambda": 0.95,
         "hist_size": history_size,
         "device": device,
         "eps_denom": 1e-5,
