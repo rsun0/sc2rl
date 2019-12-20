@@ -52,8 +52,14 @@ class ConvNet(BaseNetwork):
 
         self.spatial_policy_layer = nn.Conv2d(64 + env_config["raw_player"], self.spatial_depth, kernel_size=1, stride=1, padding=0)
 
+        self.layers_down = nn.Sequential(
+            nn.MaxPool2d(2),
+            nn.Conv2d(64, 64, kernel_size=5, stride=2, padding=2),
+            nn.Conv2d(64, 64, kernel_size=5, stride=2, padding=2),
+        )
+
         self.fc = nn.Sequential(
-            nn.Linear((64)*(self.spatial_action_size ** 2)+env_config["raw_player"], 256),
+            nn.Linear((64)*((self.spatial_action_size//8) ** 2)+env_config["raw_player"], 256),
             nn.ReLU(),
         )
 
@@ -111,7 +117,7 @@ class ConvNet(BaseNetwork):
 
         expanded_player = player.unsqueeze(2).unsqueeze(3).expand(player.shape + (self.spatial_action_size, self.spatial_action_size))
         outputs2d = torch.cat([processed_spatial, expanded_player], dim=1)
-        outputs1d = torch.cat([processed_spatial.flatten(1,-1), player], dim=1)
+        outputs1d = torch.cat([self.layers_down(processed_spatial).flatten(1,-1), player], dim=1)
 
         fc_out = self.fc(outputs1d)
 

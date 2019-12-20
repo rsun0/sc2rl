@@ -242,7 +242,6 @@ class BaseAgent(Agent):
         gathered_spatial_args, old_gathered_spatial_args = self.index_spatial(spatial_probs,
                                                                             old_spatial_probs,
                                                                             spatial_args)
-
         action_args = batch_get_action_args(base_actions)
         """
         numerator = torch.zeros((n,)).float().to(self.device)
@@ -252,7 +251,9 @@ class BaseAgent(Agent):
 
         numerator = torch.log(gathered_actions + eps_denom)
         denominator = torch.log(old_gathered_actions + eps_denom)
-        entropy = self.entropy(gathered_actions)
+        #scale_factor = avail_actions.shape[1] / torch.sum(avail_actions, dim=1, keepdim=True).float()
+        #entropy = torch.mean(self.entropy(action_probs) * scale_factor, dim=1)
+        entropy = self.entropy(gathered_args)
         num_args = torch.ones(n,).to(self.device)
 
         for i in range(n):
@@ -274,16 +275,20 @@ class BaseAgent(Agent):
         #print(numerator, denominator)
         denominator = torch.clamp(denominator, -27)
 
+        """
         ratio = torch.exp((numerator - denominator))    # * (1 / num_args))
         ratio_adv = ratio * advantages.detach()
         bounded_adv = torch.clamp(ratio, 1-clip_param, 1+clip_param)
         bounded_adv = bounded_adv * advantages.detach()
 
         pol_avg = - ((torch.min(ratio_adv, bounded_adv)).mean())
+        """
+        pol_avg = -(numerator * advantages.detach()).mean()
         value_loss = self.loss(values.squeeze(1), v_returns.detach())
         ent = entropy.mean()
         t6 = time.time()
 
+        #total_loss = pol_avg + c1 * value_loss + c2 * ent
         total_loss = pol_avg + c1 * value_loss + c2 * ent
         #total_loss = value_loss
         #total_loss = ent

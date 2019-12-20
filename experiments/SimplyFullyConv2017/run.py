@@ -28,8 +28,8 @@ def main():
                                 step_multiplier=step_mul)
 
 
-    state_embed = 5
-    action_embed = 8
+    state_embed = 10
+    action_embed = 16
 
     lr = 1e-4
     opt_eps = 1e-8
@@ -67,7 +67,7 @@ def main():
         "device": device
     }
 
-    #action_space = np.zeros(full_action_space.shape)
+    action_space = np.zeros(full_action_space.shape)
     #action_space[[0, 3, 12, 13, 331, 332]] = 1
     action_space = np.ones(full_action_space.shape)
     model = ConvNet(net_config, device=device, action_space=action_space).to(device)
@@ -99,14 +99,14 @@ def main():
 
     train_settings = {
         "discount_factor": 0.99,
-        "lambda": 0.95,
+        "lambda": 0.98,
         "hist_size": history_size,
         "device": device,
         "eps_denom": 1e-5,
         "c1": 0.1,
-        "c2": 0.1,
-        "c3": 0.5,
-        "c4": 0.5,
+        "c2": 0.01,
+        "c3": 1.0,
+        "c4": 1.0,
         "minc2": 0.01,
         "clip_param": 0.1,
         "min_clip_param": 0.01,
