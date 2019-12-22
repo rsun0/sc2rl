@@ -209,7 +209,7 @@ class BaseAgent(Agent):
         t3 = time.time()
 
         # minimaps, screens, players, avail_actions, last_actions, hiddens, curr_actions, relevant_frames
-        action_probs, arg_probs, spatial_probs, _, values, _ = self.model.stacked_past_forward(
+        action_probs, arg_probs, spatial_probs, _, values, _ = self.model.simple_forward(
             minimaps,
             screens,
             players,
@@ -221,7 +221,7 @@ class BaseAgent(Agent):
             relevant_states
         )
 
-        old_action_probs, old_arg_probs, old_spatial_probs, _, _, _ = self.target_model.stacked_past_forward(
+        old_action_probs, old_arg_probs, old_spatial_probs, _, _, _ = self.target_model.simple_forward(
             minimaps,
             screens,
             players,
@@ -242,7 +242,6 @@ class BaseAgent(Agent):
         gathered_spatial_args, old_gathered_spatial_args = self.index_spatial(spatial_probs,
                                                                             old_spatial_probs,
                                                                             spatial_args)
-
         action_args = batch_get_action_args(base_actions)
         """
         numerator = torch.zeros((n,)).float().to(self.device)
@@ -252,7 +251,9 @@ class BaseAgent(Agent):
 
         numerator = torch.log(gathered_actions + eps_denom)
         denominator = torch.log(old_gathered_actions + eps_denom)
-        entropy = self.entropy(gathered_actions)
+        #scale_factor = avail_actions.shape[1] / torch.sum(avail_actions, dim=1, keepdim=True).float()
+        #entropy = torch.mean(self.entropy(action_probs) * scale_factor, dim=1)
+        entropy = self.entropy(gathered_args)
         num_args = torch.ones(n,).to(self.device)
 
         for i in range(n):
@@ -272,7 +273,8 @@ class BaseAgent(Agent):
         t5 = time.time()
 
         #print(numerator, denominator)
-        #denominator = torch.clamp(denominator, -25)
+        denominator = torch.clamp(denominator, -27)
+
 
         ratio = torch.exp((numerator - denominator))    # * (1 / num_args))
         ratio_adv = ratio * advantages.detach()
@@ -280,25 +282,29 @@ class BaseAgent(Agent):
         bounded_adv = bounded_adv * advantages.detach()
 
         pol_avg = - ((torch.min(ratio_adv, bounded_adv)).mean())
+
+        #pol_avg = -(numerator * advantages.detach()).mean()
         value_loss = self.loss(values.squeeze(1), v_returns.detach())
         ent = entropy.mean()
         t6 = time.time()
 
+        #total_loss = pol_avg + c1 * value_loss + c2 * ent
         total_loss = pol_avg + c1 * value_loss + c2 * ent
         #total_loss = value_loss
         #total_loss = ent
         self.optimizer.zero_grad()
         total_loss.backward()
 
+        """
         print("actions: ", torch.max(gathered_actions).item(), torch.min(gathered_actions).item())
         print("args: ", torch.max(gathered_args).item(), torch.min(gathered_args).item())
         print("spatial args: ", torch.max(gathered_spatial_args).item(), torch.min(gathered_spatial_args).item())
         if len(gathered_spatial_args) == 0:
             print("No spatial arguments chosen")
         print("ratio: ", torch.max(ratio).item(), torch.min(ratio).item())
+        """
 
-
-        #self.process_gradients(self.model)
+        self.process_gradients(self.model)
         clip_grad_norm_(self.model.parameters(), 100.0)
         self.optimizer.step()
         t7 = time.time()
@@ -541,10 +547,15 @@ class BaseAgent(Agent):
 
     def process_gradients(self, network, clip=1.0):
         grad_sum = 0
+        max_grad = 0
         for param in network.parameters():
             if param.grad is None:
                 continue
             grad_sum += torch.sum(param.grad.data ** 2)
+            x = torch.abs(torch.max(param.grad.data)).item()
+            if (x > max_grad):
+                max_grad = x
+
         print(grad_sum)
 
     def process_network(self, network):

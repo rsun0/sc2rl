@@ -6,6 +6,7 @@ import numpy as np
 import time
 
 from base_agent.Network import BaseNetwork
+import matplotlib.pyplot as plt
 
 from base_agent.sc2env_utils import generate_embeddings, multi_embed, valid_args, get_action_args, batch_get_action_args, is_spatial_arg, env_config, processed_feature_dim, full_action_space
 from base_agent.net_utils import ConvLSTM, ResnetBlock, SelfAttentionBlock, Downsampler, SpatialUpsampler, Unsqueeze, Squeeze, FastEmbedding, RelationalModule, Flatten
@@ -74,6 +75,7 @@ class RRLModel(BaseNetwork):
                                 net_config['relational_features'],
                                 net_config['relational_heads'])
         )
+
         for i in range(net_config['relational_depth']-1):
             self.attention_blocks.add_module(
                 "Block"+str(i+2),
@@ -184,6 +186,15 @@ class RRLModel(BaseNetwork):
                 #[minimap, screen] = [minimap.to(self.device), screen.to(self.device)]
                 #[minimap, screen] = self.concat_spatial([minimap, screen], last_action, last_spatials)
                 [minimap, screen, _] = self.process_states(minimap, screen, player, last_action, last_spatials, sequential=False, embeddings_only=True)
+                #print(last_spatials)
+                """
+                if (np.random.random() < 0.0001):
+                    print(last_action, last_spatials, len(minimap[0]))
+                    for i in range(len(minimap[0])):
+                        print(i)
+                        plt.imshow(minimap[0,i].cpu().data.numpy())
+                        plt.show()
+                """
 
 
             processed_minimap = self.down_layers_minimap(minimap)
