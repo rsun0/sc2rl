@@ -34,7 +34,7 @@ class ConvNet(BaseNetwork):
             env_config["screen_categorical_indices"]
         ]
 
-        self.action_embedding = nn.Embedding(env_config["action_space"], net_config["action_embedding_size"])
+        self.action_embedding = FastEmbedding(env_config["action_space"], net_config["action_embedding_size"])
 
         self.screen_layers = nn.Sequential(
             nn.Conv2d(self.hist_depth * (self.screen_features+2), 16, kernel_size=5, stride=1, padding=2),
@@ -55,7 +55,9 @@ class ConvNet(BaseNetwork):
         self.layers_down = nn.Sequential(
             nn.MaxPool2d(2),
             nn.Conv2d(64, 64, kernel_size=5, stride=2, padding=2),
+            nn.ReLU(),
             nn.Conv2d(64, 64, kernel_size=5, stride=2, padding=2),
+            nn.ReLU(),
         )
 
         self.fc = nn.Sequential(
