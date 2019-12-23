@@ -14,7 +14,7 @@ NUM_ACTIONS = len(constants.Action)
 
 
 class PolicyGradientAgent(Agent):
-    def __init__(self, save_file, *args, **kwargs):
+    def __init__(self, save_file=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.save_file = save_file
 
@@ -31,12 +31,13 @@ class PolicyGradientAgent(Agent):
         return probs
 
     def train(self, run_settings):
+        batch_size = run_settings.batch_size
         self.model.train()
         data = self.memory.get_data()
         running_loss = 0
-        pbar = tqdm(range(0, len(data), run_settings.batch_size))
+        pbar = tqdm(range(0, len(data) - batch_size + 1, batch_size))
         for i in pbar:
-            batch = data[i:i+run_settings.batch_size]
+            batch = data[i:i+batch_size]
             states, actions, rewards = zip(*batch)
             images, scalars = zip(*states)
 
@@ -59,7 +60,7 @@ class PolicyGradientAgent(Agent):
             self.optimizer.step()
 
             running_loss += loss.item()
-            num_experiences = i + run_settings.batch_size
+            num_experiences = i + batch_size
             pbar.set_postfix_str("{:.3f}L".format(running_loss / num_experiences))
         pbar.close()
         # Throw away used experiences?
@@ -69,14 +70,16 @@ class PolicyGradientAgent(Agent):
         pass
     
     def save(self):
-        print('Saving policy network')
-        torch.save(self.model.state_dict(), self.save_file)
+        if self.save_file is not None:
+            print('Saving policy network')
+            torch.save(self.model.state_dict(), self.save_file)
 
     def load(self):
-        try:
-            self.model.load_state_dict(torch.load(self.save_file))
-        except FileNotFoundError:
-            print('No policy network save file found')
+        if self.save_file is not None:
+            try:
+                self.model.load_state_dict(torch.load(self.save_file))
+            except FileNotFoundError:
+                print('No policy network save file found')
 
     def push_memory(self, state, action, reward, done):
         self.memory.push(state, action, reward, done)

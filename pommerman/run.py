@@ -1,6 +1,8 @@
 import sys
 sys.path.insert(0, "../interface/")
 
+import copy
+
 import pommerman.agents
 import torch.optim
 
@@ -25,8 +27,8 @@ if __name__ == '__main__':
         num_episodes=10000,
         num_epochs=1,
         batch_size=32,
-        train_every=256,
-        save_every=512,
+        train_every=512,
+        save_every=2048,
         graph_every=50,
         averaging_window=50,
         graph_file='pommerman_results.png'
@@ -41,8 +43,8 @@ if __name__ == '__main__':
         epsilon_duration=0,
     )
 
-    discount = 0.9
-    memory = PolicyNetMemory(buffer_len=1024, discount=discount)
+    discount = 0.95
+    memory = PolicyNetMemory(buffer_len=8192, discount=discount)
 
     mcts_model = MCTSPolicyNet(board_size=6, in_channels=13)
     # agent1 = MCTSAgent(
@@ -64,7 +66,8 @@ if __name__ == '__main__':
     )
     agent1.load()
 
-    agent2 = RandomAgent()
+    agent2 = copy.deepcopy(agent1)
+    agent2.save_file = None
 
     experiment = Experiment([agent1, agent2], env, run_settings)
     experiment.train()
