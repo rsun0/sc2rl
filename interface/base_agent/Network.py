@@ -277,8 +277,11 @@ class BaseNetwork(nn.Module, Model):
         return spatial_arg_out
 
     def generate_arg_logits(self, arg_logit_inputs):
-        initial_logits = F.softmax(arg_logit_inputs) * self.valid_args
-        final_logits = initial_logits / torch.sum(initial_logits, dim=-1).unsqueeze(2)
+        #initial_logits = F.softmax(arg_logit_inputs * self.valid_args, dim=-1)
+        initial_logits = F.softmax(arg_logit_inputs.masked_fill((1-self.valid_args).bool(), float('-inf')), dim=-1)
+        final_logits = initial_logits
+        #final_logits = initial_logits / torch.sum(initial_logits, dim=-1).unsqueeze(2)
+        #print(list(initial_logits[0,0].cpu().data.numpy()), list(final_logits[0,0].cpu().data.numpy()))
         return final_logits
 
     def generate_spatial_logits(self, spatial_logits_in):

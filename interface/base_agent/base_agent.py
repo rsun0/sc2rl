@@ -305,7 +305,7 @@ class BaseAgent(Agent):
             print("ratio: ", torch.max(ratio).item(), torch.min(ratio).item())
             """
 
-            clip_grad_norm_(self.model.parameters(), 10.0)
+            clip_grad_norm_(self.model.parameters(), 100.0)
             self.process_gradients(self.model)
             self.optimizer.step()
             t7 = time.time()
