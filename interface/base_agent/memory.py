@@ -296,13 +296,17 @@ class ReplayMemory(object):
     """
         Performs random equivalent reorientation of state
     """
-    def random_transform(self, minimap, screen, hidden, action, transform):
+    def random_transform(self, minimap, screen, hidden, action, prevaction, transform):
         #minimap, screen = state[:, :2]
         #print(state.shape, minimap.shape, screen.shape)
         spatial_args = action
         new_spatial_action = np.copy(spatial_args)
+        chosen_spatials = (1 - (np.sum(new_spatial_action == -1, axis=1) > 0)).nonzero()
+        prev_spatial_args = prevaction
+        new_prev_spatials = np.copy(prev_spatial_args)
+        chosen_prev_spatials = (1 - (np.sum(new_prev_spatials == -1, axis=-1) > 0)).nonzero()
+        #print(action, chosen_spatials)
         spatial_w = env_config["spatial_action_size"]
-
         #transform = np.random.randint(0,8)
 
         # Rotations
@@ -310,36 +314,50 @@ class ReplayMemory(object):
             minimap = np.rot90(minimap, k=1, axes=(-2,-1))
             screen = np.rot90(screen, k=1, axes=(-2,-1))
             hidden = np.rot90(hidden, k=1, axes=(-2,-1))
-            new_spatial_action[:,0] = (spatial_w - 1) - spatial_args[:,1]
-            new_spatial_action[:,1] = spatial_args[:,0]
+            new_spatial_action[:,0][chosen_spatials] = (spatial_w - 1) - spatial_args[:,1][chosen_spatials]
+            new_spatial_action[:,1][chosen_spatials] = spatial_args[:,0][chosen_spatials]
+            new_prev_spatials[:,:,0][chosen_prev_spatials] = (spatial_w - 1) - prev_spatial_args[:,:,1][chosen_prev_spatials]
+            new_prev_spatials[:,:,1][chosen_prev_spatials] = prev_spatial_args[:,:,0][chosen_prev_spatials]
         if transform >= 4 and transform < 6:
             minimap = np.rot90(minimap, k=2, axes=(-2,-1))
             screen = np.rot90(screen, k=2, axes=(-2,-1))
             hidden = np.rot90(hidden, k=2, axes=(-2,-1))
-            new_spatial_action[:,0] = (spatial_w - 1) - spatial_args[:,0]
-            new_spatial_action[:,1] = (spatial_w - 1) - spatial_args[:,1]
+            new_spatial_action[:,0][chosen_spatials] = (spatial_w - 1) - spatial_args[:,0][chosen_spatials]
+            new_spatial_action[:,1][chosen_spatials] = (spatial_w - 1) - spatial_args[:,1][chosen_spatials]
+            new_prev_spatials[:,:,0][chosen_prev_spatials] = (spatial_w - 1) - prev_spatial_args[:,:,0][chosen_prev_spatials]
+            new_prev_spatials[:,:,1][chosen_prev_spatials] = (spatial_w - 1) - prev_spatial_args[:,:,1][chosen_prev_spatials]
         elif transform >= 6 and transform < 8:
             minimap = np.rot90(minimap, k=3, axes=(-2,-1))
             screen = np.rot90(screen, k=3, axes=(-2,-1))
             hidden = np.rot90(hidden, k=3, axes=(-2,-1))
-            new_spatial_action[:,0] = spatial_args[:,1]
-            new_spatial_action[:,1] = (spatial_w - 1) - spatial_args[:,0]
+            new_spatial_action[:,0][chosen_spatials] = spatial_args[:,1][chosen_spatials]
+            new_spatial_action[:,1][chosen_spatials] = (spatial_w - 1) - spatial_args[:,0][chosen_spatials]
+            new_prev_spatials[:,:,0][chosen_prev_spatials] = prev_spatial_args[:,:,1][chosen_prev_spatials]
+            new_prev_spatials[:,:,1][chosen_prev_spatials] = (spatial_w - 1) - prev_spatial_args[:,:,0][chosen_prev_spatials]
 
         # Reflection
         if transform % 2 == 1:
             minimap = np.flip(minimap, -1)
             screen = np.flip(screen, -1)
             hidden = np.flip(hidden, -1)
-            new_spatial_action[:,1] = (spatial_w - 1) - new_spatial_action[:,1]
+            new_spatial_action[:,1][chosen_spatials] = (spatial_w - 1) - new_spatial_action[:,1][chosen_spatials]
+            new_prev_spatials[:,:,1][chosen_prev_spatials] = (spatial_w - 1) - new_prev_spatials[:,:,1][chosen_prev_spatials]
 
         action = new_spatial_action
-        return minimap, screen, hidden,  action
+        prevaction = new_prev_spatials
+        return minimap, screen, hidden,  action, prevaction
 
-    def batch_random_transform(self, minimaps, screens, hiddens, actions):
+    def batch_random_transform(self, minimaps, screens, hiddens, actions, prevactions):
         for i in range(len(minimaps)):
-            transform = np.random.randint(0,8)
-            minimaps[i], screens[i], hiddens[i], actions[i] = self.random_transform(minimaps[i], screens[i], hiddens[i], actions[i], transform)
-        return minimaps, screens, hiddens, actions
+            #transform = np.random.randint(0,8)
+            transform = list(range(8))[i % 8]
+            #plt.imshow(screens[i,0,5])
+            #plt.show()
+            minimaps[i], screens[i], hiddens[i], actions[i], prevactions[i] = self.random_transform(minimaps[i], screens[i], hiddens[i], actions[i], prevactions[i], transform)
+            #plt.imshow(screens[i,0,5])
+            #plt.show()
+
+        return minimaps, screens, hiddens, actions, prevactions
 
 
     def __len__(self):
