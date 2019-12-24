@@ -295,17 +295,17 @@ class BaseAgent(Agent):
         self.optimizer.zero_grad()
         total_loss.backward()
 
-        """
+        
         print("actions: ", torch.max(gathered_actions).item(), torch.min(gathered_actions).item())
         print("args: ", torch.max(gathered_args).item(), torch.min(gathered_args).item())
         print("spatial args: ", torch.max(gathered_spatial_args).item(), torch.min(gathered_spatial_args).item())
         if len(gathered_spatial_args) == 0:
             print("No spatial arguments chosen")
         print("ratio: ", torch.max(ratio).item(), torch.min(ratio).item())
-        """
+        
 
         clip_grad_norm_(self.model.parameters(), 100.0)
-        self.process_gradients(self.model)
+        #self.process_gradients(self.model)
         self.optimizer.step()
         t7 = time.time()
         pol_loss = pol_avg.detach().item()
