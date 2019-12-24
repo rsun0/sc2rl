@@ -251,9 +251,9 @@ class BaseAgent(Agent):
 
         numerator = torch.log(gathered_actions + eps_denom)
         denominator = torch.log(old_gathered_actions + eps_denom)
-        #scale_factor = avail_actions.shape[1] / torch.sum(avail_actions, dim=1, keepdim=True).float()
-        #entropy = torch.mean(self.entropy(action_probs) * scale_factor, dim=1)
-        entropy = self.entropy(gathered_args)
+        scale_factor = avail_actions.shape[1] / torch.sum(avail_actions, dim=1, keepdim=True).float()
+        entropy = torch.mean(self.entropy(action_probs) * scale_factor, dim=1)
+        #entropy = self.entropy(gathered_args)
         num_args = torch.ones(n,).to(self.device)
 
         for i in range(n):
@@ -296,8 +296,10 @@ class BaseAgent(Agent):
         total_loss.backward()
 
         
-        print("actions: ", torch.max(gathered_actions).item(), torch.min(gathered_actions).item())
+        #print("actions: ", torch.max(gathered_actions).item(), torch.min(gathered_actions).item())
         print("args: ", torch.max(gathered_args).item(), torch.min(gathered_args).item())
+        print("actions: ", gathered_actions)
+        #print("args: ", gathered_args)
         print("spatial args: ", torch.max(gathered_spatial_args).item(), torch.min(gathered_spatial_args).item())
         if len(gathered_spatial_args) == 0:
             print("No spatial arguments chosen")

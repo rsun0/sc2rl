@@ -252,7 +252,9 @@ class BaseNetwork(nn.Module, Model):
         return np.argmax(np.random.multinomial(1, probs))
 
     def sample_action(self, action_logits):
+        #print(list(action_logits.cpu().data.numpy()))
         action = self.sample_func(action_logits[0])
+        #print(action)
         return action
 
     """
