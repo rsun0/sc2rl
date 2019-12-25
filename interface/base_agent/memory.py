@@ -349,8 +349,8 @@ class ReplayMemory(object):
 
     def batch_random_transform(self, minimaps, screens, hiddens, actions, prevactions):
         for i in range(len(minimaps)):
-            #transform = np.random.randint(0,8)
-            transform = list(range(8))[i % 8]
+            transform = np.random.randint(0,8)
+            #transform = list(range(8))[i % 8]
             #plt.imshow(screens[i,0,5])
             #plt.show()
             minimaps[i], screens[i], hiddens[i], actions[i], prevactions[i] = self.random_transform(minimaps[i], screens[i], hiddens[i], actions[i], prevactions[i], transform)
