@@ -178,9 +178,10 @@ class MCTSAgent(Agent, BaseAgent):
                     # probs = np.ones(NUM_ACTIONS) / NUM_ACTIONS
 
                     # Use policy network to initialize probs
-                    images, scalars, _ = self.state_space_converter(self.env.get_observations()[self.agent_id])
+                    model_in, _ = self.state_space_converter(
+                        self.env.get_observations()[self.agent_id])
                     self.model.eval()
-                    preds = self.model((images[np.newaxis], scalars[np.newaxis]))
+                    preds = self.model(model_in[np.newaxis])
                     probs = torch.nn.functional.softmax(preds, dim=1).detach().numpy()[0]
 
                     # use current rewards for values
@@ -188,7 +189,7 @@ class MCTSAgent(Agent, BaseAgent):
                     reward = rewards[self.agent_id]
 
                     # Use critic network for values
-                    # values = self.model((images[np.newaxis], scalars[np.newaxis]))[1]
+                    # values = self.model(state[np.newaxis])[1]
                     # rewards = torch.nn.functional.tanh(values, dim=1).detach().numpy()[0]
 
                     # add new node to the tree
@@ -293,9 +294,8 @@ class MCTSAgent(Agent, BaseAgent):
         return length, reward, rewards, my_actions, my_policies
 
     def act(self, obs, action_space):
-        board_info = obs[0]
-        scalar_info = obs[1]
-        environment = obs[2] # 'json_info
+        state = obs[0]
+        environment = obs[1] # json_info
         
         frequency = dict()
         avg_length = dict()
@@ -343,7 +343,10 @@ class MCTSAgent(Agent, BaseAgent):
         bomb_moving_direction = obs['bomb_moving_direction'] #12
         flame_life = obs['flame_life'] #13
 
-        state = np.zeros((13, board.shape[0], board.shape[1]))
+        num_images = 13
+        num_scalars = 6
+        total_frames = num_images + num_scalars
+        state = np.zeros((total_frames, board.shape[0], board.shape[1]))
         for i in range(len(to_use)):
             state[i] = (board == to_use[i]).astype(int)
         state[10] = bomb_life 
@@ -362,9 +365,10 @@ class MCTSAgent(Agent, BaseAgent):
             for scalar_item in scalar_items:
                 scalars.append(agent[scalar_item])
 
-        scalars = np.array(scalars)
+        for i, s in enumerate(scalars, 13):
+            state[i] = int(s)
 
-        return state, scalars, obs['json_info']
+        return state, obs['json_info']
 
     def action_space_converter(self, action):
         return action

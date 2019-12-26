@@ -46,7 +46,7 @@ if __name__ == '__main__':
     discount = 0.95
     memory = PolicyNetMemory(buffer_len=8192, discount=discount)
 
-    mcts_model = MCTSPolicyNet(board_size=8, in_channels=13)
+    mcts_model = MCTSPolicyNet(board_size=8, in_channels=19)
     agent1 = MCTSAgent(
         discount=discount,
         opponent=pommerman.agents.RandomAgent(),

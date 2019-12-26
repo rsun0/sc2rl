@@ -7,10 +7,10 @@ from torch import nn
 from agent import Model
 
 class MCTSPolicyNet(nn.Module, Model):
-    def __init__(self, board_size=8, in_channels=13, num_scalars=6, num_actions=6):
+    def __init__(self, board_size=8, in_channels=13, num_actions=6):
         super().__init__()
         self.conv = nn.Sequential(
-            nn.Conv2d(13, 64, 3, padding=1),
+            nn.Conv2d(in_channels, 64, 3, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.Conv2d(64, 64, 3, padding=1),
@@ -20,7 +20,7 @@ class MCTSPolicyNet(nn.Module, Model):
             nn.BatchNorm2d(1),
             nn.ReLU(),
         )
-        width = board_size ** 2 + num_scalars
+        width = board_size ** 2
         self.mlp = nn.Sequential(
             nn.Linear(width, width),
             nn.BatchNorm1d(width),
@@ -29,10 +29,8 @@ class MCTSPolicyNet(nn.Module, Model):
         )
 
     def forward(self, state):
-        images = torch.from_numpy(state[0]).type(torch.FloatTensor)
-        scalars = torch.from_numpy(state[1]).type(torch.FloatTensor)
-        i = self.conv(images)
-        i = torch.flatten(i, start_dim=1)
-        x = torch.cat((i, scalars), dim=1)
+        x = torch.from_numpy(state).type(torch.FloatTensor)
+        x = self.conv(x)
+        x = torch.flatten(x, start_dim=1)
         x = self.mlp(x)
         return x
