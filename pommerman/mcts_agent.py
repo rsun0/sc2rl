@@ -96,15 +96,14 @@ class MCTSAgent(Agent, BaseAgent):
 
     def __init__(self, discount, agent_id=0, opponent=SimpleAgent(),
             tree_save_file=None, model_save_file=None, *args, **kwargs):
-        print('init')
         super(MCTSAgent, self).__init__(*args, **kwargs)
         self.agent_id = agent_id
         self.env = self.make_env(opponent)
         self.reset_tree()
         self.num_episodes = 1
-        self.mcts_iters = 3
-        self.num_rollouts = 5
-        self.mcts_c_puct = 1.0
+        self.mcts_iters = 10
+        self.num_rollouts = 1
+        self.mcts_c_puct = 1.5
         self.discount = discount
         self.temperature = 1.0
 
@@ -112,7 +111,6 @@ class MCTSAgent(Agent, BaseAgent):
         self.model_save_file = model_save_file
 
     def make_env(self, opponent):
-        print('make_env')
         agents = []
         for agent_id in range(NUM_AGENTS):
             if agent_id == self.agent_id:
@@ -189,6 +187,10 @@ class MCTSAgent(Agent, BaseAgent):
                     rewards = self.env._get_rewards()
                     reward = rewards[self.agent_id]
 
+                    # Use critic network for values
+                    # values = self.model((images[np.newaxis], scalars[np.newaxis]))[1]
+                    # rewards = torch.nn.functional.tanh(values, dim=1).detach().numpy()[0]
+
                     # add new node to the tree
                     self.tree[state] = MCTSNode(probs, self.mcts_c_puct)
 
@@ -205,9 +207,6 @@ class MCTSAgent(Agent, BaseAgent):
                 # step environment forward
                 env_start_time = time.time()
                 obs, rewards, done, info = self.env.step(actions)
-
-                 # XD XD XD XD
-                # self.env.render()
 
                 env_time_elapsed = time.time() - env_start_time
                 total_time['env_step'] += env_time_elapsed
@@ -229,7 +228,7 @@ class MCTSAgent(Agent, BaseAgent):
     def rollout(self):
         # print('rollout')
         # reset search tree in the beginning of each rollout
-        # self.reset_tree()
+        self.reset_tree()
 
         # guarantees that we are not called recursively
         # and episode ends when this agent dies
@@ -287,8 +286,6 @@ class MCTSAgent(Agent, BaseAgent):
 
             assert self == self.env._agents[self.agent_id]
             length += 1
-            # print("Agent:", self.agent_id, "Step:", length, "Actions:", [constants.Action(a).name for a in actions], "Probs:", [round(p, 2) for p in pi], "Rewards:", rewards, "Done:", done)
-        # print('leaving')
 
         reward = rewards[self.agent_id]
         # Discount
@@ -299,8 +296,6 @@ class MCTSAgent(Agent, BaseAgent):
         board_info = obs[0]
         scalar_info = obs[1]
         environment = obs[2] # 'json_info
-
-        print('Number of nodes: ', len(self.tree))
         
         frequency = dict()
         avg_length = dict()
@@ -315,7 +310,6 @@ class MCTSAgent(Agent, BaseAgent):
             rollout_time_elapsed = time.time() - rollout_start_time
             total_time['rollout'] += rollout_time_elapsed
             total_frequency['rollout'] += 1
-            # print(my_actions[0], my_policies[0], reward, length, my_actions)
             a = my_actions[0]
 
             if a in frequency:
@@ -328,13 +322,10 @@ class MCTSAgent(Agent, BaseAgent):
                 frequency[a] = 1
 
         best_action = max(avg_reward, key=avg_reward.get)
-        print(avg_reward)
-        print(avg_length)
-        print('act', best_action)
 
-        print('timing info')
-        for action in total_time:
-            print(action, total_time[action] / total_frequency[action])
+        # print('timing info')
+        # for action in total_time:
+        #     print(action, total_time[action] / total_frequency[action])
 
         return best_action
 
@@ -398,16 +389,11 @@ class MCTSAgent(Agent, BaseAgent):
             preds = self.model((images_batch, scalars_batch))
             log_probs = torch.nn.functional.log_softmax(preds, dim=1)
             log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
-            print('Log probs for experienced actions: ', log_probs_observed)
-            print('Rewards: ', rewards_batch)
             loss = -torch.sum(log_probs_observed * rewards_batch)
-            print('Loss: ', loss)
 
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-        # Throw away used experiences?
-        # self.experiences = []
 
     def train_step(self, batch_size):
         pass
@@ -436,71 +422,3 @@ class MCTSAgent(Agent, BaseAgent):
     
     def push_memory(self, state, action, reward, done):
         self.memory.push(state, action, reward, done)
-
-
-def runner(id, num_episodes, fifo, _args):
-    # make args accessible to MCTSAgent
-    global args
-    args = _args
-    # make sure agents play at all positions
-    agent_id = id % NUM_AGENTS
-    agent = MCTSAgent(agent_id=agent_id)
-
-    data = []
-    for i in range(num_episodes):
-        # do rollout
-        start_time = time.time()
-        length, reward, rewards = agent.rollout()
-        elapsed = time.time() - start_time
-        # add data samples to log
-        fifo.put((length, reward, rewards, agent_id, elapsed))
-
-
-def profile_runner(id, num_episodes, fifo, _args):
-    import cProfile
-    command = """runner(id, num_episodes, fifo, _args)"""
-    cProfile.runctx(command, globals(), locals(), filename=_args.profile)
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--profile')
-    parser.add_argument('--render', action="store_true", default=False)
-    # runner params
-    parser.add_argument('--num_episodes', type=int, default=400)
-    parser.add_argument('--num_runners', type=int, default=4)
-    # MCTS params
-    parser.add_argument('--mcts_iters', type=int, default=10)
-    parser.add_argument('--mcts_c_puct', type=float, default=1.0)
-    # RL params
-    parser.add_argument('--discount', type=float, default=0.99)
-    parser.add_argument('--temperature', type=float, default=0)
-    args = parser.parse_args()
-
-    assert args.num_episodes % args.num_runners == 0, "The number of episodes should be divisible by number of runners"
-
-    # use spawn method for starting subprocesses
-    ctx = multiprocessing.get_context('spawn')
-
-    # create fifos and processes for all runners
-    fifo = ctx.Queue()
-    for i in range(args.num_runners):
-        process = ctx.Process(target=profile_runner if args.profile else runner, args=(i, args.num_episodes // args.num_runners, fifo, args))
-        process.start()
-
-    # do logging in the main process
-    all_rewards = []
-    all_lengths = []
-    all_elapsed = []
-    for i in range(args.num_episodes):
-        # wait for a new trajectory
-        length, reward, rewards, agent_id, elapsed = fifo.get()
-
-        print("Episode:", i, "Reward:", reward, "Length:", length, "Rewards:", rewards, "Agent:", agent_id, "Time per step:", elapsed / length)
-        all_rewards.append(reward)
-        all_lengths.append(length)
-        all_elapsed.append(elapsed)
-
-    print("Average reward:", np.mean(all_rewards))
-    print("Average length:", np.mean(all_lengths))
-    print("Time per timestep:", np.sum(all_elapsed) / np.sum(all_lengths))
