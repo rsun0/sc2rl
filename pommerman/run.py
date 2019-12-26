@@ -18,7 +18,7 @@ from policy_net import MCTSPolicyNet
 
 if __name__ == '__main__':
     env = PommermanEnvironment(
-        render=False,
+        render=True,
         num_agents=2,
         game_state_file='start.json',
     )
@@ -46,7 +46,7 @@ if __name__ == '__main__':
     discount = 0.95
     memory = PolicyNetMemory(buffer_len=8192, discount=discount)
 
-    mcts_model = MCTSPolicyNet(board_size=8, in_channels=19)
+    mcts_model = MCTSPolicyNet(board_size=8, in_channels=20)
     agent1 = MCTSAgent(
         discount=discount,
         opponent=pommerman.agents.RandomAgent(),

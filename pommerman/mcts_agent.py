@@ -336,26 +336,24 @@ class MCTSAgent(Agent, BaseAgent):
         return self._sample(state)
 
     def state_space_converter(self, obs):
-        to_use = [0, 1, 2, 3, 4, 6, 7, 8, 10, 11]
- 
-        board = obs['board'] # 0-4, 6-8, 10-11 [10 total]
-        bomb_life = obs['bomb_life'] # 11
-        bomb_moving_direction = obs['bomb_moving_direction'] #12
-        flame_life = obs['flame_life'] #13
+        board = obs['board']
+        TOTAL_FRAMES = 20
+        state = np.zeros((TOTAL_FRAMES, board.shape[0], board.shape[1]))
+        state_idx = 0
 
-        num_images = 13
-        num_scalars = 6
-        total_frames = num_images + num_scalars
-        state = np.zeros((total_frames, board.shape[0], board.shape[1]))
-        for i in range(len(to_use)):
-            state[i] = (board == to_use[i]).astype(int)
-        state[10] = bomb_life 
-        state[11] = bomb_moving_direction 
-        state[12] = flame_life 
+        board_indices = [0, 1, 2, 3, 4, 6, 7, 8, 10, 11]
+        for b in board_indices:
+            state[state_idx] = (board == b).astype(int)
+            state_idx += 1
+        additional_images = ['bomb_blast_strength', 'bomb_life',
+            'bomb_moving_direction', 'flame_life']
+        for im in additional_images:
+            state[state_idx] = obs[im]
+            state_idx += 1
 
-        scalars = []
         scalar_items = ['ammo', 'blast_strength', 'can_kick']
-        agents = obs['json_info']['agents'] # array of dictionaries as a string
+        # array of dictionaries as a string
+        agents = obs['json_info']['agents']
        
         i = agents.find('}')
         agent1 = json.loads(obs['json_info']['agents'][1:i+1])
@@ -363,11 +361,10 @@ class MCTSAgent(Agent, BaseAgent):
 
         for agent in [agent1, agent2]:
             for scalar_item in scalar_items:
-                scalars.append(agent[scalar_item])
+                state[state_idx] = int(agent[scalar_item])
+                state_idx += 1
 
-        for i, s in enumerate(scalars, 13):
-            state[i] = int(s)
-
+        assert state_idx == state.shape[0], state_idx
         return state, obs['json_info']
 
     def action_space_converter(self, action):
