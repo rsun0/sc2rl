@@ -394,7 +394,7 @@ class MCTSAgent(Agent, BaseAgent):
 
             actions_onehot = np.zeros((actions_batch.shape[0], NUM_ACTIONS))
             actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
-            actions_onehot = torch.from_numpy(actions_onehot)
+            actions_onehot = torch.from_numpy(actions_onehot).type(torch.FloatTensor)
 
             preds, _ = self.model(states_batch)
             log_probs = torch.nn.functional.log_softmax(preds, dim=1)
