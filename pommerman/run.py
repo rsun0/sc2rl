@@ -49,9 +49,13 @@ if __name__ == '__main__':
 
     mcts_model = ActorCriticNet(board_size=8, in_channels=20)
     agent1 = MCTSAgent(
+        mcts_iters=10,
+        num_rollouts=1,
         discount=discount,
-        opponent=pommerman.agents.RandomAgent(),
+        c=1.5,
+        temp=1.0,
         agent_id=0,
+        opponent=pommerman.agents.RandomAgent(),
         tree_save_file='mct.pickle',
         model_save_file='policynet.h5',
         model=mcts_model,

@@ -24,7 +24,7 @@ from tqdm import tqdm
 
 NUM_AGENTS = 2
 NUM_ACTIONS = len(constants.Action)
-NUM_CHANNELS = 18
+NUM_CHANNELS = 20
 
 total_time = {'obs_to_state': 0.0, 'env_step': 0.0, 'rollout': 0.0, 'search': 0.0}
 total_frequency = {'obs_to_state': 0, 'env_step': 0, 'rollout': 0, 'search': 0} 
@@ -95,18 +95,27 @@ class MCTSNode(object):
 
 class MCTSAgent(Agent, BaseAgent):
 
-    def __init__(self, discount, agent_id=0, opponent=SimpleAgent(),
-            tree_save_file=None, model_save_file=None, *args, **kwargs):
+    def __init__(self,
+            mcts_iters,
+            num_rollouts=1,
+            discount=1.0,
+            c=1.5,
+            temp=1.0,
+            agent_id=0,
+            opponent=SimpleAgent(),
+            tree_save_file=None,
+            model_save_file=None,
+            *args,
+            **kwargs):
         super(MCTSAgent, self).__init__(*args, **kwargs)
         self.agent_id = agent_id
         self.env = self.make_env(opponent)
         self.reset_tree()
-        self.num_episodes = 1
-        self.mcts_iters = 10
-        self.num_rollouts = 1
-        self.mcts_c_puct = 1.5
+        self.mcts_iters = mcts_iters
+        self.num_rollouts = num_rollouts
+        self.mcts_c_puct = c
         self.discount = discount
-        self.temperature = 1.0
+        self.temperature = temp
 
         self.tree_save_file = tree_save_file
         self.model_save_file = model_save_file
@@ -338,8 +347,7 @@ class MCTSAgent(Agent, BaseAgent):
 
     def state_space_converter(self, obs):
         board = obs['board']
-        TOTAL_FRAMES = 20
-        state = np.zeros((TOTAL_FRAMES, board.shape[0], board.shape[1]))
+        state = np.zeros((NUM_CHANNELS, board.shape[0], board.shape[1]))
         state_idx = 0
 
         board_indices = [0, 1, 2, 3, 4, 6, 7, 8, 10, 11]
