@@ -191,16 +191,14 @@ class MCTSAgent(Agent, BaseAgent):
                     model_in, _ = self.state_space_converter(
                         self.env.get_observations()[self.agent_id])
                     self.model.eval()
-                    preds, _ = self.model(model_in[np.newaxis])
-                    probs = torch.nn.functional.softmax(preds, dim=1).detach().numpy()[0]
+                    pi_scores, values = self.model(model_in[np.newaxis])
+                    probs = torch.nn.functional.softmax(pi_scores, dim=1).detach().numpy()[0]
 
-                    # use current rewards for values
-                    rewards = self.env._get_rewards()
-                    reward = rewards[self.agent_id]
-
-                    # Use critic network for values
-                    # values = self.model(state[np.newaxis])[1]
-                    # rewards = torch.nn.functional.tanh(values, dim=1).detach().numpy()[0]
+                    if self.env._get_done():
+                        reward = self.env._get_rewards()[self.agent_id]
+                    else:
+                        # Use critic network for values
+                        reward = torch.tanh(values).detach().numpy()[0]
 
                     # add new node to the tree
                     self.tree[state] = MCTSNode(probs, self.mcts_c_puct)
@@ -386,6 +384,9 @@ class MCTSAgent(Agent, BaseAgent):
         running_loss = 0
         for i in pbar:
             batch = data[i:i+run_settings.batch_size]
+            if len(batch) == 1:
+                # Batch norm will fail
+                break
             states, actions, rewards = zip(*batch)
 
             states_batch = np.stack(states)
