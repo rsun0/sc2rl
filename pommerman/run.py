@@ -20,7 +20,7 @@ if __name__ == '__main__':
     env = PommermanEnvironment(
         render=False,
         num_agents=2,
-        game_state_file='start_mini2.json',
+        game_state_file='start.json',
     )
 
     run_settings = RunSettings(
@@ -46,28 +46,20 @@ if __name__ == '__main__':
     discount = 0.95
     memory = PolicyNetMemory(buffer_len=8192, discount=discount)
 
-    mcts_model = MCTSPolicyNet(board_size=6, in_channels=13)
-    # agent1 = MCTSAgent(
-    #     discount=discount,
-    #     opponent=pommerman.agents.RandomAgent(),
-    #     agent_id=0,
-    #     tree_save_file='mct.pickle',
-    #     model_save_file='policynet.h5',
-    #     model=mcts_model,
-    #     settings=agent_settings,
-    #     memory=memory,
-    # )
-    # agent1.load()
-    agent1 = PolicyGradientAgent(
-        save_file='policynet.h5',
+    mcts_model = MCTSPolicyNet(board_size=8, in_channels=13)
+    agent1 = MCTSAgent(
+        discount=discount,
+        opponent=pommerman.agents.RandomAgent(),
+        agent_id=0,
+        tree_save_file='mct.pickle',
+        model_save_file='policynet.h5',
         model=mcts_model,
         settings=agent_settings,
         memory=memory,
     )
     agent1.load()
 
-    agent2 = copy.deepcopy(agent1)
-    agent2.save_file = None
+    agent2 = RandomAgent()
 
     experiment = Experiment([agent1, agent2], env, run_settings)
     experiment.train()
