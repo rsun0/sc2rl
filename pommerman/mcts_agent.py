@@ -182,7 +182,7 @@ class MCTSAgent(Agent, BaseAgent):
                     model_in, _ = self.state_space_converter(
                         self.env.get_observations()[self.agent_id])
                     self.model.eval()
-                    preds = self.model(model_in[np.newaxis])
+                    preds, _ = self.model(model_in[np.newaxis])
                     probs = torch.nn.functional.softmax(preds, dim=1).detach().numpy()[0]
 
                     # use current rewards for values
@@ -388,7 +388,7 @@ class MCTSAgent(Agent, BaseAgent):
             actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
             actions_onehot = torch.from_numpy(actions_onehot)
 
-            preds = self.model(states_batch)
+            preds, _ = self.model(states_batch)
             log_probs = torch.nn.functional.log_softmax(preds, dim=1)
             log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
             loss = -torch.sum(log_probs_observed * rewards_batch)

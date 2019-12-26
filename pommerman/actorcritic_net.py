@@ -76,7 +76,8 @@ class ActorCriticNet(nn.Module, Model):
         self.critic_criterion = nn.MSELoss()
 
     def forward(self, state):
-        x = self.shared_convs(state)
+        x = torch.from_numpy(state).type(torch.FloatTensor)
+        x = self.shared_convs(x)
         x = torch.flatten(x, start_dim=1)
         x = self.shared_fcs(x)
         policy_scores = self.actor(x)
