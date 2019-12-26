@@ -12,13 +12,14 @@ from custom_env import PommermanEnvironment
 from simple_agent import SimpleAgent
 from noop_agent import NoopAgent, PommermanNoopAgent
 from random_agent import RandomAgent
-from mcts_agent import MCTSAgent, PolicyNetMemory
+from mcts_agent import MCTSAgent, MCTSMemory
 from pg_agent import PolicyGradientAgent
 from policy_net import MCTSPolicyNet
+from actorcritic_net import ActorCriticNet
 
 if __name__ == '__main__':
     env = PommermanEnvironment(
-        render=True,
+        render=False,
         num_agents=2,
         game_state_file='start.json',
     )
@@ -27,7 +28,7 @@ if __name__ == '__main__':
         num_episodes=10000,
         num_epochs=1,
         batch_size=32,
-        train_every=512,
+        train_every=32,
         save_every=2048,
         graph_every=50,
         averaging_window=50,
@@ -44,7 +45,7 @@ if __name__ == '__main__':
     )
 
     discount = 0.95
-    memory = PolicyNetMemory(buffer_len=8192, discount=discount)
+    memory = MCTSMemory(buffer_len=8192, discount=discount)
 
     mcts_model = MCTSPolicyNet(board_size=8, in_channels=20)
     agent1 = MCTSAgent(
