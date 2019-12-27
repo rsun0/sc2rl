@@ -378,37 +378,40 @@ class MCTSAgent(Agent, BaseAgent):
         return action
 
     def train(self, run_settings):
-        self.model.train()
         data = self.memory.get_data()
-        pbar = tqdm(range(0, len(data), run_settings.batch_size))
-        running_loss = 0
-        for i in pbar:
-            batch = data[i:i+run_settings.batch_size]
-            if len(batch) == 1:
-                # Batch norm will fail
-                break
-            states, actions, rewards = zip(*batch)
+        batch_size = run_settings.batch_size
+        self.model.optimize(data, batch_size, self.optimizer)
+        # self.model.train()
+        # data = self.memory.get_data()
+        # pbar = tqdm(range(0, len(data), run_settings.batch_size))
+        # running_loss = 0
+        # for i in pbar:
+        #     batch = data[i:i+run_settings.batch_size]
+        #     if len(batch) == 1:
+        #         # Batch norm will fail
+        #         break
+        #     states, actions, rewards = zip(*batch)
 
-            states_batch = np.stack(states)
-            actions_batch = np.array(actions)
-            rewards_batch = torch.from_numpy(np.array(rewards))
+        #     states_batch = np.stack(states)
+        #     actions_batch = np.array(actions)
+        #     rewards_batch = torch.from_numpy(np.array(rewards))
 
-            actions_onehot = np.zeros((actions_batch.shape[0], NUM_ACTIONS))
-            actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
-            actions_onehot = torch.from_numpy(actions_onehot).type(torch.FloatTensor)
+        #     actions_onehot = np.zeros((actions_batch.shape[0], NUM_ACTIONS))
+        #     actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
+        #     actions_onehot = torch.from_numpy(actions_onehot).type(torch.FloatTensor)
 
-            preds, _ = self.model(states_batch)
-            log_probs = torch.nn.functional.log_softmax(preds, dim=1)
-            log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
-            loss = -torch.sum(log_probs_observed * rewards_batch)
+        #     preds, _ = self.model(states_batch)
+        #     log_probs = torch.nn.functional.log_softmax(preds, dim=1)
+        #     log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
+        #     loss = -torch.sum(log_probs_observed * rewards_batch)
 
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+        #     self.optimizer.zero_grad()
+        #     loss.backward()
+        #     self.optimizer.step()
 
-            running_loss += loss.item()
-            num_experiences = i + run_settings.batch_size
-            pbar.set_postfix_str("{:.3f}L".format(running_loss / num_experiences))
+        #     running_loss += loss.item()
+        #     num_experiences = i + run_settings.batch_size
+        #     pbar.set_postfix_str("{:.3f}L".format(running_loss / num_experiences))
 
     def train_step(self, batch_size):
         pass

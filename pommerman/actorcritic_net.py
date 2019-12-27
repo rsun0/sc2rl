@@ -1,8 +1,10 @@
 import sys
 sys.path.insert(0, "../interface/")
 
+import numpy as np
 import torch
 from torch import nn
+from tqdm import tqdm
 
 from agent import Model
 
@@ -76,10 +78,42 @@ class ActorCriticNet(nn.Module, Model):
         self.critic_criterion = nn.MSELoss()
 
     def forward(self, state):
-        x = torch.from_numpy(state).type(torch.FloatTensor)
-        x = self.shared_convs(x)
+        if isinstance(state, np.ndarray):
+            state = torch.from_numpy(state).type(torch.FloatTensor)
+        x = self.shared_convs(state)
         x = torch.flatten(x, start_dim=1)
         x = self.shared_fcs(x)
         policy_scores = self.actor(x)
         vals = self.critic(x)
         return policy_scores, vals
+
+    def get_qvals_batch(self, batched_states):
+        for states in batched_states:
+            for state in states:
+                # Find all children
+                pass
+
+    def optimize(self, data, batch_size, optimizer):
+        self.train()
+        dtype = next(self.parameters()).type()
+        
+        batched_states = []
+        pbar = tqdm(range(0, len(data), batch_size))
+        for i in pbar:
+            batch = data[i:i + batch_size]
+            if len(batch) == 1:
+                # Batch norm will fail
+                break
+            
+            raw_states, raw_actions, raw_true_vals = zip(*batch)
+            states = torch.from_numpy(np.stack(raw_states)).type(dtype)
+            true_vals = torch.from_numpy(np.array(raw_true_vals)[:, np.newaxis]).type(dtype)
+
+            optimizer.zero_grad()
+            _, logits = self(states)
+            vals = torch.tanh(logits)
+            loss = self.critic_criterion(vals, true_vals)
+            loss.backward()
+            optimizer.step()
+
+            batched_states.append(states)
