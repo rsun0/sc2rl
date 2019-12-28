@@ -96,10 +96,10 @@ class ActorCriticNet(nn.Module, Model):
     def get_batched_greedy_actions(self, batched_env_states, env):
         self.eval()
         agent_id = env.training_agent
-        shape = (len(batched_env_states), len(batched_env_states[0]))
-        greedy_actions = np.empty(shape, dtype=int)
-        for i, env_states in enumerate(batched_env_states):
-            for j, env_state in enumerate(env_states):
+        batched_greedy_actions = []
+        for env_states in batched_env_states:
+            greedy_actions = np.empty(len(env_states), dtype=int)
+            for i, env_state in enumerate(env_states):
                 next_states = np.empty((self.num_actions, self.in_channels, self.board_size, self.board_size))
 
                 MCTSAgent.set_state(env, env_state)
@@ -118,10 +118,12 @@ class ActorCriticNet(nn.Module, Model):
 
                 _, logits = self(next_states)
                 logits = logits.detach().numpy()[:, 0]
-                greedy_actions[i, j] = np.argmax(logits)
-        return greedy_actions
+                greedy_actions[i] = np.argmax(logits)
+            batched_greedy_actions.append(greedy_actions)
+        return batched_greedy_actions
 
     def optimize(self, data, batch_size, optimizer, env):
+        # TODO include metrics
         if len(data) < 2:
             return
 
@@ -131,6 +133,7 @@ class ActorCriticNet(nn.Module, Model):
         saved_state = MCTSAgent.get_state(env)
         
         batched_env_states = []
+        batched_states = []
         pbar = tqdm(range(0, len(data), batch_size))
         for i in pbar:
             batch = data[i:i + batch_size]
@@ -150,10 +153,19 @@ class ActorCriticNet(nn.Module, Model):
             optimizer.step()
 
             batched_env_states.append(env_states)
+            batched_states.append(states)
 
         batched_greedy_actions = self.get_batched_greedy_actions(batched_env_states, env)
         # get_batched_greedy_actions calls eval()
         self.train()
+        for states, greedy_actions in zip(batched_states, batched_greedy_actions):
+            greedy_actions = torch.from_numpy(greedy_actions)
+
+            optimizer.zero_grad()
+            pi_scores, _ = self(states)
+            loss = self.actor_criterion(pi_scores, greedy_actions)
+            loss.backward()
+            optimizer.step()
 
         # Restore existing state before training
         MCTSAgent.set_state(env, saved_state)
