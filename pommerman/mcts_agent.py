@@ -43,8 +43,8 @@ class MCTSMemory(Memory):
         self.current_trajectory = []
 
     def push(self, state, action, reward, done):
-        state = state[0]
-        self.current_trajectory.append( (state, action) )
+        state, env_state = state
+        self.current_trajectory.append((state, action, env_state))
         
         if done:
             rewards = []
@@ -54,9 +54,9 @@ class MCTSMemory(Memory):
                 r *= self.discount
             rewards.reverse()
 
-            states, actions = zip(*self.current_trajectory)
+            states, actions, env_states = zip(*self.current_trajectory)
 
-            trajectory = zip(states, actions, rewards)
+            trajectory = zip(states, actions, rewards, env_states)
             self.experiences.extend(trajectory)
             self.current_trajectory = []
 
@@ -128,14 +128,23 @@ class MCTSAgent(Agent, BaseAgent):
             else:
                 agents.append(opponent)
 
-        return pommerman.make('OneVsOne-v0', agents)
+        env = pommerman.make('OneVsOne-v0', agents)
+        env.set_training_agent(self.agent_id)
+        return env
+
+    @staticmethod
+    def get_state(env):
+        state = env.get_json_info()
+        state.pop('intended_actions')
+        return state
+
+    @staticmethod
+    def set_state(env, state):
+        env._init_game_state = state
+        env.set_json_info()
 
     def reset_game(self, root):
-        # remember current game state
-        self.env._init_game_state = dict()
-        for key in root:
-            self.env._init_game_state[key] = root[key]
-        self.env.set_json_info()
+        self.set_state(self.env, root)
 
     def reset_tree(self):
         # print('reset_tree')
@@ -157,7 +166,6 @@ class MCTSAgent(Agent, BaseAgent):
     def search(self, root, num_iters, temperature=1):
         # print('search', root['step_count'])
 
-        self.env.training_agent = self.agent_id
         obs = self.env.get_observations()
         root_state = self.obs_to_state(obs)
 
@@ -178,12 +186,8 @@ class MCTSAgent(Agent, BaseAgent):
                     action = node.action()
                     trace.append((node, action))
                 else:
-                    # use unfiform distribution for probs
-                    # probs = np.ones(NUM_ACTIONS) / NUM_ACTIONS
-
                     # Use policy network to initialize probs
-                    model_in, _ = self.state_space_converter(
-                        self.env.get_observations()[self.agent_id])
+                    model_in, _ = self.state_space_converter(obs[self.agent_id])
                     self.model.eval()
                     pi_scores, values = self.model(model_in[np.newaxis])
                     probs = torch.nn.functional.softmax(pi_scores, dim=1).detach().numpy()[0]
@@ -235,7 +239,6 @@ class MCTSAgent(Agent, BaseAgent):
 
         # guarantees that we are not called recursively
         # and episode ends when this agent dies
-        self.env.training_agent = self.agent_id
         obs = self.env.get_observations()
 
         length = 0
@@ -243,8 +246,7 @@ class MCTSAgent(Agent, BaseAgent):
         my_actions = []
         my_policies = []
         while not done:
-            root = self.env.get_json_info()
-            root.pop('intended_actions')
+            root = self.get_state(self.env)
             # do Monte-Carlo tree search
             search_start_time = time.time()
 
@@ -384,7 +386,7 @@ class MCTSAgent(Agent, BaseAgent):
     def train(self, run_settings):
         data = self.memory.get_data()
         batch_size = run_settings.batch_size
-        self.model.optimize(data, batch_size, self.optimizer)
+        self.model.optimize(data, batch_size, self.optimizer, self.env)
 
     def train_step(self, batch_size):
         pass

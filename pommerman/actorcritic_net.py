@@ -1,12 +1,15 @@
 import sys
 sys.path.insert(0, "../interface/")
 
+import copy
+
 import numpy as np
 import torch
 from torch import nn
 from tqdm import tqdm
 
 from agent import Model
+from mcts_agent import MCTSAgent
 
 
 class ResBlock(nn.Module):
@@ -87,17 +90,21 @@ class ActorCriticNet(nn.Module, Model):
         vals = self.critic(x)
         return policy_scores, vals
 
-    def get_qvals_batch(self, batched_states):
-        for states in batched_states:
-            for state in states:
+    def get_batched_qvals(self, batched_states, batched_env_states, env):
+        for states, env_states in zip(batched_states, batched_env_states):
+            for env_state in env_states:
+                MCTSAgent.set_state(env, env_state)
                 # Find all children
-                pass
+        return []
 
-    def optimize(self, data, batch_size, optimizer):
+    def optimize(self, data, batch_size, optimizer, env):
         self.train()
         dtype = next(self.parameters()).type()
+        # Preserve existing state of env
+        saved_state = MCTSAgent.get_state(env)
         
         batched_states = []
+        batched_env_states = []
         pbar = tqdm(range(0, len(data), batch_size))
         for i in pbar:
             batch = data[i:i + batch_size]
@@ -105,7 +112,7 @@ class ActorCriticNet(nn.Module, Model):
                 # Batch norm will fail
                 break
             
-            raw_states, raw_actions, raw_true_vals = zip(*batch)
+            raw_states, raw_actions, raw_true_vals, env_states = zip(*batch)
             states = torch.from_numpy(np.stack(raw_states)).type(dtype)
             true_vals = torch.from_numpy(np.array(raw_true_vals)[:, np.newaxis]).type(dtype)
 
@@ -117,3 +124,9 @@ class ActorCriticNet(nn.Module, Model):
             optimizer.step()
 
             batched_states.append(states)
+            batched_env_states.append(env_states)
+
+        batched_qvals = self.get_batched_qvals(batched_states, batched_env_states, env)
+
+        # Restore existing state before training
+        MCTSAgent.set_state(env, saved_state)
