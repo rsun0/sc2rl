@@ -34,12 +34,15 @@ class ResBlock(nn.Module):
 
 class ActorCriticNet(nn.Module, Model):
     def __init__(self,
-            board_size=8,
-            in_channels=13,
+            board_size,
+            in_channels,
             num_blocks=4,
             channels=32,
             num_actions=6):
         super().__init__()
+        self.board_size = board_size
+        self.in_channels = in_channels
+        self.num_actions = num_actions
 
         # Convolutions
         convs = [
@@ -90,11 +93,25 @@ class ActorCriticNet(nn.Module, Model):
         vals = self.critic(x)
         return policy_scores, vals
 
-    def get_batched_qvals(self, batched_states, batched_env_states, env):
-        for states, env_states in zip(batched_states, batched_env_states):
+    def get_batched_qvals(self, batched_env_states, env):
+        agent_id = env.training_agent
+        for env_states in batched_env_states:
             for env_state in env_states:
+                next_states = np.empty((self.num_actions, self.in_channels, self.board_size, self.board_size))
+
                 MCTSAgent.set_state(env, env_state)
-                # Find all children
+                obs = env.get_observations()
+                actions = env.act(obs)
+                actions.insert(agent_id, None)
+
+                for a in range(self.num_actions):
+                    actions[env.training_agent] = a
+                    # TODO check done
+                    obs, rewards, done, info = env.step(actions)
+                    state, _ = MCTSAgent.state_space_converter(obs[agent_id])
+                    next_states[a] = state
+
+                    MCTSAgent.set_state(env, env_state)
         return []
 
     def optimize(self, data, batch_size, optimizer, env):
@@ -103,7 +120,6 @@ class ActorCriticNet(nn.Module, Model):
         # Preserve existing state of env
         saved_state = MCTSAgent.get_state(env)
         
-        batched_states = []
         batched_env_states = []
         pbar = tqdm(range(0, len(data), batch_size))
         for i in pbar:
@@ -123,10 +139,9 @@ class ActorCriticNet(nn.Module, Model):
             loss.backward()
             optimizer.step()
 
-            batched_states.append(states)
             batched_env_states.append(env_states)
 
-        batched_qvals = self.get_batched_qvals(batched_states, batched_env_states, env)
+        batched_qvals = self.get_batched_qvals(batched_env_states, env)
 
         # Restore existing state before training
         MCTSAgent.set_state(env, saved_state)
