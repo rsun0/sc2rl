@@ -108,17 +108,26 @@ class ActorCriticNet(nn.Module, Model):
                 actions = env.act(obs)
                 actions.insert(agent_id, None)
 
+                terminal = np.full(self.num_actions, False)
+                terminal_rewards = np.empty(self.num_actions)
                 for a in range(self.num_actions):
                     actions[env.training_agent] = a
-                    # TODO check done
-                    obs, rewards, done, info = env.step(actions)
+                    obs, rewards, done, _ = env.step(actions)
+                    if done:
+                        terminal[a] = True
+                        terminal_rewards[a] = rewards[agent_id]
                     state, _ = MCTSAgent.state_space_converter(obs[agent_id])
                     next_states[a] = state
 
                     MCTSAgent.set_state(env, env_state)
 
-                _, vals = self(next_states)
-                vals = vals.detach().numpy()[:, 0]
+                if terminal.all():
+                    vals = terminal_rewards
+                else:
+                    _, vals = self(next_states)
+                    vals = vals.detach().numpy()[:, 0]
+                    # Replace vals with reward if terminal
+                    vals[terminal] = terminal_rewards[terminal]
                 greedy_actions[i] = np.argmax(vals)
             batched_greedy_actions.append(greedy_actions)
         return batched_greedy_actions
