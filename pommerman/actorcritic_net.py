@@ -93,10 +93,13 @@ class ActorCriticNet(nn.Module, Model):
         vals = self.critic(x)
         return policy_scores, vals
 
-    def get_batched_qvals(self, batched_env_states, env):
+    def get_batched_greedy_actions(self, batched_env_states, env):
+        self.eval()
         agent_id = env.training_agent
-        for env_states in batched_env_states:
-            for env_state in env_states:
+        shape = (len(batched_env_states), len(batched_env_states[0]))
+        greedy_actions = np.empty(shape, dtype=int)
+        for i, env_states in enumerate(batched_env_states):
+            for j, env_state in enumerate(env_states):
                 next_states = np.empty((self.num_actions, self.in_channels, self.board_size, self.board_size))
 
                 MCTSAgent.set_state(env, env_state)
@@ -112,9 +115,16 @@ class ActorCriticNet(nn.Module, Model):
                     next_states[a] = state
 
                     MCTSAgent.set_state(env, env_state)
-        return []
+
+                _, logits = self(next_states)
+                logits = logits.detach().numpy()[:, 0]
+                greedy_actions[i, j] = np.argmax(logits)
+        return greedy_actions
 
     def optimize(self, data, batch_size, optimizer, env):
+        if len(data) < 2:
+            return
+
         self.train()
         dtype = next(self.parameters()).type()
         # Preserve existing state of env
@@ -128,7 +138,7 @@ class ActorCriticNet(nn.Module, Model):
                 # Batch norm will fail
                 break
             
-            raw_states, raw_actions, raw_true_vals, env_states = zip(*batch)
+            raw_states, _, raw_true_vals, env_states = zip(*batch)
             states = torch.from_numpy(np.stack(raw_states)).type(dtype)
             true_vals = torch.from_numpy(np.array(raw_true_vals)[:, np.newaxis]).type(dtype)
 
@@ -141,7 +151,9 @@ class ActorCriticNet(nn.Module, Model):
 
             batched_env_states.append(env_states)
 
-        batched_qvals = self.get_batched_qvals(batched_env_states, env)
+        batched_greedy_actions = self.get_batched_greedy_actions(batched_env_states, env)
+        # get_batched_greedy_actions calls eval()
+        self.train()
 
         # Restore existing state before training
         MCTSAgent.set_state(env, saved_state)
