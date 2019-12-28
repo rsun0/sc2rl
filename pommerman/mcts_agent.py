@@ -145,13 +145,7 @@ class MCTSAgent(Agent, BaseAgent):
         start_time = time.time()
         obs = obs[self.agent_id]
 
-        board = obs['board']
-        # state = np.zeros((4, board.shape[0], board.shape[1]))
-        # state[0] = board
-        # state[1] = obs['bomb_life']
-        # state[2] = obs['bomb_moving_direction']
-        # state[3] = obs['flame_life']
-        state = board
+        state, _ = self.state_space_converter(obs)
 
         time_elapsed = time.time() - start_time
         total_time['obs_to_state'] += time_elapsed
@@ -295,6 +289,12 @@ class MCTSAgent(Agent, BaseAgent):
 
             assert self == self.env._agents[self.agent_id]
             length += 1
+            # print("Agent:", self.agent_id,
+            #     "Step:", length,
+            #     "Actions:", [constants.Action(a).name for a in actions],
+            #     "Probs:", [round(p, 2) for p in pi],
+            #     "Rewards:", rewards,
+            #     "Done:", done)
 
         reward = rewards[self.agent_id]
         # Discount
@@ -302,6 +302,7 @@ class MCTSAgent(Agent, BaseAgent):
         return length, reward, rewards, my_actions, my_policies
 
     def act(self, obs, action_space):
+        # print('Number of nodes: ', len(self.tree))
         state = obs[0]
         environment = obs[1] # json_info
         
@@ -331,6 +332,9 @@ class MCTSAgent(Agent, BaseAgent):
 
         best_action = max(avg_reward, key=avg_reward.get)
 
+        # print('Average rewards: ', avg_reward)
+        # print('Average lengths: ', avg_length)
+        # print('act', best_action)
         # print('timing info')
         # for action in total_time:
         #     print(action, total_time[action] / total_frequency[action])
@@ -381,37 +385,6 @@ class MCTSAgent(Agent, BaseAgent):
         data = self.memory.get_data()
         batch_size = run_settings.batch_size
         self.model.optimize(data, batch_size, self.optimizer)
-        # self.model.train()
-        # data = self.memory.get_data()
-        # pbar = tqdm(range(0, len(data), run_settings.batch_size))
-        # running_loss = 0
-        # for i in pbar:
-        #     batch = data[i:i+run_settings.batch_size]
-        #     if len(batch) == 1:
-        #         # Batch norm will fail
-        #         break
-        #     states, actions, rewards = zip(*batch)
-
-        #     states_batch = np.stack(states)
-        #     actions_batch = np.array(actions)
-        #     rewards_batch = torch.from_numpy(np.array(rewards))
-
-        #     actions_onehot = np.zeros((actions_batch.shape[0], NUM_ACTIONS))
-        #     actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
-        #     actions_onehot = torch.from_numpy(actions_onehot).type(torch.FloatTensor)
-
-        #     preds, _ = self.model(states_batch)
-        #     log_probs = torch.nn.functional.log_softmax(preds, dim=1)
-        #     log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
-        #     loss = -torch.sum(log_probs_observed * rewards_batch)
-
-        #     self.optimizer.zero_grad()
-        #     loss.backward()
-        #     self.optimizer.step()
-
-        #     running_loss += loss.item()
-        #     num_experiences = i + run_settings.batch_size
-        #     pbar.set_postfix_str("{:.3f}L".format(running_loss / num_experiences))
 
     def train_step(self, batch_size):
         pass
