@@ -77,7 +77,8 @@ class ActorCriticNet(nn.Module, Model):
             nn.Linear(fc_h, fc_h),
             nn.BatchNorm1d(fc_h),
             nn.ReLU(),
-            nn.Linear(fc_h, 1)
+            nn.Linear(fc_h, 1),
+            nn.Tanh(),
         )
 
         self.actor_criterion = nn.CrossEntropyLoss()
@@ -116,9 +117,9 @@ class ActorCriticNet(nn.Module, Model):
 
                     MCTSAgent.set_state(env, env_state)
 
-                _, logits = self(next_states)
-                logits = logits.detach().numpy()[:, 0]
-                greedy_actions[i] = np.argmax(logits)
+                _, vals = self(next_states)
+                vals = vals.detach().numpy()[:, 0]
+                greedy_actions[i] = np.argmax(vals)
             batched_greedy_actions.append(greedy_actions)
         return batched_greedy_actions
 
@@ -146,8 +147,7 @@ class ActorCriticNet(nn.Module, Model):
             true_vals = torch.from_numpy(np.array(raw_true_vals)[:, np.newaxis]).type(dtype)
 
             optimizer.zero_grad()
-            _, logits = self(states)
-            vals = torch.tanh(logits)
+            _, vals = self(states)
             loss = self.critic_criterion(vals, true_vals)
             loss.backward()
             optimizer.step()

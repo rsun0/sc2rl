@@ -196,7 +196,7 @@ class MCTSAgent(Agent, BaseAgent):
                         reward = self.env._get_rewards()[self.agent_id]
                     else:
                         # Use critic network for values
-                        reward = torch.tanh(values).detach().numpy()[0]
+                        reward = values.detach().numpy()[0]
 
                     # add new node to the tree
                     self.tree[state] = MCTSNode(probs, self.mcts_c_puct)
