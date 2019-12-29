@@ -410,7 +410,8 @@ class MCTSAgent(Agent, BaseAgent):
         #     with open(self.tree_save_file, 'wb') as f:
         #         pickle.dump(self.tree, f)
         if self.model_save_file:
-            print('Saving policy network')
+            if self.settings.verbose:
+                print('Saving policy network')
             torch.save(self.model.state_dict(), self.model_save_file)
 
     def load(self):

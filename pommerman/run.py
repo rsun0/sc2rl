@@ -101,6 +101,7 @@ def run_training(
         epsilon_max=0,
         epsilon_min=0,
         epsilon_duration=0,
+        verbose=verbose,
     )
 
     memory = MCTSMemory(buffer_len=memsize, discount=discount)
