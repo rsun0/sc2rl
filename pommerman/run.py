@@ -28,10 +28,10 @@ if __name__ == '__main__':
         num_episodes=10000,
         num_epochs=1,
         batch_size=32,
-        train_every=32,
+        train_every=256,
         save_every=2048,
-        graph_every=50,
-        averaging_window=50,
+        graph_every=100,
+        averaging_window=200,
         graph_file='pommerman_results.png'
     )
 
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     )
 
     discount = 0.95
-    memory = MCTSMemory(buffer_len=8192, discount=discount)
+    memory = MCTSMemory(buffer_len=32000, discount=discount)
 
     mcts_model = ActorCriticNet(board_size=8, in_channels=20)
     agent1 = MCTSAgent(
