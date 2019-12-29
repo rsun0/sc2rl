@@ -398,6 +398,7 @@ class MCTSAgent(Agent, BaseAgent):
             f'{100*c_acc:04.1f}\t{c_loss:04.3f}',
             f'{100*a_acc:04.1f}\t{a_loss:04.3f}',
             sep='\t')
+        sys.stdout.flush()
         self.train_count += 1
 
     def train_step(self, batch_size):
