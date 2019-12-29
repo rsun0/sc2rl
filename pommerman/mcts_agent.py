@@ -120,6 +120,8 @@ class MCTSAgent(Agent, BaseAgent):
         self.tree_save_file = tree_save_file
         self.model_save_file = model_save_file
 
+        self.train_count = 0
+
     def make_env(self, opponent):
         agents = []
         for agent_id in range(NUM_AGENTS):
@@ -387,7 +389,16 @@ class MCTSAgent(Agent, BaseAgent):
     def train(self, run_settings):
         data = self.memory.get_data()
         batch_size = run_settings.batch_size
-        self.model.optimize(data, batch_size, self.optimizer, self.env)
+        c_loss, c_acc, a_loss, a_acc = self.model.optimize(
+            data, batch_size, self.optimizer, self.env)
+
+        if self.train_count == 0:
+            print('ITR', 'C_ACC', 'C_LOSS', 'A_ACC', 'A_LOSS', sep='\t')
+        print(f'{self.train_count:02d}',
+            f'{100*c_acc:04.1f}\t{c_loss:04.3f}',
+            f'{100*a_acc:04.1f}\t{a_loss:04.3f}',
+            sep='\t')
+        self.train_count += 1
 
     def train_step(self, batch_size):
         pass

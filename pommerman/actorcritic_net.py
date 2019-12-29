@@ -97,6 +97,9 @@ class ActorCriticNet(nn.Module, Model):
     def get_batched_greedy_actions(self, batched_env_states, env):
         self.eval()
         agent_id = env.training_agent
+        # Preserve existing state of env
+        saved_state = MCTSAgent.get_state(env)
+
         batched_greedy_actions = []
         for env_states in batched_env_states:
             greedy_actions = np.empty(len(env_states), dtype=int)
@@ -130,21 +133,24 @@ class ActorCriticNet(nn.Module, Model):
                     vals[terminal] = terminal_rewards[terminal]
                 greedy_actions[i] = np.argmax(vals)
             batched_greedy_actions.append(greedy_actions)
+        
+        # Restore existing state from before training
+        MCTSAgent.set_state(env, saved_state)
         return batched_greedy_actions
 
     def optimize(self, data, batch_size, optimizer, env):
-        # TODO include metrics
         if len(data) < 2:
-            return
+            # Need at least 2 data points for batch norm
+            return -1, -1, -1, -1
 
         self.train()
         dtype = next(self.parameters()).type()
-        # Preserve existing state of env
-        saved_state = MCTSAgent.get_state(env)
         
         batched_env_states = []
         batched_states = []
         pbar = tqdm(range(0, len(data), batch_size))
+        critic_running_loss = 0
+        critic_running_acc = 0
         for i in pbar:
             batch = data[i:i + batch_size]
             if len(batch) == 1:
@@ -161,12 +167,20 @@ class ActorCriticNet(nn.Module, Model):
             loss.backward()
             optimizer.step()
 
+            critic_running_loss += loss.item()
+            pred_wins = torch.sign(vals)
+            wins = torch.sign(true_vals)
+            correct = (pred_wins == wins).type(torch.FloatTensor)
+            critic_running_acc += torch.mean(correct).item()
+
             batched_env_states.append(env_states)
             batched_states.append(states)
 
         batched_greedy_actions = self.get_batched_greedy_actions(batched_env_states, env)
         # get_batched_greedy_actions calls eval()
         self.train()
+        actor_running_loss = 0
+        actor_running_acc = 0
         for states, greedy_actions in zip(batched_states, batched_greedy_actions):
             greedy_actions = torch.from_numpy(greedy_actions)
 
@@ -176,5 +190,14 @@ class ActorCriticNet(nn.Module, Model):
             loss.backward()
             optimizer.step()
 
-        # Restore existing state before training
-        MCTSAgent.set_state(env, saved_state)
+            actor_running_loss += loss.item()
+            pred_actions = torch.argmax(pi_scores, dim=1)
+            correct = (pred_actions == greedy_actions).type(torch.FloatTensor)
+            actor_running_acc += torch.mean(correct).item()
+
+        num_batches = np.ceil(len(data) / batch_size)
+        avg_critic_loss = critic_running_loss / num_batches
+        avg_critic_acc = critic_running_acc / num_batches
+        avg_actor_loss = actor_running_loss / num_batches
+        avg_actor_acc = actor_running_acc / num_batches
+        return avg_critic_loss, avg_critic_acc, avg_actor_loss, avg_actor_acc
