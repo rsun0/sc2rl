@@ -177,11 +177,14 @@ class ActorCriticNet(nn.Module, Model):
             batched_states.append(states)
 
         batched_greedy_actions = self.get_batched_greedy_actions(batched_env_states, env)
+        assert len(batched_states) == len(batched_greedy_actions), \
+            (len(batched_states), len(batched_greedy_actions))
         # get_batched_greedy_actions calls eval()
         self.train()
+        pbar = tqdm(zip(batched_states, batched_greedy_actions), total=len(batched_states))
         actor_running_loss = 0
         actor_running_acc = 0
-        for states, greedy_actions in zip(batched_states, batched_greedy_actions):
+        for states, greedy_actions in pbar:
             greedy_actions = torch.from_numpy(greedy_actions)
 
             optimizer.zero_grad()
