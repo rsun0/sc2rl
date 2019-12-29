@@ -1,0 +1,11 @@
+#!/bin/bash
+#SBATCH --job-name="pommerman"
+#SBATCH --error="bin/log.err"
+#SBATCH --output="bin/stats.out"
+#SBATCH --partition=cpu
+#SBATCH --time=4320
+
+source /home/raysun2/.bashrc
+conda activate sc2rl_env
+cd /home/raysun2/sc2rl/pommerman/
+python run.py
