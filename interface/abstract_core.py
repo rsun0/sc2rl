@@ -77,8 +77,9 @@ class Experiment:
                         scores = scores[0]
                         averages = averages[0]
                     recent_mean = np.mean(scores_history)
-                    print("Game {} ended after {} steps. Game score: {}. Averages: {}"
-                        .format(e+1, step, scores, averages))
+                    if self.run_settings.verbose:
+                        print("Game {} ended after {} steps. Game score: {}. Averages: {}"
+                            .format(e+1, step, scores, averages))
             if (self.run_settings.graph_every > 0 and e > 0
                     and e % self.run_settings.graph_every == 0):
                 self.plot_results(averages_history)
@@ -107,7 +108,8 @@ class Experiment:
                     for a in range(len(self.agents))]
                 env_actions = [self.agents[a].action_space_converter(actions[a])
                     for a in range(len(self.agents))]
-                self.print_action(env_actions)
+                if self.run_settings.verbose:
+                    self.print_action(env_actions)
                 # Take environment step
                 env_states, rewards, done, metainfo = self.custom_env.step(env_actions)
                 step += 1
@@ -121,10 +123,11 @@ class Experiment:
 
                     if len(scores) == 1:
                         scores = scores[0]
-                    print("Game {} ended after {} steps. Game score: {}"
-                        .format(e+1, step, scores))
-
-        print("Average game scores: {}".format(running_scores / self.run_settings.test_episodes))
+                    if self.run_settings.verbose:
+                        print("Game {} ended after {} steps. Game score: {}"
+                            .format(e+1, step, scores))
+        if self.run_settings.verbose:
+            print("Average game scores: {}".format(running_scores / self.run_settings.test_episodes))
 
     def print_action(self, actions):
         pass

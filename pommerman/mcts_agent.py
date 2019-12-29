@@ -20,10 +20,11 @@ import gym
 
 import json
 import time
+from tqdm import tqdm
 
 NUM_AGENTS = 2
 NUM_ACTIONS = len(constants.Action)
-NUM_CHANNELS = 18
+NUM_CHANNELS = 20
 
 total_time = {'obs_to_state': 0.0, 'env_step': 0.0, 'rollout': 0.0, 'search': 0.0}
 total_frequency = {'obs_to_state': 0, 'env_step': 0, 'rollout': 0, 'search': 0} 
@@ -35,15 +36,15 @@ def argmax_tiebreaking(Q):
     return np.random.choice(idx)
 
 
-class PolicyNetMemory(Memory):
+class MCTSMemory(Memory):
     def __init__(self, buffer_len, discount):
         self.experiences = collections.deque(maxlen=buffer_len)
         self.discount = discount
         self.current_trajectory = []
 
     def push(self, state, action, reward, done):
-        state = (state[0], state[1])
-        self.current_trajectory.append( (state, action) )
+        state, env_state = state
+        self.current_trajectory.append((state, action, env_state))
         
         if done:
             rewards = []
@@ -53,9 +54,9 @@ class PolicyNetMemory(Memory):
                 r *= self.discount
             rewards.reverse()
 
-            states, actions = zip(*self.current_trajectory)
+            states, actions, env_states = zip(*self.current_trajectory)
 
-            trajectory = zip(states, actions, rewards)
+            trajectory = zip(states, actions, rewards, env_states)
             self.experiences.extend(trajectory)
             self.current_trajectory = []
 
@@ -94,25 +95,34 @@ class MCTSNode(object):
 
 class MCTSAgent(Agent, BaseAgent):
 
-    def __init__(self, discount, agent_id=0, opponent=SimpleAgent(),
-            tree_save_file=None, model_save_file=None, *args, **kwargs):
-        print('init')
+    def __init__(self,
+            mcts_iters,
+            num_rollouts=1,
+            discount=1.0,
+            c=1.5,
+            temp=1.0,
+            agent_id=0,
+            opponent=SimpleAgent(),
+            tree_save_file=None,
+            model_save_file=None,
+            *args,
+            **kwargs):
         super(MCTSAgent, self).__init__(*args, **kwargs)
         self.agent_id = agent_id
         self.env = self.make_env(opponent)
         self.reset_tree()
-        self.num_episodes = 1
-        self.mcts_iters = 3
-        self.num_rollouts = 5
-        self.mcts_c_puct = 1.0
+        self.mcts_iters = mcts_iters
+        self.num_rollouts = num_rollouts
+        self.mcts_c_puct = c
         self.discount = discount
-        self.temperature = 1.0
+        self.temperature = temp
 
         self.tree_save_file = tree_save_file
         self.model_save_file = model_save_file
 
+        self.train_count = 0
+
     def make_env(self, opponent):
-        print('make_env')
         agents = []
         for agent_id in range(NUM_AGENTS):
             if agent_id == self.agent_id:
@@ -120,14 +130,23 @@ class MCTSAgent(Agent, BaseAgent):
             else:
                 agents.append(opponent)
 
-        return pommerman.make('OneVsOne-v0', agents)
+        env = pommerman.make('OneVsOne-v0', agents)
+        env.set_training_agent(self.agent_id)
+        return env
+
+    @staticmethod
+    def get_state(env):
+        state = env.get_json_info()
+        state.pop('intended_actions')
+        return state
+
+    @staticmethod
+    def set_state(env, state):
+        env._init_game_state = state
+        env.set_json_info()
 
     def reset_game(self, root):
-        # remember current game state
-        self.env._init_game_state = dict()
-        for key in root:
-            self.env._init_game_state[key] = root[key]
-        self.env.set_json_info()
+        self.set_state(self.env, root)
 
     def reset_tree(self):
         # print('reset_tree')
@@ -137,13 +156,7 @@ class MCTSAgent(Agent, BaseAgent):
         start_time = time.time()
         obs = obs[self.agent_id]
 
-        board = obs['board']
-        # state = np.zeros((4, board.shape[0], board.shape[1]))
-        # state[0] = board
-        # state[1] = obs['bomb_life']
-        # state[2] = obs['bomb_moving_direction']
-        # state[3] = obs['flame_life']
-        state = board
+        state, _ = self.state_space_converter(obs)
 
         time_elapsed = time.time() - start_time
         total_time['obs_to_state'] += time_elapsed
@@ -155,7 +168,6 @@ class MCTSAgent(Agent, BaseAgent):
     def search(self, root, num_iters, temperature=1):
         # print('search', root['step_count'])
 
-        self.env.training_agent = self.agent_id
         obs = self.env.get_observations()
         root_state = self.obs_to_state(obs)
 
@@ -176,18 +188,17 @@ class MCTSAgent(Agent, BaseAgent):
                     action = node.action()
                     trace.append((node, action))
                 else:
-                    # use unfiform distribution for probs
-                    # probs = np.ones(NUM_ACTIONS) / NUM_ACTIONS
-
                     # Use policy network to initialize probs
-                    images, scalars, _ = self.state_space_converter(self.env.get_observations()[self.agent_id])
+                    model_in, _ = self.state_space_converter(obs[self.agent_id])
                     self.model.eval()
-                    preds = self.model((images[np.newaxis], scalars[np.newaxis]))
-                    probs = torch.nn.functional.softmax(preds, dim=1).detach().numpy()[0]
+                    pi_scores, values = self.model(model_in[np.newaxis])
+                    probs = torch.nn.functional.softmax(pi_scores, dim=1).detach().numpy()[0]
 
-                    # use current rewards for values
-                    rewards = self.env._get_rewards()
-                    reward = rewards[self.agent_id]
+                    if self.env._get_done():
+                        reward = self.env._get_rewards()[self.agent_id]
+                    else:
+                        # Use critic network for values
+                        reward = values.detach().numpy()[0]
 
                     # add new node to the tree
                     self.tree[state] = MCTSNode(probs, self.mcts_c_puct)
@@ -205,9 +216,6 @@ class MCTSAgent(Agent, BaseAgent):
                 # step environment forward
                 env_start_time = time.time()
                 obs, rewards, done, info = self.env.step(actions)
-
-                 # XD XD XD XD
-                # self.env.render()
 
                 env_time_elapsed = time.time() - env_start_time
                 total_time['env_step'] += env_time_elapsed
@@ -229,11 +237,10 @@ class MCTSAgent(Agent, BaseAgent):
     def rollout(self):
         # print('rollout')
         # reset search tree in the beginning of each rollout
-        # self.reset_tree()
+        self.reset_tree()
 
         # guarantees that we are not called recursively
         # and episode ends when this agent dies
-        self.env.training_agent = self.agent_id
         obs = self.env.get_observations()
 
         length = 0
@@ -241,8 +248,7 @@ class MCTSAgent(Agent, BaseAgent):
         my_actions = []
         my_policies = []
         while not done:
-            root = self.env.get_json_info()
-            root.pop('intended_actions')
+            root = self.get_state(self.env)
             # do Monte-Carlo tree search
             search_start_time = time.time()
 
@@ -287,8 +293,12 @@ class MCTSAgent(Agent, BaseAgent):
 
             assert self == self.env._agents[self.agent_id]
             length += 1
-            # print("Agent:", self.agent_id, "Step:", length, "Actions:", [constants.Action(a).name for a in actions], "Probs:", [round(p, 2) for p in pi], "Rewards:", rewards, "Done:", done)
-        # print('leaving')
+            # print("Agent:", self.agent_id,
+            #     "Step:", length,
+            #     "Actions:", [constants.Action(a).name for a in actions],
+            #     "Probs:", [round(p, 2) for p in pi],
+            #     "Rewards:", rewards,
+            #     "Done:", done)
 
         reward = rewards[self.agent_id]
         # Discount
@@ -296,11 +306,9 @@ class MCTSAgent(Agent, BaseAgent):
         return length, reward, rewards, my_actions, my_policies
 
     def act(self, obs, action_space):
-        board_info = obs[0]
-        scalar_info = obs[1]
-        environment = obs[2] # 'json_info
-
-        print('Number of nodes: ', len(self.tree))
+        # print('Number of nodes: ', len(self.tree))
+        state = obs[0]
+        environment = obs[1] # json_info
         
         frequency = dict()
         avg_length = dict()
@@ -315,7 +323,6 @@ class MCTSAgent(Agent, BaseAgent):
             rollout_time_elapsed = time.time() - rollout_start_time
             total_time['rollout'] += rollout_time_elapsed
             total_frequency['rollout'] += 1
-            # print(my_actions[0], my_policies[0], reward, length, my_actions)
             a = my_actions[0]
 
             if a in frequency:
@@ -328,13 +335,13 @@ class MCTSAgent(Agent, BaseAgent):
                 frequency[a] = 1
 
         best_action = max(avg_reward, key=avg_reward.get)
-        print(avg_reward)
-        print(avg_length)
-        print('act', best_action)
 
-        print('timing info')
-        for action in total_time:
-            print(action, total_time[action] / total_frequency[action])
+        # print('Average rewards: ', avg_reward)
+        # print('Average lengths: ', avg_length)
+        # print('act', best_action)
+        # print('timing info')
+        # for action in total_time:
+        #     print(action, total_time[action] / total_frequency[action])
 
         return best_action
 
@@ -344,24 +351,25 @@ class MCTSAgent(Agent, BaseAgent):
     def _forward(self, state):
         return self._sample(state)
 
-    def state_space_converter(self, obs):
-        to_use = [0, 1, 2, 3, 4, 6, 7, 8, 10, 11]
- 
-        board = obs['board'] # 0-4, 6-8, 10-11 [10 total]
-        bomb_life = obs['bomb_life'] # 11
-        bomb_moving_direction = obs['bomb_moving_direction'] #12
-        flame_life = obs['flame_life'] #13
+    @staticmethod
+    def state_space_converter(obs):
+        board = obs['board']
+        state = np.zeros((NUM_CHANNELS, board.shape[0], board.shape[1]))
+        state_idx = 0
 
-        state = np.zeros((13, board.shape[0], board.shape[1]))
-        for i in range(len(to_use)):
-            state[i] = (board == to_use[i]).astype(int)
-        state[10] = bomb_life 
-        state[11] = bomb_moving_direction 
-        state[12] = flame_life 
+        board_indices = [0, 1, 2, 3, 4, 6, 7, 8, 10, 11]
+        for b in board_indices:
+            state[state_idx] = (board == b).astype(int)
+            state_idx += 1
+        additional_images = ['bomb_blast_strength', 'bomb_life',
+            'bomb_moving_direction', 'flame_life']
+        for im in additional_images:
+            state[state_idx] = obs[im]
+            state_idx += 1
 
-        scalars = []
         scalar_items = ['ammo', 'blast_strength', 'can_kick']
-        agents = obs['json_info']['agents'] # array of dictionaries as a string
+        # array of dictionaries as a string
+        agents = obs['json_info']['agents']
        
         i = agents.find('}')
         agent1 = json.loads(obs['json_info']['agents'][1:i+1])
@@ -369,45 +377,28 @@ class MCTSAgent(Agent, BaseAgent):
 
         for agent in [agent1, agent2]:
             for scalar_item in scalar_items:
-                scalars.append(agent[scalar_item])
+                state[state_idx] = int(agent[scalar_item])
+                state_idx += 1
 
-        scalars = np.array(scalars)
-
-        return state, scalars, obs['json_info']
+        assert state_idx == state.shape[0], state_idx
+        return state, obs['json_info']
 
     def action_space_converter(self, action):
         return action
 
     def train(self, run_settings):
-        self.model.train()
         data = self.memory.get_data()
-        for i in range(0, len(data), run_settings.batch_size):
-            batch = data[i:i+run_settings.batch_size]
-            states, actions, rewards = zip(*batch)
-            images, scalars = zip(*states)
+        batch_size = run_settings.batch_size
+        c_loss, c_acc, a_loss, a_acc = self.model.optimize(
+            data, batch_size, self.optimizer, self.env)
 
-            images_batch = np.stack(images)
-            scalars_batch = np.stack(scalars)
-            actions_batch = np.array(actions)
-            rewards_batch = torch.from_numpy(np.array(rewards))
-
-            actions_onehot = np.zeros((actions_batch.shape[0], NUM_ACTIONS))
-            actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
-            actions_onehot = torch.from_numpy(actions_onehot)
-
-            preds = self.model((images_batch, scalars_batch))
-            log_probs = torch.nn.functional.log_softmax(preds, dim=1)
-            log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
-            print('Log probs for experienced actions: ', log_probs_observed)
-            print('Rewards: ', rewards_batch)
-            loss = -torch.sum(log_probs_observed * rewards_batch)
-            print('Loss: ', loss)
-
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
-        # Throw away used experiences?
-        # self.experiences = []
+        if self.train_count == 0:
+            print('ITR', 'C_ACC', 'C_LOSS', 'A_ACC', 'A_LOSS', sep='\t')
+        print(f'{self.train_count:02d}',
+            f'{100*c_acc:04.1f}\t{c_loss:04.3f}',
+            f'{100*a_acc:04.1f}\t{a_loss:04.3f}',
+            sep='\t')
+        self.train_count += 1
 
     def train_step(self, batch_size):
         pass
@@ -436,71 +427,3 @@ class MCTSAgent(Agent, BaseAgent):
     
     def push_memory(self, state, action, reward, done):
         self.memory.push(state, action, reward, done)
-
-
-def runner(id, num_episodes, fifo, _args):
-    # make args accessible to MCTSAgent
-    global args
-    args = _args
-    # make sure agents play at all positions
-    agent_id = id % NUM_AGENTS
-    agent = MCTSAgent(agent_id=agent_id)
-
-    data = []
-    for i in range(num_episodes):
-        # do rollout
-        start_time = time.time()
-        length, reward, rewards = agent.rollout()
-        elapsed = time.time() - start_time
-        # add data samples to log
-        fifo.put((length, reward, rewards, agent_id, elapsed))
-
-
-def profile_runner(id, num_episodes, fifo, _args):
-    import cProfile
-    command = """runner(id, num_episodes, fifo, _args)"""
-    cProfile.runctx(command, globals(), locals(), filename=_args.profile)
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--profile')
-    parser.add_argument('--render', action="store_true", default=False)
-    # runner params
-    parser.add_argument('--num_episodes', type=int, default=400)
-    parser.add_argument('--num_runners', type=int, default=4)
-    # MCTS params
-    parser.add_argument('--mcts_iters', type=int, default=10)
-    parser.add_argument('--mcts_c_puct', type=float, default=1.0)
-    # RL params
-    parser.add_argument('--discount', type=float, default=0.99)
-    parser.add_argument('--temperature', type=float, default=0)
-    args = parser.parse_args()
-
-    assert args.num_episodes % args.num_runners == 0, "The number of episodes should be divisible by number of runners"
-
-    # use spawn method for starting subprocesses
-    ctx = multiprocessing.get_context('spawn')
-
-    # create fifos and processes for all runners
-    fifo = ctx.Queue()
-    for i in range(args.num_runners):
-        process = ctx.Process(target=profile_runner if args.profile else runner, args=(i, args.num_episodes // args.num_runners, fifo, args))
-        process.start()
-
-    # do logging in the main process
-    all_rewards = []
-    all_lengths = []
-    all_elapsed = []
-    for i in range(args.num_episodes):
-        # wait for a new trajectory
-        length, reward, rewards, agent_id, elapsed = fifo.get()
-
-        print("Episode:", i, "Reward:", reward, "Length:", length, "Rewards:", rewards, "Agent:", agent_id, "Time per step:", elapsed / length)
-        all_rewards.append(reward)
-        all_lengths.append(length)
-        all_elapsed.append(elapsed)
-
-    print("Average reward:", np.mean(all_rewards))
-    print("Average length:", np.mean(all_lengths))
-    print("Time per timestep:", np.sum(all_elapsed) / np.sum(all_lengths))
