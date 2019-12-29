@@ -32,7 +32,8 @@ if __name__ == '__main__':
         save_every=2048,
         graph_every=100,
         averaging_window=200,
-        graph_file='pommerman_results.png'
+        graph_file='pommerman_results.png',
+        verbose=False,
     )
 
     agent_settings = AgentSettings(

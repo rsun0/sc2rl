@@ -148,7 +148,7 @@ class ActorCriticNet(nn.Module, Model):
         
         batched_env_states = []
         batched_states = []
-        pbar = tqdm(range(0, len(data), batch_size))
+        pbar = tqdm(range(0, len(data), batch_size), disable=True)
         critic_running_loss = 0
         critic_running_acc = 0
         for i in pbar:
@@ -181,7 +181,8 @@ class ActorCriticNet(nn.Module, Model):
             (len(batched_states), len(batched_greedy_actions))
         # get_batched_greedy_actions calls eval()
         self.train()
-        pbar = tqdm(zip(batched_states, batched_greedy_actions), total=len(batched_states))
+        pbar = tqdm(zip(batched_states, batched_greedy_actions),
+            total=len(batched_states), disable=True)
         actor_running_loss = 0
         actor_running_acc = 0
         for states, greedy_actions in pbar:
