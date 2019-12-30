@@ -135,8 +135,6 @@ def run_training(
     )
     agent1.load()
 
-    agent2 = RandomAgent()
-
     experiment = Experiment([agent1, agent2], env, run_settings)
     experiment.train()
 
