@@ -110,7 +110,7 @@ def run_training(
         opp = pommerman.agents.RandomAgent()
         agent2 = RandomAgent()
     elif opponent == 'noop':
-        opp = PommermanNoopAgent
+        opp = PommermanNoopAgent()
         agent2 = NoopAgent()
     elif opponent == 'simp':
         opp = pommerman.agents.SimpleAgent()
