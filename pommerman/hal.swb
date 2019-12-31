@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name="noop"
-#SBATCH --error="bin/log_noop.err"
-#SBATCH --output="bin/noop.out"
+#SBATCH --job-name="simp95"
+#SBATCH --error="bin/log_simp95.err"
+#SBATCH --output="bin/simp95.out"
 #SBATCH --partition=cpu
 #SBATCH --time=4320
 
 source /home/raysun2/.bashrc
 conda activate sc2rl_env
 cd /home/raysun2/sc2rl/pommerman/
-TYPE="noop"
-python run.py --opponent ${TYPE} --graph-file bin/${TYPE}.png --model-file bin/${TYPE}.h5 --train-every 512 --save-every 512 --graph-every 50
+NAME="simp95"
+python run.py --opponent simp --graph-file bin/${NAME}.png --model-file bin/${NAME}.h5 --train-every 512 --save-every 512 --graph-every 50 --discount 0.95
