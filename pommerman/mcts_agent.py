@@ -368,14 +368,9 @@ class MCTSAgent(Agent, BaseAgent):
             state_idx += 1
 
         scalar_items = ['ammo', 'blast_strength', 'can_kick']
-        # array of dictionaries as a string
-        agents = obs['json_info']['agents']
-       
-        i = agents.find('}')
-        agent1 = json.loads(obs['json_info']['agents'][1:i+1])
-        agent2 = json.loads(obs['json_info']['agents'][i+2:-1]) 
+        agents = json.loads(obs['json_info']['agents'])
 
-        for agent in [agent1, agent2]:
+        for agent in agents:
             for scalar_item in scalar_items:
                 state[state_idx] = int(agent[scalar_item])
                 state_idx += 1
