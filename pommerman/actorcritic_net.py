@@ -1,8 +1,6 @@
 import sys
 sys.path.insert(0, "../interface/")
 
-import copy
-
 import numpy as np
 import torch
 from torch import nn
