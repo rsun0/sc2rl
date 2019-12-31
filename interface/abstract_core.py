@@ -137,7 +137,7 @@ class Experiment:
         plt.clf()
         plt.suptitle("Training results")
         plt.title("Ray Sun, David Long, Michael McGuire")
-        plt.xlabel("Training iteration")
+        plt.xlabel("Episodes")
         plt.ylabel("Average score")
         for i in range(len(averages)):
             plt.plot(averages[i])
