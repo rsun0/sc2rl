@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name="noopmini"
-#SBATCH --error="bin/log_noopmini.err"
-#SBATCH --output="bin/noopmini.out"
+#SBATCH --job-name="simpmini"
+#SBATCH --error="bin/log_simpmini.err"
+#SBATCH --output="bin/simpmini.out"
 #SBATCH --partition=cpu
 #SBATCH --time=4320
 
 source /home/raysun2/.bashrc
 conda activate sc2rl_env
 cd /home/raysun2/sc2rl/pommerman/
-NAME="noopmini"
-python run.py --opponent noop --graph-file bin/${NAME}.png --model-file bin/${NAME}.h5 --train-every 512 --save-every 512 --graph-every 50 --board-file start_mini2.json --board-size 6
+NAME="simpmini"
+python run.py --opponent simp --graph-file bin/${NAME}.png --model-file bin/${NAME}.h5 --train-every 512 --save-every 512 --graph-every 50 --board-file start_mini2.json --board-size 6 --lr 0.00001 --searches 32 --rollouts 8
