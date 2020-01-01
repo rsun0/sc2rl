@@ -19,11 +19,24 @@ class RelGraphMemory(Memory):
 
 
 class RelGraphAgent(Agent):
-    def __init__(self, *args, **kwargs):
+    def __init__(self,
+        num_agents=2,
+        board_size=8,
+        init_eps=0.0001,
+        *args,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
+        self.init_eps = init_eps
+        num_objects = board_size ** 2
+        self.graph_dim = (num_agents, num_agents + num_objects)
 
+        self.reset()
+
+    def reset(self):
         self.prev_state = None
         self.prev_action = None
+        self.prev_graph = np.random.random(self.graph_dim).astype('float32') + self.init_eps
 
     def state_space_converter(self, obs):
         board = obs['board']

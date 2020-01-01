@@ -10,14 +10,8 @@ from agent import Model
 
 
 class RelGraphNet(nn.Module, Model):
-    def __init__(self,
-        num_agents,
-        num_objects,
-        init_eps=0.0001,
-    ):
+    def __init__(self):
         super().__init__()
-        self.init_eps = init_eps
-        self.graph_dim = (num_agents, num_agents * num_objects)
 
         self.ggn_core = nn.Sequential(
             nn.Linear(, 512),
@@ -35,6 +29,5 @@ class RelGraphNet(nn.Module, Model):
 
         )
 
-    def reset(self):
-        self.prev_graph = np.random.random(self.graph_dim).astype('float32') + self.init_eps
-        self.prev_state = None
+    def forward(self, state):
+        prev_state, curr_state, prev_graph = state
