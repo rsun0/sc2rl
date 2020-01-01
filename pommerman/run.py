@@ -24,6 +24,7 @@ def parse_hyperparams():
 
     parser.add_argument('--opponent', type=str, choices=['rand', 'noop', 'simp'], default='rand', help='opponent type')
     
+    parser.add_argument('--board-size', type=int, default=8, help='side length of game board')
     parser.add_argument('--board-file', type=str, default='start.json', help='starting state file')
     parser.add_argument('--graph-file', type=str, default='bin/graph.png', help='graph save location')
     parser.add_argument('--model-file', type=str, default='bin/model.h5', help='model save file')
@@ -161,4 +162,5 @@ if __name__ == '__main__':
         averaging_window=args.window,
         render=args.render,
         verbose=args.verbose,
+        boardsize=args.board_size,
     )
