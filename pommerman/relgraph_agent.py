@@ -5,7 +5,8 @@ import numpy as np
 
 from agent import Agent, Memory
 
-NUM_CHANNELS = 18
+# 10 board, 7 additional, 6 action
+NUM_CHANNELS = 23
 
 
 class RelGraphMemory(Memory):
@@ -61,8 +62,10 @@ class RelGraphAgent(Agent):
             state[state_idx] = obs[im]
             state_idx += 1
 
-        state[state_idx] = self.prev_action if self.prev_action is not None else 0
-        state_idx += 1
+        # one-hot action among 6 action channels, zero-hot if no previous
+        if self.prev_action is not None:
+            state[state_idx + self.prev_action] = 1
+        state_idx += 6
 
         assert state_idx == state.shape[0], state_idx
         return state
