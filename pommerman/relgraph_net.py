@@ -9,8 +9,8 @@ from tqdm import tqdm
 from agent import Model
 
 
-class RelGraphNet(nn.Module, Model):
-    def __init__(self, board_size, in_channels):
+class GraphGenNet(nn.Module, Model):
+    def __init__(self, board_size, in_channels, graph_dim):
         super().__init__()
 
         self.pre_prev = nn.Sequential(
@@ -34,9 +34,15 @@ class RelGraphNet(nn.Module, Model):
             nn.Linear(combined_dim, 1024),
             nn.ReLU(),
         )
+        self.pre_graph = nn.Sequential(
+            nn.Linear(graph_dim, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1024),
+            nn.ReLU(),
+        )
 
         self.ggn_core = nn.Sequential(
-            nn.Linear(1024, 512),
+            nn.Linear(2048, 512),
             nn.ReLU(),
             nn.Linear(512, 128),
             nn.ReLU(),
@@ -45,26 +51,41 @@ class RelGraphNet(nn.Module, Model):
         )
 
         self.ggn_post = nn.Sequential(
-
+            nn.Linear(128, 1024),
+            nn.Dropout(p=0.4),
+            nn.Linear(1024, graph_dim),
         )
 
-    def forward(self, state):
-        prev_state, curr_state, prev_graph = state
-        # TODO convert to pytorch
+    def forward(self, inputs):
+        assert len(inputs) == 3
+        inputs = list(inputs)
+        for i in range(3):
+            if isinstance(inputs[i], np.ndarray):
+                inputs[i] = torch.from_numpy(inputs[i]).type(torch.FloatTensor)
+        prev_state, curr_state, prev_graph = inputs
 
-        processed_prev = self.pre_prev(prev_state)
-        processed_prev = torch.flatten(processed_prev, start_dim=1)
-        processed_curr = self.pre_curr(curr_state)
-        processed_curr = torch.flatten(processed_curr, start_dim=1)
-        preprocessed = torch.cat((processed_prev, processed_curr), dim=1)
-        preprocessed = self.pre_combined(preprocessed)
+        prev = self.pre_prev(prev_state)
+        prev = torch.flatten(prev, start_dim=1)
+        curr = self.pre_curr(curr_state)
+        curr = torch.flatten(curr, start_dim=1)
+        combined = torch.cat((prev, curr), dim=1)
+        combined = self.pre_combined(combined)
+        graph = torch.flatten(prev_graph, start_dim=1)
+        graph = self.pre_graph(graph)
+        preprocessed = torch.cat((combined, graph), dim=1)
 
-        # TODO include prev_graph
+        new_graph = self.ggn_core(preprocessed)
+        new_graph = self.ggn_post(new_graph)
+        return new_graph
 
 if __name__ == '__main__':
     bs = 8
     cs = 23
+    graph = np.random.random((10, 2, 66)).astype('float32')
+    graph = torch.from_numpy(graph)
     i = np.random.random((10, cs, bs, bs)).astype('float32')
     i = torch.from_numpy(i)
-    m = RelGraphNet(bs, cs)
-    o = m((i, i, i))
+    m = GraphGenNet(bs, cs, 66*2)
+    o = m((i, i, graph))
+    print(o.shape)
+    print(o)
