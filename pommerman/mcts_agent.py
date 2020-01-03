@@ -97,7 +97,6 @@ class MCTSAgent(Agent, BaseAgent):
 
     def __init__(self,
             mcts_iters,
-            num_rollouts=1,
             discount=1.0,
             c=1.5,
             temp=1.0,
@@ -112,7 +111,6 @@ class MCTSAgent(Agent, BaseAgent):
         self.env = self.make_env(opponent)
         self.reset_tree()
         self.mcts_iters = mcts_iters
-        self.num_rollouts = num_rollouts
         self.mcts_c_puct = c
         self.discount = discount
         self.temperature = temp
@@ -234,116 +232,15 @@ class MCTSAgent(Agent, BaseAgent):
         # return action probabilities
         return self.tree[root_state].probs(self.temperature)
 
-    def rollout(self):
-        # print('rollout')
-        # reset search tree in the beginning of each rollout
-        self.reset_tree()
-
-        # guarantees that we are not called recursively
-        # and episode ends when this agent dies
-        obs = self.env.get_observations()
-
-        length = 0
-        done = False
-        my_actions = []
-        my_policies = []
-        while not done:
-            root = self.get_state(self.env)
-            # do Monte-Carlo tree search
-            search_start_time = time.time()
-
-            # load original state
-            # print(root)
-            self.reset_game(root) 
-
-            # print(done, type(done))
-            # self.env.render()
-            pi = self.search(root, self.mcts_iters, self.temperature)
-
-            my_policies.append(pi)
-
-            # reset env back where we were
-            self.reset_game(root)
-
-            search_time_elapsed = time.time() - search_start_time
-            total_time['search'] += search_time_elapsed
-            total_frequency['search'] += 1
-
-            # sample action from probabilities
-            action = np.random.choice(NUM_ACTIONS, p=pi)
-            my_actions.append(action)
-
-            # ensure we are not called recursively
-            assert self.env.training_agent == self.agent_id
-
-            # make other agents act
-            actions = self.env.act(obs)
-
-            # add my action to list of actions
-            actions.insert(self.agent_id, action)
-
-            # step environment
-            env_start_time = time.time()
-
-            obs, rewards, done, info = self.env.step(actions)
-
-            env_time_elapsed = time.time() - env_start_time
-            total_time['env_step'] += env_time_elapsed
-            total_frequency['env_step'] += 1
-
-            assert self == self.env._agents[self.agent_id]
-            length += 1
-            # print("Agent:", self.agent_id,
-            #     "Step:", length,
-            #     "Actions:", [constants.Action(a).name for a in actions],
-            #     "Probs:", [round(p, 2) for p in pi],
-            #     "Rewards:", rewards,
-            #     "Done:", done)
-
-        reward = rewards[self.agent_id]
-        # Discount
-        reward = reward * self.discount ** (length - 1)
-        return length, reward, rewards, my_actions, my_policies
-
     def act(self, obs, action_space):
         # print('Number of nodes: ', len(self.tree))
-        state = obs[0]
-        environment = obs[1] # json_info
-        
-        frequency = dict()
-        avg_length = dict()
-        avg_reward = dict()
+        _, env_state = obs
 
-        for i in range(self.num_rollouts):
-            rollout_start_time = time.time()
-
-            self.reset_game(environment)
-
-            length, reward, _, my_actions, my_policies = self.rollout()
-            rollout_time_elapsed = time.time() - rollout_start_time
-            total_time['rollout'] += rollout_time_elapsed
-            total_frequency['rollout'] += 1
-            a = my_actions[0]
-
-            if a in frequency:
-                avg_length[a] = (frequency[a])/(frequency[a] + 1) * avg_length[a] + length / (frequency[a] + 1)
-                avg_reward[a] = (frequency[a])/(frequency[a] + 1) * avg_reward[a] + reward / (frequency[a] + 1)
-                frequency[a] += 1
-            else:
-                avg_length[a] = length
-                avg_reward[a] = reward
-                frequency[a] = 1
-
-        best_action = max(avg_reward, key=avg_reward.get)
-
-        # print('Average rewards: ', avg_reward)
-        # print('Average lengths: ', avg_length)
-        # print('act', best_action)
-        # print('timing info')
-        # for action in total_time:
-        #     print(action, total_time[action] / total_frequency[action])
-
-        return best_action
+        self.reset_tree()
+        self.reset_game(env_state)
+        pi = self.search(env_state, self.mcts_iters, self.temperature)
+        action = np.random.choice(NUM_ACTIONS, p=pi)
+        return action
 
     def _sample(self, state):
         return self.act(state, gym.spaces.discrete.Discrete(NUM_ACTIONS))

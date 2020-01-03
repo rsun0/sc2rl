@@ -30,7 +30,6 @@ def parse_hyperparams():
     parser.add_argument('--model-file', type=str, default='bin/model.h5', help='model save file')
 
     parser.add_argument('--searches', type=int, default=10, help='MCTS searches per rollout')
-    parser.add_argument('--rollouts', type=int, default=1, help='MCTS rollouts per turn')
     parser.add_argument('--temp', type=float, default=1.0, help='MCTS temperature')
 
     parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
@@ -58,7 +57,6 @@ def run_training(
         graph_file,
         model_save_file,
         mcts_iters,
-        rollouts,
         temp,
         lr,
         discount,
@@ -122,7 +120,6 @@ def run_training(
     mcts_model = ActorCriticNet(board_size=boardsize, in_channels=inputs)
     agent1 = MCTSAgent(
         mcts_iters=mcts_iters,
-        num_rollouts=rollouts,
         discount=discount,
         c=ucb_c,
         temp=temp,
@@ -148,7 +145,6 @@ if __name__ == '__main__':
         graph_file=args.graph_file,
         model_save_file=args.model_file,
         mcts_iters=args.searches,
-        rollouts=args.rollouts,
         temp=args.temp,
         lr=args.lr,
         discount=args.discount,
