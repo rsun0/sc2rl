@@ -133,12 +133,6 @@ class MCTSAgent(Agent, BaseAgent):
         return env
 
     @staticmethod
-    def get_state(env):
-        state = env.get_json_info()
-        state.pop('intended_actions')
-        return state
-
-    @staticmethod
     def set_state(env, state):
         env._init_game_state = state
         env.set_json_info()

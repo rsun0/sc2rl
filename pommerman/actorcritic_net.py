@@ -96,7 +96,7 @@ class ActorCriticNet(nn.Module, Model):
         self.eval()
         agent_id = env.training_agent
         # Preserve existing state of env
-        saved_state = MCTSAgent.get_state(env)
+        saved_state = env.get_json_info()
 
         batched_greedy_actions = []
         for env_states in batched_env_states:
