@@ -39,8 +39,8 @@ def parse_hyperparams():
     parser.add_argument('--episodes', type=int, default=10000, help='number of episodes per epoch')
     parser.add_argument('--epochs', type=int, default=1, help='number of epochs')
     parser.add_argument('--batch-size', type=int, default=32)
-    parser.add_argument('--train-every', type=int, default=256, help='training period in number of steps')
-    parser.add_argument('--save-every', type=int, default=2048, help='save period in number of steps')
+    parser.add_argument('--train-every', type=int, default=1024, help='training period in number of steps')
+    parser.add_argument('--save-every', type=int, default=1024, help='save period in number of steps')
     parser.add_argument('--graph-every', type=int, default=100, help='graphing period in number of episodes')
     parser.add_argument('--window', type=int, default=200, help='averaging window for graph')
 
