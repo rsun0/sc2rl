@@ -102,7 +102,6 @@ class MCTSAgent(Agent, BaseAgent):
             temp=1.0,
             agent_id=0,
             opponent=SimpleAgent(),
-            tree_save_file=None,
             model_save_file=None,
             *args,
             **kwargs):
@@ -115,7 +114,6 @@ class MCTSAgent(Agent, BaseAgent):
         self.discount = discount
         self.temperature = temp
 
-        self.tree_save_file = tree_save_file
         self.model_save_file = model_save_file
 
         self.train_count = 0
@@ -291,22 +289,12 @@ class MCTSAgent(Agent, BaseAgent):
         pass
 
     def save(self):
-        # if self.tree_save_file:
-        #     print('Saving {} tree nodes'.format(len(self.tree)))
-        #     with open(self.tree_save_file, 'wb') as f:
-        #         pickle.dump(self.tree, f)
         if self.model_save_file:
             if self.settings.verbose:
                 print('Saving policy network')
             torch.save(self.model.state_dict(), self.model_save_file)
 
     def load(self):
-        # if self.tree_save_file:
-        #     try:
-        #         with open(self.tree_save_file, 'rb') as f:
-        #             self.tree = pickle.load(f)
-        #     except FileNotFoundError:
-        #         print('No tree save file found')
         if self.model_save_file:
             try:
                 self.model.load_state_dict(torch.load(self.model_save_file))

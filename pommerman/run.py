@@ -125,7 +125,6 @@ def run_training(
         temp=temp,
         agent_id=0,
         opponent=opp,
-        tree_save_file=None,
         model_save_file=model_save_file,
         model=mcts_model,
         settings=agent_settings,
