@@ -33,7 +33,7 @@ def parse_hyperparams():
     parser.add_argument('--searches', type=int, default=32, help='MCTS searches per turn')
     parser.add_argument('--temp', type=float, default=0.0, help='MCTS temperature')
 
-    parser.add_argument('--lr', type=float, default=0.0001, help='learning rate')
+    parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
     parser.add_argument('--discount', type=float, default=0.99)
     parser.add_argument('--memsize', type=int, default=32000, help='experience replay memory size')
 
