@@ -47,11 +47,12 @@ class GraphGenNet(nn.Module, Model):
             nn.Linear(512, 128),
             nn.ReLU(),
             nn.Linear(128, 128),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
         self.ggn_post = nn.Sequential(
             nn.Linear(128, 1024),
+            nn.ReLU(),
             nn.Dropout(p=0.4),
             nn.Linear(1024, graph_dim),
         )
@@ -77,6 +78,7 @@ class GraphGenNet(nn.Module, Model):
         new_graph = self.ggn_core(preprocessed)
         new_graph = self.ggn_post(new_graph)
         return new_graph
+
 
 if __name__ == '__main__':
     bs = 8
