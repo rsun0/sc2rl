@@ -23,6 +23,7 @@ def parse_hyperparams():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--opponent', type=str, choices=['rand', 'noop', 'simp'], default='rand', help='opponent type')
+    parser.add_argument('--mcts-opp', type=str, choices=['rand', 'noop', 'simp'], default=None, help='opponent used in MCTS')
     
     parser.add_argument('--board-size', type=int, default=8, help='side length of game board')
     parser.add_argument('--board-file', type=str, default='start.json', help='starting state file')
@@ -30,10 +31,10 @@ def parse_hyperparams():
     parser.add_argument('--model-file', type=str, default='bin/model.h5', help='model save file')
 
     parser.add_argument('--searches', type=int, default=32, help='MCTS searches per turn')
-    parser.add_argument('--temp', type=float, default=1.0, help='MCTS temperature')
+    parser.add_argument('--temp', type=float, default=0.0, help='MCTS temperature')
 
     parser.add_argument('--lr', type=float, default=0.0001, help='learning rate')
-    parser.add_argument('--discount', type=float, default=1.0)
+    parser.add_argument('--discount', type=float, default=0.99)
     parser.add_argument('--memsize', type=int, default=32000, help='experience replay memory size')
 
     parser.add_argument('--episodes', type=int, default=10000, help='number of episodes per epoch')
@@ -53,6 +54,7 @@ def parse_hyperparams():
 
 def run_training(
         opponent,
+        mcts_opp,
         game_state_file,
         graph_file,
         model_save_file,
@@ -105,17 +107,16 @@ def run_training(
 
     memory = MCTSMemory(buffer_len=memsize, discount=discount)
 
-    if opponent == 'rand':
+    if mcts_opp is None:
+        mcts_opp = opponent
+    if mcts_opp == 'rand':
         opp = pommerman.agents.RandomAgent()
-        agent2 = RandomAgent()
-    elif opponent == 'noop':
+    elif mcts_opp == 'noop':
         opp = PommermanNoopAgent()
-        agent2 = NoopAgent()
-    elif opponent == 'simp':
+    elif mcts_opp == 'simp':
         opp = pommerman.agents.SimpleAgent()
-        agent2 = SimpleAgent()
     else:
-        raise Exception('Invalid opponent type', opponent)
+        raise Exception('Invalid MCTS opponent type', mcts_opp)
 
     mcts_model = ActorCriticNet(board_size=boardsize, in_channels=inputs)
     agent1 = MCTSAgent(
@@ -132,6 +133,15 @@ def run_training(
     )
     agent1.load()
 
+    if opponent == 'rand':
+        agent2 = RandomAgent()
+    elif opponent == 'noop':
+        agent2 = NoopAgent()
+    elif opponent == 'simp':
+        agent2 = SimpleAgent()
+    else:
+        raise Exception('Invalid opponent type', opponent)
+    
     experiment = Experiment([agent1, agent2], env, run_settings)
     experiment.train()
 
@@ -140,6 +150,7 @@ if __name__ == '__main__':
     args = parse_hyperparams()
     run_training(
         opponent=args.opponent,
+        mcts_opp=args.mcts_opp,
         game_state_file=args.board_file,
         graph_file=args.graph_file,
         model_save_file=args.model_file,
