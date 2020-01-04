@@ -7,6 +7,7 @@ from agent import Agent, Memory
 
 # 10 board, 7 additional, 6 action
 NUM_CHANNELS = 23
+POWERUP_RELEVANCE = 10
 
 
 class RelGraphMemory(Memory):
@@ -90,3 +91,22 @@ class RelGraphAgent(Agent):
 
     def push_memory(self, state, action, reward, done):
         raise NotImplementedError
+
+    @staticmethod
+    def ground_truth_update(prev_state, curr_state, prev_graph, agent_id):
+        curr_graph = np.copy(prev_graph)
+        curr_loc = curr_state[8 + agent_id].flatten().nonzero()[0].item()
+
+        # ammo increase
+        if (curr_state[14] > prev_state[14]).all():
+            curr_graph[agent_id, curr_loc] = POWERUP_RELEVANCE
+        # range increase
+        if (curr_state[15] > prev_state[15]).all():
+            curr_graph[agent_id, curr_loc] = POWERUP_RELEVANCE
+        # can kick
+        if (curr_state[16] > prev_state[16]).all():
+            curr_graph[agent_id, curr_loc] = POWERUP_RELEVANCE
+
+        # TODO add relevance for bombs
+
+        return curr_graph
