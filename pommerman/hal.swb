@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name="rand"
-#SBATCH --error="bin/log_rand.err"
-#SBATCH --output="bin/rand.out"
+#SBATCH --job-name="noopvrand"
+#SBATCH --error="bin/log_noopvrand.err"
+#SBATCH --output="bin/noopvrand.out"
 #SBATCH --partition=cpu
 #SBATCH --time=4320
 
 source /home/raysun2/.bashrc
 conda activate sc2rl_env
 cd /home/raysun2/sc2rl/pommerman/
-NAME="rand"
-python run.py --opponent rand --graph-file bin/${NAME}.png --model-file bin/${NAME}.h5
+NAME="noopvrand"
+python run.py --opponent rand --graph-file bin/${NAME}.png --model-file bin/invalid.h5

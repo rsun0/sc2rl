@@ -118,20 +118,22 @@ def run_training(
     else:
         raise Exception('Invalid MCTS opponent type', mcts_opp)
 
-    mcts_model = ActorCriticNet(board_size=boardsize, in_channels=inputs)
-    agent1 = MCTSAgent(
-        mcts_iters=mcts_iters,
-        discount=discount,
-        c=ucb_c,
-        temp=temp,
-        agent_id=0,
-        opponent=opp,
-        model_save_file=model_save_file,
-        model=mcts_model,
-        settings=agent_settings,
-        memory=memory,
-    )
-    agent1.load()
+    #mcts_model = ActorCriticNet(board_size=boardsize, in_channels=inputs)
+    #agent1 = MCTSAgent(
+    #    mcts_iters=mcts_iters,
+    #    discount=discount,
+    #    c=ucb_c,
+    #    temp=temp,
+    #    agent_id=0,
+    #    opponent=opp,
+    #    model_save_file=model_save_file,
+    #    model=mcts_model,
+    #    settings=agent_settings,
+    #    memory=memory,
+    #)
+    #agent1.load()
+
+    agent1 = NoopAgent()
 
     if opponent == 'rand':
         agent2 = RandomAgent()
