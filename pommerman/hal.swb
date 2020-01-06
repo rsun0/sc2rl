@@ -1,12 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name="rand"
-#SBATCH --error="bin/log_rand.err"
-#SBATCH --output="bin/rand.out"
+#SBATCH --job-name="from_noop"
+#SBATCH --error="bin2/log_from_noop.err"
+#SBATCH --output="bin2/from_noop.out"
 #SBATCH --partition=cpu
 #SBATCH --time=4320
 
 source /home/raysun2/.bashrc
 conda activate sc2rl_env
 cd /home/raysun2/sc2rl/pommerman/
-NAME="rand"
-python run.py --opponent rand --graph-file bin/${NAME}.png --model-file bin/${NAME}.h5
+NAME="from_noop"
+FOLDER="bin2"
+python run.py --opponent simp --graph-file ${FOLDER}/${NAME}.png --model-file ${FOLDER}/${NAME}.h5
