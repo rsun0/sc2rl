@@ -148,6 +148,7 @@ def run_training(
 
 if __name__ == '__main__':
     args = parse_hyperparams()
+    print('Args: ', args)
     run_training(
         opponent=args.opponent,
         mcts_opp=args.mcts_opp,
