@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name="frand_0001"
-#SBATCH --error="bin2/log_frand_0001.err"
-#SBATCH --output="bin2/frand_0001.out"
+#SBATCH --job-name="frand_temp"
+#SBATCH --error="bin2/log_frand_temp.err"
+#SBATCH --output="bin2/frand_temp.out"
 #SBATCH --partition=cpu
 #SBATCH --time=4320
 
 source /home/raysun2/.bashrc
 conda activate sc2rl_env
 cd /home/raysun2/sc2rl/pommerman/
-NAME="frand_0001"
+NAME="frand_temp"
 FOLDER="bin2"
-python run.py --opponent simp --graph-file ${FOLDER}/${NAME}.png --model-file ${FOLDER}/${NAME}.h5 --lr 0.0001
+python run.py --opponent simp --graph-file ${FOLDER}/${NAME}.png --model-file ${FOLDER}/${NAME}.h5 --lr 0.0001 --temp 0.5
