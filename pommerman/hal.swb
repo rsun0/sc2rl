@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name="from_noop"
-#SBATCH --error="bin2/log_from_noop.err"
-#SBATCH --output="bin2/from_noop.out"
+#SBATCH --job-name="frand_0001"
+#SBATCH --error="bin2/log_frand_0001.err"
+#SBATCH --output="bin2/frand_0001.out"
 #SBATCH --partition=cpu
 #SBATCH --time=4320
 
 source /home/raysun2/.bashrc
 conda activate sc2rl_env
 cd /home/raysun2/sc2rl/pommerman/
-NAME="from_noop"
+NAME="frand_0001"
 FOLDER="bin2"
-python run.py --opponent simp --graph-file ${FOLDER}/${NAME}.png --model-file ${FOLDER}/${NAME}.h5
+python run.py --opponent simp --graph-file ${FOLDER}/${NAME}.png --model-file ${FOLDER}/${NAME}.h5 --lr 0.0001
