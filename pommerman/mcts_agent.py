@@ -83,7 +83,7 @@ class MCTSNode(object):
         self.N[action] += 1
         self.Q[action] = self.W[action] / self.N[action]
 
-    def probs(self, temperature=1):
+    def probs(self, temperature):
         if temperature == 0:
             p = np.zeros(NUM_ACTIONS)
             p[argmax_tiebreaking(self.N)] = 1
@@ -100,6 +100,7 @@ class MCTSAgent(Agent, BaseAgent):
             discount=1.0,
             c=1.5,
             temp=1.0,
+            tempsteps=None,
             agent_id=0,
             opponent=SimpleAgent(),
             model_save_file=None,
@@ -112,11 +113,17 @@ class MCTSAgent(Agent, BaseAgent):
         self.mcts_iters = mcts_iters
         self.mcts_c_puct = c
         self.discount = discount
-        self.temperature = temp
+        self.init_temp = temp
+        self.tempsteps = tempsteps
 
         self.model_save_file = model_save_file
 
         self.train_count = 0
+
+    def get_temp(self, step_count):
+        if self.tempsteps is not None and step_count >= self.tempsteps:
+            return 0.0
+        return self.init_temp
 
     def make_env(self, opponent):
         agents = []
@@ -155,7 +162,7 @@ class MCTSAgent(Agent, BaseAgent):
         state = state.astype(np.uint8)
         return state.tobytes()
 
-    def search(self, root, num_iters, temperature=1):
+    def search(self, root, num_iters, temperature):
         # print('search', root['step_count'])
 
         obs = self.env.get_observations()
@@ -222,15 +229,18 @@ class MCTSAgent(Agent, BaseAgent):
                 reward *= self.discount
 
         # return action probabilities
-        return self.tree[root_state].probs(self.temperature)
+        return self.tree[root_state].probs(temperature)
 
     def act(self, obs, action_space):
         # print('Number of nodes: ', len(self.tree))
         _, env_state = obs
 
+        step_count = int(env_state['step_count'])
+        temperature = self.get_temp(step_count)
+
         self.reset_tree()
         self.reset_game(env_state)
-        pi = self.search(env_state, self.mcts_iters, self.temperature)
+        pi = self.search(env_state, self.mcts_iters, temperature)
         action = np.random.choice(NUM_ACTIONS, p=pi)
         return action
 

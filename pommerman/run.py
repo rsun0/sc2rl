@@ -32,6 +32,7 @@ def parse_hyperparams():
 
     parser.add_argument('--searches', type=int, default=32, help='MCTS searches per turn')
     parser.add_argument('--temp', type=float, default=0.0, help='MCTS temperature')
+    parser.add_argument('--tempsteps', type=int, default=None, help='Number of steps to use temperature')
 
     parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
     parser.add_argument('--discount', type=float, default=0.99)
@@ -60,6 +61,7 @@ def run_training(
         model_save_file,
         mcts_iters,
         temp,
+        tempsteps,
         lr,
         discount,
         memsize,
@@ -124,6 +126,7 @@ def run_training(
         discount=discount,
         c=ucb_c,
         temp=temp,
+        tempsteps=tempsteps,
         agent_id=0,
         opponent=opp,
         model_save_file=model_save_file,
@@ -157,6 +160,7 @@ if __name__ == '__main__':
         model_save_file=args.model_file,
         mcts_iters=args.searches,
         temp=args.temp,
+        tempsteps=args.tempsteps,
         lr=args.lr,
         discount=args.discount,
         memsize=args.memsize,
