@@ -284,7 +284,7 @@ class MCTSAgent(Agent, BaseAgent):
         data = self.memory.get_data()
         batch_size = run_settings.batch_size
         c_loss, c_acc, a_loss, a_acc = self.model.optimize(
-            data, batch_size, self.optimizer, self.env)
+            data, batch_size, self.optimizer, self.env, self.settings.verbose)
 
         if self.train_count == 0:
             print('ITR', 'C_ACC', 'C_LOSS', 'A_ACC', 'A_LOSS', sep='\t')
