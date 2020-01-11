@@ -8,6 +8,7 @@ from agent import Agent, Memory
 # 10 board, 7 additional, 6 action
 NUM_CHANNELS = 23
 POWERUP_RELEVANCE = 10
+FLAME_RELEVANCE = 100
 
 
 class RelGraphMemory(Memory):
@@ -42,7 +43,7 @@ class RelGraphAgent(Agent):
 
     def state_space_converter(self, obs):
         board = obs['board']
-        state = np.zeros((NUM_CHANNELS, board.shape[0], board.shape[1]), dtype='float32')
+        state = np.zeros((NUM_CHANNELS, board.shape[0], board.shape[1]), dtype=int)
         state_idx = 0
 
         board_indices = [0, 1, 2, 3, 4, 6, 7, 8, 10, 11]
@@ -93,20 +94,39 @@ class RelGraphAgent(Agent):
         raise NotImplementedError
 
     @staticmethod
-    def ground_truth_update(prev_state, curr_state, prev_graph, agent_id):
+    def get_adjacent_flames(agent_frame, flames):
+        adjacent = np.copy(agent_frame)
+
+        loc = agent_frame.nonzero()
+        if loc[0] > 0:
+            adjacent[loc[0] - 1, loc[1]] = 1
+        if loc[0] < adjacent.shape[0] - 1:
+            adjacent[loc[0] + 1, loc[1]] = 1
+        if loc[1] > 0:
+            adjacent[loc[0], loc[1] - 1] = 1
+        if loc[1] < adjacent.shape[1] - 1:
+            adjacent[loc[0], loc[1] + 1] = 1
+
+        return np.bitwise_and(adjacent, flames)
+
+    @staticmethod
+    def ground_truth_update(prev_state, curr_state, prev_graph, next_state, agent_id):
         curr_graph = np.copy(prev_graph)
-        curr_loc = curr_state[8 + agent_id].flatten().nonzero()[0].item()
 
-        # ammo increase
-        if (curr_state[14] > prev_state[14]).all():
-            curr_graph[agent_id, curr_loc] = POWERUP_RELEVANCE
-        # range increase
-        if (curr_state[15] > prev_state[15]).all():
-            curr_graph[agent_id, curr_loc] = POWERUP_RELEVANCE
-        # can kick
-        if (curr_state[16] > prev_state[16]).all():
-            curr_graph[agent_id, curr_loc] = POWERUP_RELEVANCE
+        # ammo increase, range increase, or can kick pickup
+        for idx in [14, 15, 16]:
+            if (next_state[idx] > curr_state[idx]).all():
+                next_loc = np.flatnonzero(next_state[8 + agent_id]).item()
+                curr_graph[agent_id, next_loc] = POWERUP_RELEVANCE
 
-        # TODO add relevance for bombs
+        for agent in [0, 1]:
+            # agent died
+            if not next_state[8 + agent].any():
+                agent_loc = curr_state[8 + agent]
+                adj_flames = RelGraphAgent.get_adjacent_flames(agent_loc, next_state[4])
+                for flame_idx in np.flatnonzero(adj_flames):
+                    curr_graph[agent, flame_idx] = FLAME_RELEVANCE
+
+        # TODO add relevance for kicking bombs
 
         return curr_graph

@@ -253,7 +253,7 @@ class MCTSAgent(Agent, BaseAgent):
     @staticmethod
     def state_space_converter(obs):
         board = obs['board']
-        state = np.zeros((NUM_CHANNELS, board.shape[0], board.shape[1]))
+        state = np.zeros((NUM_CHANNELS, board.shape[0], board.shape[1]), dtype=int)
         state_idx = 0
 
         board_indices = [0, 1, 2, 3, 4, 6, 7, 8, 10, 11]
