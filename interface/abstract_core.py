@@ -67,6 +67,12 @@ class Experiment:
                     self.agents[a].push_memory(states[a], actions[a], rewards[a], done)
 
                 if done:
+                    end_states = [self.agents[a].state_space_converter(env_states[a])
+                        for a in range(len(self.agents))]
+                    for a in range(len(self.agents)):
+                        if hasattr(self.agents[a], 'push_memory_terminal'):
+                            self.agents[a].push_memory_terminal(end_states[a])
+
                     averages = []
                     for a in range(len(scores_history)):
                         scores_history[a].append(scores[a])
@@ -137,7 +143,7 @@ class Experiment:
         plt.clf()
         plt.suptitle("Training results")
         plt.title("Ray Sun, David Long, Michael McGuire")
-        plt.xlabel("Training iteration")
+        plt.xlabel("Episodes")
         plt.ylabel("Average score")
         for i in range(len(averages)):
             plt.plot(averages[i])

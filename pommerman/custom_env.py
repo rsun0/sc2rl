@@ -46,8 +46,11 @@ class PommermanEnvironment(CustomEnvironment):
         return obs, rewards, False, None
 
     def step(self, action_list):
-        actions = self._env.act(self._state)
-        actions[:self.num_agents] = action_list
+        if self.num_agents == 1:
+            actions = self._env.act(self._state)
+            actions[:1] = action_list
+        else:
+            actions = action_list
         self._state, reward, terminal, info = self._env.step(actions)
         
         if self.render:

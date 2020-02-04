@@ -1,8 +1,6 @@
 import sys
 sys.path.insert(0, "../interface/")
 
-import copy
-
 import numpy as np
 import torch
 from torch import nn
@@ -98,7 +96,7 @@ class ActorCriticNet(nn.Module, Model):
         self.eval()
         agent_id = env.training_agent
         # Preserve existing state of env
-        saved_state = MCTSAgent.get_state(env)
+        saved_state = env.get_json_info()
 
         batched_greedy_actions = []
         for env_states in batched_env_states:
@@ -138,7 +136,7 @@ class ActorCriticNet(nn.Module, Model):
         MCTSAgent.set_state(env, saved_state)
         return batched_greedy_actions
 
-    def optimize(self, data, batch_size, optimizer, env):
+    def optimize(self, data, batch_size, optimizer, env, verbose=False):
         if len(data) < 2:
             # Need at least 2 data points for batch norm
             return -1, -1, -1, -1
@@ -148,7 +146,7 @@ class ActorCriticNet(nn.Module, Model):
         
         batched_env_states = []
         batched_states = []
-        pbar = tqdm(range(0, len(data), batch_size), disable=True)
+        pbar = tqdm(range(0, len(data), batch_size), disable=(not verbose))
         critic_running_loss = 0
         critic_running_acc = 0
         for i in pbar:
@@ -182,7 +180,7 @@ class ActorCriticNet(nn.Module, Model):
         # get_batched_greedy_actions calls eval()
         self.train()
         pbar = tqdm(zip(batched_states, batched_greedy_actions),
-            total=len(batched_states), disable=True)
+            total=len(batched_states), disable=(not verbose))
         actor_running_loss = 0
         actor_running_acc = 0
         for states, greedy_actions in pbar:

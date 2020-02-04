@@ -1,4 +1,7 @@
 __pycache__/
 .vscode/
 env/
+bin/
 *.pickle
+*.h5
+*.png
