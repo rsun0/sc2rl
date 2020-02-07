@@ -7,10 +7,15 @@ from action_interface import BuildMarinesAction
 class TestAgent(Agent):
     def __init__(self):
         # Intentionally bypassing parent constructor
-        pass
+        self.built_depot = False
 
     def _sample(self, state):
-        return BuildMarinesAction.BUILD_DEPOT
+        if state.observation.player.minerals < 100:
+            return BuildMarinesAction.NO_OP
+        if not self.built_depot:
+            self.built_depot = True
+            return BuildMarinesAction.BUILD_DEPOT
+        return BuildMarinesAction.NO_OP
 
     def _forward(self, state):
         return self._sample(state)
