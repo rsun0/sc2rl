@@ -5,3 +5,4 @@ bin/
 *.pickle
 *.h5
 *.png
+pommerman/stage*
