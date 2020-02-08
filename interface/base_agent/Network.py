@@ -62,7 +62,7 @@ class BaseNetwork(nn.Module, Model):
         raise NotImplementedError
 
     def simple_forward(self, minimaps, screens, players, avail_actions, last_actions, last_spatials, hiddens, curr_actions, relevant_frames):
-        minimaps, screens, inputs2d = self.process_states(minimaps, screens, players[:,-1], last_actions[:,-1], last_spatials, sequential=False, embeddings_only=True)
+        #minimaps, screens, inputs2d = self.process_states(minimaps, screens, players[:,-1], last_actions[:,-1], last_spatials, sequential=False, embeddings_only=True)
         #minimaps = minimaps.flatten(1, -1)
         #screens = screens.flatten(1, -1)
         action_logits, arg_logits, spatial_logits, _, values, _ = self.forward(
@@ -74,9 +74,9 @@ class BaseNetwork(nn.Module, Model):
             last_spatials,
             None,
             curr_action=curr_actions,
-            process_inputs=False,
-            format_inputs=False,
-            inputs2d=inputs2d
+            process_inputs=True,
+            format_inputs=True,
+            inputs2d=None
         )
 
         return action_logits, arg_logits, spatial_logits, _, values, _

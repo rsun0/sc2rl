@@ -66,7 +66,7 @@ env_config = {
     "arg_depth": 10,
     "max_arg_size": 500,
     "spatial_action_depth": 3,
-    "spatial_action_size": 64
+    "spatial_action_size": 32
 }
 
 
