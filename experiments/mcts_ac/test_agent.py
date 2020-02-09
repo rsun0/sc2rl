@@ -12,7 +12,10 @@ class TestAgent(Agent):
     def _sample(self, state):
         if state.observation.player.minerals < 100:
             return BuildMarinesAction.NO_OP
-        return BuildMarinesAction.BUILD_DEPOT
+        if not self.built_depot:
+            self.built_depot = True
+            return BuildMarinesAction.BUILD_DEPOT
+        return BuildMarinesAction.BUILD_BARRACKS
 
     def _forward(self, state):
         return self._sample(state)
