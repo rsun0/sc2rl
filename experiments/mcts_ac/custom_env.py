@@ -5,7 +5,6 @@ from enum import Enum
 from abstract_core import CustomEnvironment
 
 class BuildMarinesEnvironment(CustomEnvironment):
-    # TODO decide correct screen dimensions by observing Depot height and width, possibly 640 x 480
     SCREEN_SIZE = 84
     MINIMAP_SIZE = 1
     MAP = 'BuildMarines'
