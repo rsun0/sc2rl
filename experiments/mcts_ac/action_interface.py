@@ -23,6 +23,7 @@ class BuildMarinesActuator:
     def reset(self):
         self.in_progress = None
         self.progress_stage = 0
+        self.selecting = False
         self.num_depots = 0
 
     def compute_action(self, action, raw_obs):
@@ -34,6 +35,10 @@ class BuildMarinesActuator:
         '''
         assert self.in_progress is None or action is None or action == self.in_progress
 
+        if self.selecting:
+            # Continue SCV selection
+            return self._select_scv(raw_obs)
+
         if action == BuildMarinesAction.NO_OP:
             return actions.FUNCTIONS.no_op()
         if action == BuildMarinesAction.BUILD_DEPOT:
@@ -43,24 +48,23 @@ class BuildMarinesActuator:
 
     def _build_depot(self, raw_obs):
         self.in_progress = BuildMarinesAction.BUILD_DEPOT
-
-        if self.num_depots >= self.MAX_DEPOTS:
-            print('Reached maximum number of Supply Depots')
-            return self._conclude_sequence(raw_obs)
-
-        # NOTE Assumes selected has 1 element
-        selected = raw_obs.observation.single_select
-        if selected[0].unit_type != units.Terran.SCV.value:
-            return self._select_scv(raw_obs)
-        elif self.progress_stage == 0:
+        
+        if self.progress_stage == 0:
+            if self.num_depots >= self.MAX_DEPOTS:
+                print('Reached maximum number of Supply Depots')
+                return self._conclude_sequence(raw_obs)
+            minerals = raw_obs.observation.player.minerals
+            if minerals < self.DEPOT_COST:
+                print('Not enough minerals for Supply Depot')
+                return self._conclude_sequence(raw_obs)
             self.progress_stage += 1
+            return self._select_scv(raw_obs)
 
         if self.progress_stage == 1:
             available = raw_obs.observation.available_actions
             if actions.FUNCTIONS.Build_SupplyDepot_screen.id not in available:
                 print('Cannot build depot')
                 return self._conclude_sequence(raw_obs)
-            
             self.progress_stage += 1
             return self._place_depot(raw_obs, self.num_depots)
 
@@ -81,24 +85,19 @@ class BuildMarinesActuator:
         self.progress_stage = 0
         return self._select_cc(raw_obs)
 
-    # FIXME Sometimes misses an SCV
-    @staticmethod
-    def _select_scv(raw_obs):
+    def _select_scv(self, raw_obs):
         '''
         Select the leftmost SCV (SCVs on the left of the map are mining)
         '''
-        TOPLEFT_OFFSET = 2
-        BOTRIGHT_OFFSET = 4
+        MINING_TOPLEFT = (10, 19)
+        MINING_BOTRIGHT = (26, 48)
         
-        unit_types = raw_obs.observation.feature_screen.unit_type
-        scv_locations = np.transpose(np.nonzero(unit_types == units.Terran.SCV.value))
-        # Switch x-coordinate to be 1st
-        scv_locations = np.flip(scv_locations, 1)
-        select_point = np.amin(scv_locations, axis=0)
-        # Select center of SCV instead of corner
-        select_topleft = select_point - TOPLEFT_OFFSET
-        select_botright = select_point + BOTRIGHT_OFFSET
-        return actions.FUNCTIONS.select_rect('select', select_topleft, select_botright)
+        if not self.selecting:
+            self.selecting = True
+            return actions.FUNCTIONS.select_rect('select', MINING_TOPLEFT, MINING_BOTRIGHT)
+        else:
+            self.selecting = False
+            return actions.FUNCTIONS.select_unit('select', 0)
 
     @staticmethod
     def _select_cc(raw_obs):
@@ -128,11 +127,5 @@ class BuildMarinesActuator:
         '''
         Assuming an SCV is selected, queues it back to collecting minerals
         '''
-        CENTER_OFFSET = 2
-        
-        unit_types = raw_obs.observation.feature_screen.unit_type
-        mineral_locations = np.transpose(np.nonzero(unit_types == units.Neutral.MineralField.value))
-        mineral_location = np.flip(mineral_locations[0], 0)
-        # Select center of mineral instead of corner
-        mineral_location += CENTER_OFFSET
-        return actions.FUNCTIONS.Harvest_Gather_screen('queued', mineral_location)
+        MINERAL_LOCATION = (14, 14)
+        return actions.FUNCTIONS.Harvest_Gather_screen('queued', MINERAL_LOCATION)
