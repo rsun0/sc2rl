@@ -10,7 +10,7 @@ import torch
 import argparse
 
 def run_training():
-    render = True
+    render = False
     step_mul = 8
 
     env = BuildMarinesEnvironment(render=render, step_multiplier=step_mul)
