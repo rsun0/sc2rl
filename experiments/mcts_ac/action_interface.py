@@ -53,6 +53,8 @@ class BuildMarinesActuator:
             return actions.FUNCTIONS.no_op()
         if action == BuildMarinesAction.MAKE_SCV:
             return self._make_scv(obs)
+        if action == BuildMarinesAction.MAKE_MARINE:
+            return self._make_marine(obs)
         if action == BuildMarinesAction.BUILD_DEPOT:
             return self._build_depot(obs)
         if action == BuildMarinesAction.BUILD_BARRACKS:
@@ -104,6 +106,28 @@ class BuildMarinesActuator:
             return actions.FUNCTIONS.no_op()
         self.num_scvs += 1
         return actions.FUNCTIONS.Train_SCV_quick('now')
+    
+    def _make_marine(self, obs):
+        self.in_progress = BuildMarinesAction.MAKE_MARINE
+        selected = obs.observation.multi_select
+        if not all(s.unit_type == units.Terran.Barracks.value for s in selected):
+            if self.progress_stage > 0:
+                self._print_warning('No Barracks to select')
+                return self._conclude_sequence(obs)
+            self.progress_stage += 1
+            return self._select_barracks(obs)
+
+        self.in_progress = None
+        self.progress_stage = 0
+
+        if obs.observation.player.minerals < self.MARINE_COST:
+            self._print_warning('Not enough minerals for Marine')
+            return actions.FUNCTIONS.no_op()
+        available = obs.observation.available_actions
+        if actions.FUNCTIONS.Train_Marine_quick.id not in available:
+            self._print_warning('Train_Marine_quick not in available_actions')
+            return actions.FUNCTIONS.no_op()
+        return actions.FUNCTIONS.Train_Marine_quick('now')
 
     def _build_depot(self, obs):
         self.in_progress = BuildMarinesAction.BUILD_DEPOT
@@ -177,15 +201,18 @@ class BuildMarinesActuator:
         '''
         Select the command center
         '''
-        CENTER_OFFSET = 5
-        
-        unit_types = obs.observation.feature_screen.unit_type
-        cc_locations = np.transpose(np.nonzero(unit_types == units.Terran.CommandCenter.value))
-        # Switch x-coordinate to be 1st
-        cc_location = np.flip(cc_locations[0], axis=0)
-        # Select center of CC instead of corner
-        cc_location += CENTER_OFFSET
-        return actions.FUNCTIONS.select_point('select', cc_location)
+        CC_LOCATION = (35, 29)
+        return actions.FUNCTIONS.select_point('select', CC_LOCATION)
+
+    @staticmethod
+    def _select_barracks(obs):
+        '''
+        Select all barracks
+        '''
+        BARRACKS_LOCATION = BuildMarinesActuator.BARRACKS_LOCATIONS[0]
+
+        print('Selecting ', BARRACKS_LOCATION) 
+        return actions.FUNCTIONS.select_point('select_all_type', BARRACKS_LOCATION)
 
     @staticmethod
     def _queue_gather(obs):
