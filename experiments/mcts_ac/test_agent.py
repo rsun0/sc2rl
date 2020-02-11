@@ -10,19 +10,18 @@ class TestAgent(Agent):
         self.num_depots = 0
         self.num_barracks = 0
         self.num_scvs = 12
-        self.time = 0
         self.wait = 0
 
     def _sample(self, state):
         if self.wait > 0:
             self.wait -= 1
             return BuildMarinesAction.NO_OP
-        self.time += 1
-        if state.observation.player.minerals < 300:
+
+        if state.observation.player.minerals < 150:
             return BuildMarinesAction.NO_OP
-        if self.num_depots < 1:
+        if self.num_depots < 2:
             self.num_depots += 1
-            self.wait = 61
+            self.wait = 80
             return BuildMarinesAction.BUILD_DEPOT
         if self.num_barracks < 1:
             self.num_barracks += 1

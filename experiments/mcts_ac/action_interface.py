@@ -109,8 +109,12 @@ class BuildMarinesActuator:
     
     def _make_marine(self, obs):
         self.in_progress = BuildMarinesAction.MAKE_MARINE
-        selected = obs.observation.multi_select
-        if not all(s.unit_type == units.Terran.Barracks.value for s in selected):
+
+        single = obs.observation.single_select
+        multi = obs.observation.multi_select
+        single_selected = single[0].unit_type == units.Terran.Barracks.value
+        multi_selected = len(multi) > 0 and all(s.unit_type == units.Terran.Barracks.value for s in multi)
+        if not (single_selected or multi_selected):
             if self.progress_stage > 0:
                 self._print_warning('No Barracks to select')
                 return self._conclude_sequence(obs)
