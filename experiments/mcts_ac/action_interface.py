@@ -60,8 +60,7 @@ class BuildMarinesActuator:
         if action == BuildMarinesAction.BUILD_BARRACKS:
             return self._build_barracks(obs)
         if action == BuildMarinesAction.KILL_MARINE:
-            # TODO KILL_MARINE should be queued action, not now
-            pass
+            return self._kill_marine(obs)
 
         return actions.FUNCTIONS.no_op()
 
@@ -195,6 +194,21 @@ class BuildMarinesActuator:
         assert self.progress_stage == 3 
         self.num_barracks += 1
         return self._conclude_sequence(obs)
+    
+    def _kill_marine(self, obs):
+        self.in_progress = BuildMarinesAction.KILL_MARINE
+
+        multi = obs.observation.multi_select
+        if len(multi) == 0 or any(s.unit_type != units.Terran.Marine for s in multi):
+            if self.progress_stage > 0:
+                self._print_warning('Not enough Marines to select')
+                return self._conclude_sequence(obs)
+            self.progress_stage += 1
+            return actions.FUNCTIONS.select_army('select')
+
+        self.in_progress = None
+        self.progress_stage = 0
+        return self._attack_marine(obs)
 
     def _print_warning(self, msg):
         if self.verbose:
@@ -214,8 +228,6 @@ class BuildMarinesActuator:
         Select all barracks
         '''
         BARRACKS_LOCATION = BuildMarinesActuator.BARRACKS_LOCATIONS[0]
-
-        print('Selecting ', BARRACKS_LOCATION) 
         return actions.FUNCTIONS.select_point('select_all_type', BARRACKS_LOCATION)
 
     @staticmethod
@@ -241,3 +253,19 @@ class BuildMarinesActuator:
         '''
         build_location = BuildMarinesActuator.BARRACKS_LOCATIONS[location_index]
         return actions.FUNCTIONS.Build_Barracks_screen('now', build_location)
+
+    @staticmethod
+    def _attack_marine(obs):
+        '''
+        Queues an attack on a random Marine
+        '''
+        MIN_DENSITY = 16
+
+        marine_locations = obs.observation.feature_screen.unit_type == units.Terran.Marine.value
+        dense_locations = obs.observation.feature_screen.unit_density_aa >= MIN_DENSITY
+
+        marine_locations = np.logical_and(marine_locations, dense_locations)
+        marine_locations = np.flip(np.transpose(np.nonzero(marine_locations)), axis=1)
+        rand_index = np.random.randint(marine_locations.shape[0])
+        attack_location = marine_locations[rand_index]
+        return actions.FUNCTIONS.Attack_screen('queued', attack_location)

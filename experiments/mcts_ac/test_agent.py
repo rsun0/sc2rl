@@ -9,6 +9,7 @@ class TestAgent(Agent):
         # Intentionally bypassing parent constructor
         self.num_depots = 0
         self.num_barracks = 0
+        self.num_marines = 0
         self.num_scvs = 12
         self.wait = 0
 
@@ -23,10 +24,14 @@ class TestAgent(Agent):
             self.num_depots += 1
             self.wait = 80
             return BuildMarinesAction.BUILD_DEPOT
-        if self.num_barracks < 1:
+        if self.num_barracks < 7:
             self.num_barracks += 1
+            self.wait = 120
             return BuildMarinesAction.BUILD_BARRACKS
-        return BuildMarinesAction.MAKE_MARINE
+        if self.num_marines < 50:
+            self.num_marines += 1
+            return BuildMarinesAction.MAKE_MARINE
+        return BuildMarinesAction.KILL_MARINE
 
     def _forward(self, state):
         return self._sample(state)
