@@ -21,7 +21,7 @@ class BuildMarinesActuator:
     BARRACKS_LOCATIONS = ([(20 + 10*i, 60) for i in range(6)] + [(83, 60)]
         + [(52 + 10*i, 40) for i in range(4)])
     MAX_SCVS = 22
-    MAX_DEPOTS = 2
+    MAX_DEPOTS = 3
     MAX_BARRACKS = 11
 
     def __init__(self, verbose=True):
