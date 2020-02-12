@@ -62,6 +62,8 @@ class Experiment:
 
                 # Update scores
                 scores = [scores[a] + rewards[a] for a in range(len(self.agents))]
+                s = env_states[0].observation.score_cumulative.score
+                print('Env score:', s, 'Tracked score:', scores[0], 'Reward:', rewards[0])
                 # Push to agent Memories
                 for a in range(len(self.agents)):
                     self.agents[a].push_memory(states[a], actions[a], rewards[a], done)

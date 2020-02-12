@@ -10,8 +10,10 @@ import torch
 import argparse
 
 def run_training():
-    render = True
-    step_mul = 8
+    # FIXME reported score does not match render
+    # FIXME SCVs are not rallied at start on reset
+    render = False
+    step_mul = 16
 
     env = BuildMarinesEnvironment(render=render, step_multiplier=step_mul)
                                 

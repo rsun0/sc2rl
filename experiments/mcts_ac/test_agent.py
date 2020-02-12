@@ -6,17 +6,24 @@ from agent import Agent
 from action_interface import BuildMarinesAction
 
 class TestAgent(Agent):
+    NOT_SET = 999999
+
     def __init__(self):
         # Intentionally bypassing parent constructor
+        self.reset()
+
+    def reset(self):
         self.num_depots = 0
         self.num_barracks = 0
         self.num_scvs = 12
-        self.time_to_rax = -1
+        self.rax_done_at = self.NOT_SET
+
+    def push_memory_terminal(self, _):
+        self.reset()
 
     def _sample(self, state):
-        if self.time_to_rax > 0:
-            self.time_to_rax -= 1
         mins = state.observation.player.minerals
+        time = state.observation.game_loop[0]
 
         if mins < 50:
             if state.observation.player.food_army > 8:
@@ -36,13 +43,13 @@ class TestAgent(Agent):
         if self.num_barracks < 7 and state.observation.player.food_cap >= 23:
             if mins >= 150:
                 self.num_barracks += 1
-                if self.time_to_rax == -1:
-                    self.time_to_rax = 136
+                if self.rax_done_at == self.NOT_SET:
+                    self.rax_done_at = time + 1110
                 return BuildMarinesAction.BUILD_BARRACKS
             else:
                 return BuildMarinesAction.NO_OP
         
-        if self.time_to_rax == 0 and state.observation.player.food_used < state.observation.player.food_cap:
+        if time >= self.rax_done_at and state.observation.player.food_used < state.observation.player.food_cap:
             return BuildMarinesAction.MAKE_MARINE
         
         if self.num_depots < 3 and mins >= 100:
