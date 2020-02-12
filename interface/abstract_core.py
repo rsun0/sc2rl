@@ -82,7 +82,6 @@ class Experiment:
                     if len(scores) == 1:
                         scores = scores[0]
                         averages = averages[0]
-                    recent_mean = np.mean(scores_history)
                     if self.run_settings.verbose:
                         print("Game {} ended after {} steps. Game score: {}. Averages: {}"
                             .format(e+1, step, scores, averages))
