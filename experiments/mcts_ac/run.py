@@ -10,7 +10,6 @@ import torch
 import argparse
 
 def run_training():
-    # FIXME SCVs are not rallied at start on reset
     render = True
     step_mul = 16
 
@@ -27,7 +26,7 @@ def run_training():
     #                             eps_min,
     #                             eps_duration)
     
-    num_episodes = 5
+    num_episodes = 10
     num_epochs = 1
     batch_size = 32
     train_every = 9999

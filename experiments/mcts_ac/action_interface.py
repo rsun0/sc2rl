@@ -4,6 +4,7 @@ import numpy as np
 
 
 class BuildMarinesAction(Enum):
+    RALLY_SCVS = -1
     NO_OP = 0
     MAKE_SCV = 1
     MAKE_MARINE = 2
@@ -49,6 +50,8 @@ class BuildMarinesActuator:
             # Continue SCV selection
             return self._select_scv(obs)
 
+        if action == BuildMarinesAction.RALLY_SCVS:
+            return self._rally_scvs(obs)
         if action == BuildMarinesAction.NO_OP:
             return actions.FUNCTIONS.no_op()
         if action == BuildMarinesAction.MAKE_SCV:
@@ -72,6 +75,25 @@ class BuildMarinesActuator:
         self.in_progress = None
         self.progress_stage = 0
         return self._select_cc(obs)
+
+    def _rally_scvs(self, obs):
+        '''
+        Send all idle SCVs to mine
+        '''
+        self.in_progress = BuildMarinesAction.RALLY_SCVS
+
+        single = obs.observation.single_select
+        multi = obs.observation.multi_select
+        single_selected = single[0].unit_type == units.Terran.SCV.value
+        multi_selected = len(multi) > 0 and all(s.unit_type == units.Terran.SCV.value for s in multi)
+        if not (single_selected or multi_selected):
+            return actions.FUNCTIONS.select_idle_worker('select_all')
+
+        if self.progress_stage == 0:
+            self.progress_stage += 1
+            return self._queue_gather(obs)
+
+        return self._conclude_sequence(obs)
 
     def _select_scv(self, obs):
         '''
@@ -237,6 +259,15 @@ class BuildMarinesActuator:
         '''
         MINERAL_LOCATION = (14, 14)
         return actions.FUNCTIONS.Harvest_Gather_screen('queued', MINERAL_LOCATION)
+
+        # CENTER_OFFSET = 2
+        
+        # unit_types = obs.observation.feature_screen.unit_type
+        # mineral_locations = np.transpose(np.nonzero(unit_types == units.Neutral.MineralField.value))
+        # mineral_location = np.flip(mineral_locations[0], 0)
+        # # Select center of mineral instead of corner
+        # mineral_location += CENTER_OFFSET
+        # return actions.FUNCTIONS.Harvest_Gather_screen('queued', mineral_location)
 
     @staticmethod
     def _place_depot(obs, location_index):

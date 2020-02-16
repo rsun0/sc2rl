@@ -48,6 +48,8 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self._accumulated_reward = 0
 
         self._reset_env()
+        self._run_helpers()
+        
         self._terminal = self._curr_frame.last()
         agent_obs = self._curr_frame
 
@@ -67,9 +69,19 @@ class BuildMarinesEnvironment(CustomEnvironment):
         action = BuildMarinesAction(action)
 
         self._run_to_next(action)
+        self._run_helpers()
+        
         self._terminal = self._curr_frame.last()
         agent_obs = self._curr_frame
         return [agent_obs], [self._accumulated_reward], self._curr_frame.last(), [None]
+
+    def _run_helpers(self):
+        checks_cleared = False
+        while not checks_cleared:
+            checks_cleared = True
+            if self._curr_frame.observation.player.idle_worker_count > 0:
+                checks_cleared = False
+                self._run_to_next(BuildMarinesAction.RALLY_SCVS)
 
     def _run_to_next(self, start_action):
         raw_action = self._actuator.compute_action(start_action, self._curr_frame)
@@ -84,12 +96,11 @@ class BuildMarinesEnvironment(CustomEnvironment):
     
     def _reset_env(self):
         self._prev_frame = self._curr_frame
-            # Get obs for 1st agent
+        # Get obs for 1st agent
         self._curr_frame = self._env.reset()[0]
         self._accumulated_reward += self._curr_frame.reward
 
     def _step_env(self, raw_action):
-        # TODO check self._curr_frame.observation.game_loop and print action
         self._prev_frame = self._curr_frame
         try:
             # Get obs for 1st agent
