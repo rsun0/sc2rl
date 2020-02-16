@@ -10,7 +10,6 @@ import torch
 import argparse
 
 def run_training():
-    # FIXME reported score does not match render
     # FIXME SCVs are not rallied at start on reset
     render = False
     step_mul = 16

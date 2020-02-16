@@ -36,6 +36,7 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self._prev_frame = None
         self._curr_frame = None
         self._terminal = True
+        self._accumulated_reward = 0
 
     def reset(self):
         '''
@@ -44,12 +45,13 @@ class BuildMarinesEnvironment(CustomEnvironment):
         '''
         self._actuator.reset()
         self._terminal = False
+        self._accumulated_reward = 0
 
         self._reset_env()
         self._terminal = self._curr_frame.last()
         agent_obs = self._curr_frame
 
-        return [agent_obs], [self._curr_frame.reward], self._curr_frame.last(), [None]
+        return [agent_obs], [self._accumulated_reward], self._curr_frame.last(), [None]
 
     def step(self, action_list):
         '''
@@ -58,6 +60,7 @@ class BuildMarinesEnvironment(CustomEnvironment):
         :returns: Observations, reward, terminal, None
         '''
         assert not self._terminal, 'Environment must be reset after init or terminal'
+        self._accumulated_reward = 0
         
         action = action_list[0]
         # Convert to Enum
@@ -66,7 +69,7 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self._run_to_next(action)
         self._terminal = self._curr_frame.last()
         agent_obs = self._curr_frame
-        return [agent_obs], [self._curr_frame.reward], self._curr_frame.last(), [None]
+        return [agent_obs], [self._accumulated_reward], self._curr_frame.last(), [None]
 
     def _run_to_next(self, start_action):
         raw_action = self._actuator.compute_action(start_action, self._curr_frame)
@@ -83,11 +86,14 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self._prev_frame = self._curr_frame
             # Get obs for 1st agent
         self._curr_frame = self._env.reset()[0]
+        self._accumulated_reward += self._curr_frame.reward
 
     def _step_env(self, raw_action):
         self._prev_frame = self._curr_frame
         try:
             # Get obs for 1st agent
             self._curr_frame = self._env.step([raw_action])[0]
+            self._accumulated_reward += self._curr_frame.reward
         except protocol.ConnectionError:
             self._curr_frame = self._env.reset()[0]
+            self._accumulated_reward += self._curr_frame.reward
