@@ -11,27 +11,13 @@ class BuildMarinesEnvironment(CustomEnvironment):
 
     def __init__(self, render=False, step_multiplier=None):
         '''
-        Initializes internal pysc2 environment
         :param render: Whether to render the game
         :param step_multiplier: Step multiplier for pysc2 environment
         '''
 
-        import sys
-        from absl import flags
-        FLAGS = flags.FLAGS
-        FLAGS(sys.argv)
+        self.render = render
+        self.step_multiplier = step_multiplier
 
-        self._env = sc2_env.SC2Env(
-            map_name=self.MAP,
-            agent_interface_format=features.AgentInterfaceFormat(
-                feature_dimensions=features.Dimensions(
-                    screen=self.SCREEN_SIZE, minimap=self.MINIMAP_SIZE),
-                use_feature_units=True
-            ),
-            step_mul=step_multiplier,
-            visualize=render,
-            game_steps_per_episode=None
-        )
         self._actuator = BuildMarinesActuator()
         self._prev_frame = None
         self._curr_frame = None
@@ -43,6 +29,8 @@ class BuildMarinesEnvironment(CustomEnvironment):
         Resets the environment for a new episode
         :returns: Observations, reward, terminal, None for start state
         '''
+        self._create_env()
+
         self._actuator.reset()
         self._terminal = False
         self._accumulated_reward = 0
@@ -74,6 +62,27 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self._terminal = self._curr_frame.last()
         agent_obs = self._curr_frame
         return [agent_obs], [self._accumulated_reward], self._curr_frame.last(), [None]
+
+    def _create_env(self):
+        '''
+        Initializes internal pysc2 environment
+        '''
+        import sys
+        from absl import flags
+        FLAGS = flags.FLAGS
+        FLAGS(sys.argv)
+
+        self._env = sc2_env.SC2Env(
+            map_name=self.MAP,
+            agent_interface_format=features.AgentInterfaceFormat(
+                feature_dimensions=features.Dimensions(
+                    screen=self.SCREEN_SIZE, minimap=self.MINIMAP_SIZE),
+                use_feature_units=True
+            ),
+            step_mul=self.step_multiplier,
+            visualize=self.render,
+            game_steps_per_episode=None
+        )
 
     def _run_helpers(self):
         checks_cleared = False
