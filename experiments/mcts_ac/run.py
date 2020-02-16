@@ -11,7 +11,7 @@ import argparse
 
 def run_training():
     # FIXME SCVs are not rallied at start on reset
-    render = False
+    render = True
     step_mul = 16
 
     env = BuildMarinesEnvironment(render=render, step_multiplier=step_mul)
@@ -27,7 +27,7 @@ def run_training():
     #                             eps_min,
     #                             eps_duration)
     
-    num_episodes = 1
+    num_episodes = 5
     num_epochs = 1
     batch_size = 32
     train_every = 9999

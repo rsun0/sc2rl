@@ -89,11 +89,11 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self._accumulated_reward += self._curr_frame.reward
 
     def _step_env(self, raw_action):
+        # TODO check self._curr_frame.observation.game_loop and print action
         self._prev_frame = self._curr_frame
         try:
             # Get obs for 1st agent
             self._curr_frame = self._env.step([raw_action])[0]
-            self._accumulated_reward += self._curr_frame.reward
         except protocol.ConnectionError:
             self._curr_frame = self._env.reset()[0]
-            self._accumulated_reward += self._curr_frame.reward
+        self._accumulated_reward += self._curr_frame.reward
