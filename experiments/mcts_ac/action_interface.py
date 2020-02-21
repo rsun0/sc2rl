@@ -232,9 +232,9 @@ class BuildMarinesActuator:
         self.progress_stage = 0
         return self._attack_marine(obs)
 
-    def _print_warning(self, msg):
+    def _print_warning(self, *msg):
         if self.verbose:
-            print(msg)
+            print(*msg)
 
     @staticmethod
     def _select_cc(obs):

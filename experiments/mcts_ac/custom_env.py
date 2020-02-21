@@ -1,7 +1,8 @@
-from pysc2.env import sc2_env
-from pysc2.lib import features, protocol
-from action_interface import BuildMarinesAction, BuildMarinesActuator
 from enum import Enum
+import numpy as np
+from pysc2.env import sc2_env
+from pysc2.lib import features, protocol, units
+from action_interface import BuildMarinesAction, BuildMarinesActuator
 from abstract_core import CustomEnvironment
 
 class BuildMarinesEnvironment(CustomEnvironment):
@@ -9,14 +10,23 @@ class BuildMarinesEnvironment(CustomEnvironment):
     MINIMAP_SIZE = 1
     MAP = 'BuildMarines'
 
-    def __init__(self, render=False, step_multiplier=None):
+    def __init__(self,
+            render=False,
+            step_multiplier=None,
+            enable_scv_helper=True,
+            enable_kill_helper=True,
+        ):
         '''
         :param render: Whether to render the game
         :param step_multiplier: Step multiplier for pysc2 environment
+        :param enable_scv_helper: Auto-make SCVs
+        :param enable_kill_helper: Auto-kill Marines
         '''
 
         self.render = render
         self.step_multiplier = step_multiplier
+        self.enable_scv_helper = enable_scv_helper
+        self.enable_kill_helper = enable_kill_helper
 
         self._actuator = BuildMarinesActuator()
         self._prev_frame = None
@@ -91,6 +101,12 @@ class BuildMarinesEnvironment(CustomEnvironment):
             if self._curr_frame.observation.player.idle_worker_count > 0:
                 checks_cleared = False
                 self._run_to_next(BuildMarinesAction.RALLY_SCVS)
+            if self.enable_scv_helper and self._should_make_scv(self._curr_frame):
+                checks_cleared = False
+                self._run_to_next(BuildMarinesAction.MAKE_SCV)
+            if self.enable_kill_helper and self._should_kill_marine(self._curr_frame):
+                checks_cleared = False
+                self._run_to_next(BuildMarinesAction.KILL_MARINE)
 
     def _run_to_next(self, start_action):
         raw_action = self._actuator.compute_action(start_action, self._curr_frame)
@@ -117,3 +133,34 @@ class BuildMarinesEnvironment(CustomEnvironment):
         except protocol.ConnectionError:
             self._curr_frame = self._env.reset()[0]
         self._accumulated_reward += self._curr_frame.reward
+
+    @staticmethod
+    def _should_make_scv(obs):
+        '''
+        Checks if an SCV should be made
+        (enough minerals, not supply blocked, less than optimal number,
+        no SCV queued or CC not selected)
+        '''
+        if (obs.observation.player.minerals < BuildMarinesActuator.SCV_COST
+                or obs.observation.player.food_used == obs.observation.player.food_cap
+                or obs.observation.player.food_workers >= BuildMarinesActuator.MAX_SCVS):
+            return False
+        if obs.observation.single_select[0].unit_type != units.Terran.CommandCenter.value:
+            return True
+        return len(obs.observation.build_queue) == 0
+
+    @staticmethod
+    def _should_kill_marine(obs):
+        '''
+        Checks if an attack should be queued (less than 50 minerals, enough marines)
+        '''
+        PIXELS_PER_RAX = 110
+
+        rax_pixels = np.sum(obs.observation.feature_screen.unit_type == units.Terran.Barracks.value)
+        num_rax = rax_pixels // PIXELS_PER_RAX
+        num_marines = obs.observation.player.food_army - num_rax
+        multiple_marines = num_marines >= 2
+
+        few_mins = obs.observation.player.minerals < BuildMarinesActuator.MARINE_COST
+        capped = obs.observation.player.food_used == obs.observation.player.food_cap
+        return multiple_marines and (few_mins or capped)
