@@ -48,10 +48,9 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self._reset_env()
         self._run_helpers()
         
-        self._terminal = self._curr_frame.last()
         agent_obs = self._curr_frame
 
-        return [agent_obs], [self._accumulated_reward], self._curr_frame.last(), [None]
+        return [agent_obs], [self._accumulated_reward], self._terminal, [None]
 
     def step(self, action_list):
         '''
@@ -69,9 +68,8 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self._run_to_next(action)
         self._run_helpers()
         
-        self._terminal = self._curr_frame.last()
         agent_obs = self._curr_frame
-        return [agent_obs], [self._accumulated_reward], self._curr_frame.last(), [None]
+        return [agent_obs], [self._accumulated_reward], self._terminal, [None]
 
     def _create_env(self):
         '''
@@ -113,7 +111,8 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self._step_env(raw_action)
         
         while self._actuator.in_progress is not None:
-            if self._curr_frame.last():
+            if self._terminal:
+                print('Exiting _run_to_next early')
                 return
 
             raw_action = self._actuator.compute_action(start_action, self._curr_frame)
@@ -124,6 +123,9 @@ class BuildMarinesEnvironment(CustomEnvironment):
         # Get obs for 1st agent
         self._curr_frame = self._env.reset()[0]
         self._accumulated_reward += self._curr_frame.reward
+        if self._curr_frame.last():
+            self._terminal = True
+            print('Terminal:', self._terminal)
 
     def _step_env(self, raw_action):
         self._prev_frame = self._curr_frame
@@ -133,6 +135,9 @@ class BuildMarinesEnvironment(CustomEnvironment):
         except protocol.ConnectionError:
             self._curr_frame = self._env.reset()[0]
         self._accumulated_reward += self._curr_frame.reward
+        if self._curr_frame.last():
+            self._terminal = True
+            print('Terminal:', self._terminal)
 
     @staticmethod
     def _should_make_scv(obs):

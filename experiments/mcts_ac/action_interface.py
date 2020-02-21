@@ -44,7 +44,8 @@ class BuildMarinesActuator:
         :param obs: Observations from pysc2
         :returns: The raw action to return to environment
         '''
-        assert self.in_progress is None or action is None or action == self.in_progress
+        assert self.in_progress is None or action is None or action == self.in_progress,
+            'self.in_progress ' + str(self.in_progress) + ', action ' + str(action)
 
         if self.selecting:
             # Continue SCV selection
@@ -117,6 +118,7 @@ class BuildMarinesActuator:
         self.in_progress = None
         if self.num_scvs >= self.MAX_SCVS:
             self._print_warning('Reached maximum number of SCVs')
+            self._print_warning(self)
             return actions.FUNCTIONS.no_op()
         if obs.observation.player.minerals < self.SCV_COST:
             self._print_warning('Not enough minerals for SCV')
@@ -301,3 +303,7 @@ class BuildMarinesActuator:
         rand_index = np.random.randint(marine_locations.shape[0])
         attack_location = marine_locations[rand_index]
         return actions.FUNCTIONS.Attack_screen('queued', attack_location)
+
+    def __str__(self):
+        return ('SCVs: ' + str(self.num_scvs) + ', Depots: ' + str(self.num_depots)
+            + ', Rax: ' + str(self.num_barracks))
