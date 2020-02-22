@@ -26,8 +26,8 @@ class TestAgent(Agent):
         time = state.observation.game_loop[0]
 
         if mins < 50:
-            if state.observation.player.food_army > 8:
-                return BuildMarinesAction.KILL_MARINE
+            # if state.observation.player.food_army > 8:
+            #     return BuildMarinesAction.KILL_MARINE
             return BuildMarinesAction.NO_OP
 
         # if self.num_scvs < 22:
@@ -56,8 +56,8 @@ class TestAgent(Agent):
             self.num_depots += 1
             return BuildMarinesAction.BUILD_DEPOT
         
-        if state.observation.player.food_army > 8:
-            return BuildMarinesAction.KILL_MARINE
+        # if state.observation.player.food_army > 8:
+        #     return BuildMarinesAction.KILL_MARINE
         return BuildMarinesAction.NO_OP
 
     def _forward(self, state):
