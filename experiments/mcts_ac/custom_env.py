@@ -48,9 +48,7 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self._reset_env()
         self._run_helpers()
         
-        agent_obs = self._curr_frame
-
-        return [agent_obs], [self._accumulated_reward], self._terminal, [None]
+        return [self._curr_frame], [self._accumulated_reward], self._terminal, [None]
 
     def step(self, action_list):
         '''
@@ -68,8 +66,7 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self._run_to_next(action)
         self._run_helpers()
         
-        agent_obs = self._curr_frame
-        return [agent_obs], [self._accumulated_reward], self._terminal, [None]
+        return [self._curr_frame], [self._accumulated_reward], self._terminal, [None]
 
     def _create_env(self):
         '''
@@ -94,7 +91,7 @@ class BuildMarinesEnvironment(CustomEnvironment):
 
     def _run_helpers(self):
         checks_cleared = False
-        while not checks_cleared:
+        while not checks_cleared and not self._terminal:
             checks_cleared = True
             if self._curr_frame.observation.player.idle_worker_count > 0:
                 checks_cleared = False
@@ -107,12 +104,12 @@ class BuildMarinesEnvironment(CustomEnvironment):
                 self._run_to_next(BuildMarinesAction.KILL_MARINE)
 
     def _run_to_next(self, start_action):
+        assert not self._terminal, 'Entered _run_to_next at terminal'
         raw_action = self._actuator.compute_action(start_action, self._curr_frame)
         self._step_env(raw_action)
         
         while self._actuator.in_progress is not None:
             if self._terminal:
-                print('Exiting _run_to_next early')
                 return
 
             raw_action = self._actuator.compute_action(start_action, self._curr_frame)
@@ -125,7 +122,6 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self._accumulated_reward += self._curr_frame.reward
         if self._curr_frame.last():
             self._terminal = True
-            print('Terminal:', self._terminal)
 
     def _step_env(self, raw_action):
         self._prev_frame = self._curr_frame
@@ -137,7 +133,6 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self._accumulated_reward += self._curr_frame.reward
         if self._curr_frame.last():
             self._terminal = True
-            print('Terminal:', self._terminal)
 
     @staticmethod
     def _should_make_scv(obs):
