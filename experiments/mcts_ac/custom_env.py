@@ -3,7 +3,6 @@ from enum import Enum
 import numpy as np
 from pysc2.env import sc2_env
 from pysc2.lib import features, protocol, units
-from absl import logging
 
 from action_interface import BuildMarinesAction, BuildMarinesActuator
 from abstract_core import CustomEnvironment
@@ -80,7 +79,6 @@ class BuildMarinesEnvironment(CustomEnvironment):
         FLAGS = flags.FLAGS
         FLAGS(sys.argv)
 
-        # TODO suppress absl.logging
         self._env = sc2_env.SC2Env(
             map_name=self.MAP,
             agent_interface_format=features.AgentInterfaceFormat(
