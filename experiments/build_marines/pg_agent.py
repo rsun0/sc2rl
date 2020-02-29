@@ -12,6 +12,7 @@ from agent import Agent, Memory
 from action_interface import BuildMarinesAction
 
 NUM_ACTIONS = len(list(BuildMarinesAction))
+NUM_CHANNELS = 
 
 
 class PolicyGradientMemory(Memory):
@@ -93,8 +94,13 @@ class PolicyGradientAgent(Agent):
 
     # TODO change state converter, check paper
     def state_space_converter(self, obs):
-        # feature screen unit_type
-        # feature screen build_progress
+        state = np.zeros((NUM_CHANNELS, board.shape[0], board.shape[1]), dtype=int)
+        state_idx = 0
+
+        state[state_idx] = obs.observation.feature_screen.unit_type
+        state_idx += 1
+        state[state_idx] = obs.observation.feature_screen.build_progress
+        state_idx += 1
         
         # minerals
         # food used
@@ -104,7 +110,7 @@ class PolicyGradientAgent(Agent):
         # idle worker count
         # army_count
 
-        # build queue
+        # len build queue
         return obs
 
     def action_space_converter(self, action):

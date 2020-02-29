@@ -22,6 +22,7 @@ class TestAgent(Agent):
         self.reset()
 
     def _sample(self, state):
+        print(state.observation.feature_screen.build_progress)
         mins = state.observation.player.minerals
         time = state.observation.game_loop[0]
 
