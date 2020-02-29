@@ -3,14 +3,14 @@ import json
 import torch
 import numpy as np
 from tqdm import tqdm
-from pommerman import constants
 
 import sys
 sys.path.insert(0, "../interface/")
 
 from agent import Agent
+from action_interface import BuildMarinesAction
 
-NUM_ACTIONS = len(constants.Action)
+NUM_ACTIONS = len(list(BuildMarinesAction))
 
 
 class PolicyGradientAgent(Agent):
@@ -20,7 +20,7 @@ class PolicyGradientAgent(Agent):
 
     def _sample(self, state):
         probs = self._forward(state)
-        action = np.random.choice(6, p=probs)
+        action = np.random.choice(NUM_ACTIONS, p=probs)
         return action
 
     def _forward(self, state):
@@ -84,36 +84,21 @@ class PolicyGradientAgent(Agent):
     def push_memory(self, state, action, reward, done):
         self.memory.push(state, action, reward, done)
 
+    # TODO change state converter, check paper
     def state_space_converter(self, obs):
-        to_use = [0, 1, 2, 3, 4, 6, 7, 8, 10, 11]
- 
-        board = obs['board'] # 0-4, 6-8, 10-11 [10 total]
-        bomb_life = obs['bomb_life'] # 11
-        bomb_moving_direction = obs['bomb_moving_direction'] #12
-        flame_life = obs['flame_life'] #13
+        # feature screen unit_type
+        # feature screen build_progress
+        
+        # minerals
+        # food used
+        # food cap
+        # food army
+        # food workers
+        # idle worker count
+        # army_count
 
-        images = np.zeros((13, board.shape[0], board.shape[1]))
-        for i in range(len(to_use)):
-            images[i] = (board == to_use[i]).astype(int)
-        images[10] = bomb_life 
-        images[11] = bomb_moving_direction 
-        images[12] = flame_life 
-
-        scalars = []
-        scalar_items = ['ammo', 'blast_strength', 'can_kick']
-        agents = obs['json_info']['agents'] # array of dictionaries as a string
-       
-        i = agents.find('}')
-        agent1 = json.loads(obs['json_info']['agents'][1:i+1])
-        agent2 = json.loads(obs['json_info']['agents'][i+2:-1]) 
-
-        for agent in [agent1, agent2]:
-            for scalar_item in scalar_items:
-                scalars.append(agent[scalar_item])
-
-        scalars = np.array(scalars)
-
-        return images, scalars
+        # build queue
+        return obs
 
     def action_space_converter(self, action):
         return action

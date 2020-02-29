@@ -7,6 +7,7 @@ from pysc2.lib import features, protocol, units
 from action_interface import BuildMarinesAction, BuildMarinesActuator
 from abstract_core import CustomEnvironment
 
+# TODO record build queue for both CC and rax
 class BuildMarinesEnvironment(CustomEnvironment):
     SCREEN_SIZE = 84
     MINIMAP_SIZE = 1
