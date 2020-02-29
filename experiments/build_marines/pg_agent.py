@@ -1,4 +1,5 @@
 import json
+import collections
 
 import torch
 import numpy as np
@@ -7,16 +8,46 @@ from tqdm import tqdm
 import sys
 sys.path.insert(0, "../interface/")
 
-from agent import Agent
+from agent import Agent, Memory
 from action_interface import BuildMarinesAction
 
 NUM_ACTIONS = len(list(BuildMarinesAction))
+
+
+class PolicyGradientMemory(Memory):
+    def __init__(self, buffer_len, discount):
+        self.experiences = collections.deque(maxlen=buffer_len)
+        self.discount = discount
+        self.current_trajectory = []
+
+    def push(self, state, action, reward, done):
+        state, env_state = state
+        self.current_trajectory.append((state, action, env_state))
+        
+        if done:
+            rewards = []
+            r = reward
+            for i in range(len(self.current_trajectory)):
+                rewards.append(r)
+                r *= self.discount
+            rewards.reverse()
+
+            states, actions, env_states = zip(*self.current_trajectory)
+
+            trajectory = zip(states, actions, rewards, env_states)
+            self.experiences.extend(trajectory)
+            self.current_trajectory = []
+
+    def get_data(self):
+        return list(self.experiences)
 
 
 class PolicyGradientAgent(Agent):
     def __init__(self, save_file=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.save_file = save_file
+
+        self.train_count = 0
 
     def _sample(self, state):
         probs = self._forward(state)
@@ -31,40 +62,16 @@ class PolicyGradientAgent(Agent):
         return probs
 
     def train(self, run_settings):
-        batch_size = run_settings.batch_size
-        self.model.train()
         data = self.memory.get_data()
-        running_loss = 0
-        pbar = tqdm(range(0, len(data) - batch_size + 1, batch_size))
-        for i in pbar:
-            batch = data[i:i+batch_size]
-            states, actions, rewards = zip(*batch)
-            images, scalars = zip(*states)
-
-            images_batch = np.stack(images)
-            scalars_batch = np.stack(scalars)
-            actions_batch = np.array(actions)
-            rewards_batch = torch.from_numpy(np.array(rewards))
-
-            actions_onehot = np.zeros((actions_batch.shape[0], NUM_ACTIONS))
-            actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
-            actions_onehot = torch.from_numpy(actions_onehot)
-
-            preds = self.model((images_batch, scalars_batch))
-            log_probs = torch.nn.functional.log_softmax(preds, dim=1)
-            log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
-            loss = -torch.sum(log_probs_observed * rewards_batch)
-
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
-
-            running_loss += loss.item()
-            num_experiences = i + batch_size
-            pbar.set_postfix_str("{:.3f}L".format(running_loss / num_experiences))
-        pbar.close()
-        # Throw away used experiences?
-        # self.experiences = []
+        batch_size = run_settings.batch_size
+        loss = self.model.optimize(
+            data, batch_size, self.optimizer, self.settings.verbose)
+        
+        if self.train_count == 0:
+            print('ITR', 'LOSS', sep='\t')
+        print(f'{self.train_count:02d}', f'{100*loss:04.1f}', sep='\t')
+        sys.stdout.flush()
+        self.train_count += 1
 
     def train_step(self, batch_size):
         pass

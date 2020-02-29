@@ -7,7 +7,7 @@ from torch import nn
 from tqdm import tqdm
 
 from agent import Model
-from mcts_agent import MCTSAgent
+from pg_agent import NUM_ACTIONS
 
 
 class ResBlock(nn.Module):
@@ -30,15 +30,15 @@ class ResBlock(nn.Module):
         return out
 
 
-class ActorCriticNet(nn.Module, Model):
+class PolicyGradientNet(nn.Module, Model):
     def __init__(self,
-            board_size,
+            screen_size,
             in_channels,
             num_blocks=4,
             channels=32,
-            num_actions=6):
+            num_actions=NUM_ACTIONS):
         super().__init__()
-        self.board_size = board_size
+        self.screen_size = screen_size
         self.in_channels = in_channels
         self.num_actions = num_actions
 
@@ -55,151 +55,61 @@ class ActorCriticNet(nn.Module, Model):
             nn.BatchNorm2d(4),
             nn.ReLU(),
         ])
-        self.shared_convs = nn.Sequential(*convs)
+        self.convs = nn.Sequential(*convs)
         
-        fc_h = 4 * board_size ** 2
-        self.shared_fcs = nn.Sequential(
+        fc_h = 4 * screen_size ** 2
+        self.fc = nn.Sequential(
             nn.Linear(fc_h, fc_h),
             nn.BatchNorm1d(fc_h),
-            nn.ReLU()
-        )
-
-        self.actor = nn.Sequential(
+            nn.ReLU(),
             nn.Linear(fc_h, fc_h),
             nn.BatchNorm1d(fc_h),
             nn.ReLU(),
             nn.Linear(fc_h, num_actions)
         )
 
-        self.critic = nn.Sequential(
-            nn.Linear(fc_h, fc_h),
-            nn.BatchNorm1d(fc_h),
-            nn.ReLU(),
-            nn.Linear(fc_h, 1),
-            nn.Tanh(),
-        )
-
-        self.actor_criterion = nn.CrossEntropyLoss()
-        self.critic_criterion = nn.MSELoss()
-
     def forward(self, state):
         if isinstance(state, np.ndarray):
             state = torch.from_numpy(state).type(torch.FloatTensor)
-        x = self.shared_convs(state)
+        x = self.convs(state)
         x = torch.flatten(x, start_dim=1)
-        x = self.shared_fcs(x)
-        policy_scores = self.actor(x)
-        vals = self.critic(x)
-        return policy_scores, vals
+        policy_scores = self.fc(x)
+        return policy_scores
 
-    def get_batched_greedy_actions(self, batched_env_states, env):
-        self.eval()
-        agent_id = env.training_agent
-        # Preserve existing state of env
-        saved_state = env.get_json_info()
-
-        batched_greedy_actions = []
-        for env_states in batched_env_states:
-            greedy_actions = np.empty(len(env_states), dtype=int)
-            for i, env_state in enumerate(env_states):
-                next_states = np.empty((self.num_actions, self.in_channels, self.board_size, self.board_size))
-
-                MCTSAgent.set_state(env, env_state)
-                obs = env.get_observations()
-                actions = env.act(obs)
-                actions.insert(agent_id, None)
-
-                terminal = np.full(self.num_actions, False)
-                terminal_rewards = np.empty(self.num_actions)
-                for a in range(self.num_actions):
-                    actions[env.training_agent] = a
-                    obs, rewards, done, _ = env.step(actions)
-                    if done:
-                        terminal[a] = True
-                        terminal_rewards[a] = rewards[agent_id]
-                    state, _ = MCTSAgent.state_space_converter(obs[agent_id])
-                    next_states[a] = state
-
-                    MCTSAgent.set_state(env, env_state)
-
-                if terminal.all():
-                    vals = terminal_rewards
-                else:
-                    _, vals = self(next_states)
-                    vals = vals.detach().numpy()[:, 0]
-                    # Replace vals with reward if terminal
-                    vals[terminal] = terminal_rewards[terminal]
-                greedy_actions[i] = np.argmax(vals)
-            batched_greedy_actions.append(greedy_actions)
-        
-        # Restore existing state from before training
-        MCTSAgent.set_state(env, saved_state)
-        return batched_greedy_actions
-
-    def optimize(self, data, batch_size, optimizer, env, verbose=False):
+    def optimize(self, data, batch_size, optimizer, verbose=False):
         if len(data) < 2:
             # Need at least 2 data points for batch norm
-            return -1, -1, -1, -1
-
-        self.train()
-        dtype = next(self.parameters()).type()
+            return None
         
-        batched_env_states = []
-        batched_states = []
-        pbar = tqdm(range(0, len(data), batch_size), disable=(not verbose))
-        critic_running_loss = 0
-        critic_running_acc = 0
-        for i in pbar:
-            batch = data[i:i + batch_size]
-            if len(batch) == 1:
-                # Batch norm will fail
-                break
-            
-            raw_states, _, raw_true_vals, env_states = zip(*batch)
-            states = torch.from_numpy(np.stack(raw_states)).type(dtype)
-            true_vals = torch.from_numpy(np.array(raw_true_vals)[:, np.newaxis]).type(dtype)
-
-            optimizer.zero_grad()
-            _, vals = self(states)
-            loss = self.critic_criterion(vals, true_vals)
-            loss.backward()
-            optimizer.step()
-
-            critic_running_loss += loss.item()
-            pred_wins = torch.sign(vals)
-            wins = torch.sign(true_vals)
-            correct = (pred_wins == wins).type(torch.FloatTensor)
-            critic_running_acc += torch.mean(correct).item()
-
-            batched_env_states.append(env_states)
-            batched_states.append(states)
-
-        batched_greedy_actions = self.get_batched_greedy_actions(batched_env_states, env)
-        assert len(batched_states) == len(batched_greedy_actions), \
-            (len(batched_states), len(batched_greedy_actions))
-        # get_batched_greedy_actions calls eval()
         self.train()
-        pbar = tqdm(zip(batched_states, batched_greedy_actions),
-            total=len(batched_states), disable=(not verbose))
-        actor_running_loss = 0
-        actor_running_acc = 0
-        for states, greedy_actions in pbar:
-            greedy_actions = torch.from_numpy(greedy_actions)
+        running_loss = 0
+        pbar = tqdm(range(0, len(data) - batch_size + 1, batch_size))
+        for i in pbar:
+            batch = data[i:i+batch_size]
+            states, actions, rewards = zip(*batch)
 
-            optimizer.zero_grad()
-            pi_scores, _ = self(states)
-            loss = self.actor_criterion(pi_scores, greedy_actions)
+            states_batch = np.stack(states)
+            actions_batch = np.array(actions)
+            rewards_batch = torch.from_numpy(np.array(rewards))
+
+            actions_onehot = np.zeros((actions_batch.shape[0], NUM_ACTIONS))
+            actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
+            actions_onehot = torch.from_numpy(actions_onehot)
+
+            preds = self.model(states_batch)
+            log_probs = torch.nn.functional.log_softmax(preds, dim=1)
+            log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
+            loss = -torch.sum(log_probs_observed * rewards_batch)
+
+            self.optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
+            self.optimizer.step()
 
-            actor_running_loss += loss.item()
-            pred_actions = torch.argmax(pi_scores, dim=1)
-            correct = (pred_actions == greedy_actions).type(torch.FloatTensor)
-            actor_running_acc += torch.mean(correct).item()
+            running_loss += loss.item()
+            num_experiences = i + batch_size
+            pbar.set_postfix_str("{:.3f}L".format(running_loss / num_experiences))
+        pbar.close()
 
         num_batches = np.ceil(len(data) / batch_size)
-        avg_critic_loss = critic_running_loss / num_batches
-        avg_critic_acc = critic_running_acc / num_batches
-        avg_actor_loss = actor_running_loss / num_batches
-        avg_actor_acc = actor_running_acc / num_batches
-        return avg_critic_loss, avg_critic_acc, avg_actor_loss, avg_actor_acc
+        avg_loss = running_loss / num_batches
+        return avg_loss
