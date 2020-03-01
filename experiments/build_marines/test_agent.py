@@ -22,7 +22,6 @@ class TestAgent(Agent):
         self.reset()
 
     def _sample(self, state):
-        print(state.observation.feature_screen.build_progress)
         mins = state.observation.player.minerals
         time = state.observation.game_loop[0]
 
@@ -64,7 +63,8 @@ class TestAgent(Agent):
     def _forward(self, state):
         return self._sample(state)
 
-    def state_space_converter(self, state):
+    def state_space_converter(self, raw_state):
+        state, cc_queue_len = raw_state
         return state
 
     def action_space_converter(self, action):

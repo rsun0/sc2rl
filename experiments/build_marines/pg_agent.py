@@ -12,7 +12,7 @@ from agent import Agent, Memory
 from action_interface import BuildMarinesAction
 
 NUM_ACTIONS = len(list(BuildMarinesAction))
-NUM_CHANNELS = 
+NUM_CHANNELS = 11
 
 
 class PolicyGradientMemory(Memory):
@@ -92,26 +92,31 @@ class PolicyGradientAgent(Agent):
     def push_memory(self, state, action, reward, done):
         self.memory.push(state, action, reward, done)
 
-    # TODO change state converter, check paper
-    def state_space_converter(self, obs):
+    def state_space_converter(self, raw_state):
+        obs, cc_queue_len = raw_state
         state = np.zeros((NUM_CHANNELS, board.shape[0], board.shape[1]), dtype=int)
         state_idx = 0
 
-        state[state_idx] = obs.observation.feature_screen.unit_type
-        state_idx += 1
-        state[state_idx] = obs.observation.feature_screen.build_progress
-        state_idx += 1
-        
-        # minerals
-        # food used
-        # food cap
-        # food army
-        # food workers
-        # idle worker count
-        # army_count
+        features = [
+            obs.observation.feature_screen.unit_type,
+            obs.observation.feature_screen.unit_hit_points,
+            obs.observation.feature_screen.unit_hit_points_ratio,
+            obs.observation.player.minerals,
+            obs.observation.player.food_used,
+            obs.observation.player.food_cap,
+            obs.observation.player.food_army,
+            obs.observation.player.food_workers,
+            obs.observation.player.army_count,
+            obs.observation.game_loop.item(),
+            cc_queue_len,
+        ]
 
-        # len build queue
-        return obs
+        for f in features:
+            state[state_idx] = f
+            state_idx += 1
+
+        assert state_idx == state.shape[0], state_idx
+        return state
 
     def action_space_converter(self, action):
         return action

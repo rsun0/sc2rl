@@ -7,7 +7,6 @@ from pysc2.lib import features, protocol, units
 from action_interface import BuildMarinesAction, BuildMarinesActuator
 from abstract_core import CustomEnvironment
 
-# TODO record build queue for both CC and rax
 class BuildMarinesEnvironment(CustomEnvironment):
     SCREEN_SIZE = 84
     MINIMAP_SIZE = 1
@@ -32,7 +31,6 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self.enable_kill_helper = enable_kill_helper
 
         self._actuator = BuildMarinesActuator()
-        self._prev_frame = None
         self._curr_frame = None
         self._terminal = True
         self._accumulated_reward = 0
@@ -47,11 +45,12 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self._actuator.reset()
         self._terminal = False
         self._accumulated_reward = 0
+        self._cc_queue_len = 0
 
         self._reset_env()
         self._run_helpers()
         
-        return [self._curr_frame], [self._accumulated_reward], self._terminal, [None]
+        return [self._get_state()], [self._accumulated_reward], self._terminal, [None]
 
     def step(self, action_list):
         '''
@@ -69,7 +68,10 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self._run_to_next(action)
         self._run_helpers()
         
-        return [self._curr_frame], [self._accumulated_reward], self._terminal, [None]
+        return [self._get_state()], [self._accumulated_reward], self._terminal, [None]
+
+    def _get_state(self):
+        return self._curr_frame, self._cc_queue_len
 
     def _create_env(self):
         '''
@@ -91,6 +93,11 @@ class BuildMarinesEnvironment(CustomEnvironment):
             visualize=self.render,
             game_steps_per_episode=None
         )
+
+    def _update_persistent_state(self):
+        single_select = self._curr_frame.observation.single_select[0]
+        if single_select.unit_type == units.Terran.CommandCenter.value:
+            self._cc_queue_len = len(self._curr_frame.observation.build_queue)
 
     def _run_helpers(self):
         checks_cleared = False
@@ -119,26 +126,22 @@ class BuildMarinesEnvironment(CustomEnvironment):
             self._step_env(raw_action)
     
     def _reset_env(self):
-        self._prev_frame = self._curr_frame
         # Get obs for 1st agent
         self._curr_frame = self._env.reset()[0]
+        self._update_persistent_state()
         self._accumulated_reward += self._curr_frame.reward
         if self._curr_frame.last():
             self._terminal = True
 
     def _step_env(self, raw_action):
-        self._prev_frame = self._curr_frame
-        try:
-            # Get obs for 1st agent
-            self._curr_frame = self._env.step([raw_action])[0]
-        except protocol.ConnectionError:
-            self._curr_frame = self._env.reset()[0]
+        # Get obs for 1st agent
+        self._curr_frame = self._env.step([raw_action])[0]
+        self._update_persistent_state()
         self._accumulated_reward += self._curr_frame.reward
         if self._curr_frame.last():
             self._terminal = True
 
-    @staticmethod
-    def _should_make_scv(obs):
+    def _should_make_scv(self, obs):
         '''
         Checks if an SCV should be made
         (enough minerals, not supply blocked, less than optimal number,
@@ -150,7 +153,7 @@ class BuildMarinesEnvironment(CustomEnvironment):
             return False
         if obs.observation.single_select[0].unit_type != units.Terran.CommandCenter.value:
             return True
-        return len(obs.observation.build_queue) == 0
+        return self._cc_queue_len == 0
 
     @staticmethod
     def _should_kill_marine(obs):
