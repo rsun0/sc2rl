@@ -14,6 +14,7 @@ class BuildMarinesEnvironment(CustomEnvironment):
 
     def __init__(self,
             render=False,
+            verbose=True,
             step_multiplier=None,
             enable_scv_helper=True,
             enable_kill_helper=True,
@@ -30,7 +31,7 @@ class BuildMarinesEnvironment(CustomEnvironment):
         self.enable_scv_helper = enable_scv_helper
         self.enable_kill_helper = enable_kill_helper
 
-        self._actuator = BuildMarinesActuator()
+        self._actuator = BuildMarinesActuator(verbose)
         self._curr_frame = None
         self._terminal = True
         self._accumulated_reward = 0

@@ -7,7 +7,8 @@ from torch import nn
 from tqdm import tqdm
 
 from agent import Model
-from pg_agent import NUM_ACTIONS
+from pg_agent import NUM_ACTIONS, NUM_CHANNELS
+from custom_env import BuildMarinesEnvironment
 
 
 class ResBlock(nn.Module):
@@ -32,10 +33,10 @@ class ResBlock(nn.Module):
 
 class PolicyGradientNet(nn.Module, Model):
     def __init__(self,
-            screen_size,
-            in_channels,
             num_blocks=4,
             channels=32,
+            screen_size=BuildMarinesEnvironment.SCREEN_SIZE,
+            in_channels=NUM_CHANNELS,
             num_actions=NUM_ACTIONS):
         super().__init__()
         self.screen_size = screen_size
