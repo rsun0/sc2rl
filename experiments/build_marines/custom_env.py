@@ -6,12 +6,13 @@ from pysc2.lib import features, protocol, units
 
 from action_interface import BuildMarinesAction, BuildMarinesActuator
 from abstract_core import CustomEnvironment
+    
+SCREEN_SIZE = 84
+MINIMAP_SIZE = 1
+MAP = 'BuildMarines'
+
 
 class BuildMarinesEnvironment(CustomEnvironment):
-    SCREEN_SIZE = 84
-    MINIMAP_SIZE = 1
-    MAP = 'BuildMarines'
-
     def __init__(self,
             render=False,
             verbose=True,
@@ -84,10 +85,10 @@ class BuildMarinesEnvironment(CustomEnvironment):
         FLAGS(sys.argv)
 
         self._env = sc2_env.SC2Env(
-            map_name=self.MAP,
+            map_name=MAP,
             agent_interface_format=features.AgentInterfaceFormat(
                 feature_dimensions=features.Dimensions(
-                    screen=self.SCREEN_SIZE, minimap=self.MINIMAP_SIZE),
+                    screen=SCREEN_SIZE, minimap=MINIMAP_SIZE),
                 use_feature_units=True
             ),
             step_mul=self.step_multiplier,

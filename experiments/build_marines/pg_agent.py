@@ -10,8 +10,9 @@ sys.path.insert(0, "../interface/")
 
 from agent import Agent, Memory
 from action_interface import BuildMarinesAction
+from custom_env import SCREEN_SIZE
+from action_interface import NUM_ACTIONS
 
-NUM_ACTIONS = len(list(BuildMarinesAction))
 NUM_CHANNELS = 11
 
 
@@ -21,9 +22,9 @@ class PolicyGradientMemory(Memory):
         self.discount = discount
         self.current_trajectory = []
 
+    # FIXME fix reward calculation
     def push(self, state, action, reward, done):
-        state, env_state = state
-        self.current_trajectory.append((state, action, env_state))
+        self.current_trajectory.append((state, action))
         
         if done:
             rewards = []
@@ -33,9 +34,9 @@ class PolicyGradientMemory(Memory):
                 r *= self.discount
             rewards.reverse()
 
-            states, actions, env_states = zip(*self.current_trajectory)
+            states, actions = zip(*self.current_trajectory)
 
-            trajectory = zip(states, actions, rewards, env_states)
+            trajectory = zip(states, actions, rewards)
             self.experiences.extend(trajectory)
             self.current_trajectory = []
 
@@ -57,8 +58,7 @@ class PolicyGradientAgent(Agent):
 
     def _forward(self, state):
         self.model.eval()
-        images, scalars = state
-        preds = self.model((images[np.newaxis], scalars[np.newaxis]))
+        preds = self.model(state[np.newaxis])
         probs = torch.nn.functional.softmax(preds, dim=1).detach().numpy()[0]
         return probs
 
@@ -94,7 +94,7 @@ class PolicyGradientAgent(Agent):
 
     def state_space_converter(self, raw_state):
         obs, cc_queue_len = raw_state
-        state = np.zeros((NUM_CHANNELS, board.shape[0], board.shape[1]), dtype=int)
+        state = np.zeros((NUM_CHANNELS, SCREEN_SIZE, SCREEN_SIZE), dtype=int)
         state_idx = 0
 
         features = [

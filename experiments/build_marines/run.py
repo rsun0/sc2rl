@@ -72,6 +72,7 @@ def run_training():
         settings=agent_settings,
         memory=memory,
     )
+    agent.load()
 
     experiment = Experiment([agent], env, run_settings)
     experiment.train()

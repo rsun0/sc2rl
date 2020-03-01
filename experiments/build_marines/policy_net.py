@@ -7,14 +7,14 @@ from torch import nn
 from tqdm import tqdm
 
 from agent import Model
-from pg_agent import NUM_ACTIONS, NUM_CHANNELS
-from custom_env import BuildMarinesEnvironment
+from pg_agent import NUM_CHANNELS
+from custom_env import SCREEN_SIZE
+from action_interface import NUM_ACTIONS
 
 
 class ResBlock(nn.Module):
     def __init__(self, inplanes, planes):
         super().__init__()
-        # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.main = nn.Sequential(
             nn.Conv2d(inplanes, planes, 3, padding=1),
             nn.BatchNorm2d(planes),
@@ -34,39 +34,50 @@ class ResBlock(nn.Module):
 class PolicyGradientNet(nn.Module, Model):
     def __init__(self,
             num_blocks=4,
-            channels=32,
-            screen_size=BuildMarinesEnvironment.SCREEN_SIZE,
-            in_channels=NUM_CHANNELS,
-            num_actions=NUM_ACTIONS):
+            channels=32):
         super().__init__()
-        self.screen_size = screen_size
-        self.in_channels = in_channels
-        self.num_actions = num_actions
 
-        # Convolutions
-        convs = [
-            nn.Conv2d(in_channels, channels, 3, padding=1),
-            nn.BatchNorm2d(channels),
-            nn.ReLU()
-        ]
-        for i in range(num_blocks):
-            convs.append(ResBlock(channels, channels))
-        convs.extend([
-            nn.Conv2d(channels, 4, 1),
-            nn.BatchNorm2d(4),
-            nn.ReLU(),
-        ])
-        self.convs = nn.Sequential(*convs)
+        # FIXME simplified model due to memory constraints
+
+        # convs = [
+        #     nn.Conv2d(NUM_CHANNELS, channels, 3, padding=1),
+        #     nn.BatchNorm2d(channels),
+        #     nn.ReLU()
+        # ]
+        # for i in range(num_blocks):
+        #     convs.append(ResBlock(channels, channels))
+        # convs.extend([
+        #     nn.Conv2d(channels, 4, 1),
+        #     nn.BatchNorm2d(4),
+        #     nn.ReLU(),
+        # ])
+        # self.convs = nn.Sequential(*convs)
         
-        fc_h = 4 * screen_size ** 2
+        # fc_h = 4 * SCREEN_SIZE ** 2
+        # self.fc = nn.Sequential(
+        #     nn.Linear(fc_h, fc_h),
+        #     nn.BatchNorm1d(fc_h),
+        #     nn.ReLU(),
+        #     nn.Linear(fc_h, fc_h),
+        #     nn.BatchNorm1d(fc_h),
+        #     nn.ReLU(),
+        #     nn.Linear(fc_h, NUM_ACTIONS)
+        # )
+        self.convs = nn.Sequential(
+            nn.Conv2d(NUM_CHANNELS, channels, 3, padding=1),
+            nn.BatchNorm2d(channels),
+            nn.ReLU(),
+            nn.Conv2d(channels, 1, 3, padding=1),
+            nn.BatchNorm2d(1),
+            nn.ReLU(),
+        )
+        
+        fc_h = SCREEN_SIZE ** 2
         self.fc = nn.Sequential(
             nn.Linear(fc_h, fc_h),
             nn.BatchNorm1d(fc_h),
             nn.ReLU(),
-            nn.Linear(fc_h, fc_h),
-            nn.BatchNorm1d(fc_h),
-            nn.ReLU(),
-            nn.Linear(fc_h, num_actions)
+            nn.Linear(fc_h, NUM_ACTIONS)
         )
 
     def forward(self, state):

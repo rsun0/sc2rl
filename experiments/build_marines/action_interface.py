@@ -2,6 +2,8 @@ from pysc2.lib import actions, units
 from enum import Enum
 import numpy as np
 
+NUM_ACTIONS = 6
+
 
 class BuildMarinesAction(Enum):
     RALLY_SCVS = -1
