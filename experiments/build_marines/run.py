@@ -14,6 +14,8 @@ import argparse
 def run_training():
     render = True
     verbose = True
+    use_test_net = True
+    use_test_agent = False
     step_mul = 16
 
     lr = 0.0001
@@ -26,8 +28,8 @@ def run_training():
     num_episodes = 10
     num_epochs = 1
     batch_size = 32
-    train_every = 9999
-    save_every = 9999
+    train_every = 400
+    save_every = 99999999
     graph_every = 0
     averaging_window = 100
     graph_file = 'bin/graph.png'
@@ -64,15 +66,19 @@ def run_training():
     model = PolicyGradientNet(
         num_blocks=num_blocks,
         channels=num_channels,
+        test_mode=use_test_net,
     )
     
-    agent = PolicyGradientAgent(
-        save_file=save_file,
-        model=model,
-        settings=agent_settings,
-        memory=memory,
-    )
-    agent.load()
+    if use_test_agent:
+        agent = TestAgent()
+    else:
+        agent = PolicyGradientAgent(
+            save_file=save_file,
+            model=model,
+            settings=agent_settings,
+            memory=memory,
+        )
+        agent.load()
 
     experiment = Experiment([agent], env, run_settings)
     experiment.train()

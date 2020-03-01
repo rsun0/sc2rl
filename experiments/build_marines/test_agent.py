@@ -1,3 +1,5 @@
+import numpy as np
+
 import sys
 sys.path.insert(0, "../interface/")
 
@@ -11,6 +13,7 @@ class TestAgent(Agent):
     def __init__(self):
         # Intentionally bypassing parent constructor
         self.reset()
+        self.train_count = 0
 
     def reset(self):
         self.num_depots = 0
@@ -71,7 +74,11 @@ class TestAgent(Agent):
         return action
 
     def train(self, run_settings):
-        pass
+        loss = np.random.rand() * 100 - 50
+        if self.train_count == 0:
+            print('ITR', 'LOSS', sep='\t')
+        print('{itr:02d}\t{loss:.4f}'.format(itr=self.train_count, loss=loss))
+        self.train_count += 1
 
     def train_step(self, batch_size):
         pass
