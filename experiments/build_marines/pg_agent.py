@@ -22,21 +22,23 @@ class PolicyGradientMemory(Memory):
         self.discount = discount
         self.current_trajectory = []
 
-    # FIXME fix reward calculation
     def push(self, state, action, reward, done):
-        self.current_trajectory.append((state, action))
+        self.current_trajectory.append((state, action, reward))
         
         if done:
-            rewards = []
-            r = reward
-            for i in range(len(self.current_trajectory)):
-                rewards.append(r)
-                r *= self.discount
-            rewards.reverse()
+            states, actions, rewards = zip(*self.current_trajectory)
+            
+            values = []
+            running_value = 0
+            for i in range(len(rewards) - 1, -1, -1):
+                running_value += rewards[i]
+                values.append(running_value)
+                running_value *= self.discount
+            values.reverse()
+            print('Rewards: ', rewards)
+            print('Values: ', values)
 
-            states, actions = zip(*self.current_trajectory)
-
-            trajectory = zip(states, actions, rewards)
+            trajectory = zip(states, actions, values)
             self.experiences.extend(trajectory)
             self.current_trajectory = []
 
