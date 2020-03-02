@@ -72,7 +72,10 @@ class PolicyGradientAgent(Agent):
         
         if self.train_count == 0:
             print('ITR', 'LOSS', sep='\t')
-        print('{itr:02d}\t{loss:.4f}'.format(itr=self.train_count, loss=loss))
+        if loss is not None:
+            print('{itr:02d}\t{loss:.4f}'.format(itr=self.train_count, loss=loss))
+        else:
+            print('{itr:02d}\tNone'.format(itr=self.train_count))
         sys.stdout.flush()
         self.train_count += 1
 

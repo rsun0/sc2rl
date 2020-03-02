@@ -225,7 +225,8 @@ class BuildMarinesActuator:
 
         multi = obs.observation.multi_select
         if len(multi) == 0 or any(s.unit_type != units.Terran.Marine for s in multi):
-            if self.progress_stage > 0:
+            available = obs.observation.available_actions
+            if self.progress_stage > 0 or actions.FUNCTIONS.select_army.id not in available:
                 self._print_warning('Not enough Marines to select')
                 return self._conclude_sequence(obs)
             self.progress_stage += 1
