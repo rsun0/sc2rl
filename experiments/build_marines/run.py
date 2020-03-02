@@ -12,10 +12,17 @@ import torch
 import argparse
 
 def run_training():
-    render = True
-    verbose = True
-    use_test_net = True
-    use_test_agent = False
+    testing = True
+    if testing:
+        render = True
+        verbose = True
+        use_test_net = True
+        use_test_agent = False
+    else:
+        render = False
+        verbose = False
+        use_test_net = False
+        use_test_agent = False
     step_mul = 16
 
     lr = 0.0001
