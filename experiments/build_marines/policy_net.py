@@ -31,6 +31,7 @@ class ResBlock(nn.Module):
         return out
 
 
+# TODO do on gpu
 class PolicyGradientNet(nn.Module, Model):
     def __init__(self,
             num_blocks=4,
@@ -56,6 +57,7 @@ class PolicyGradientNet(nn.Module, Model):
                 nn.Linear(fc_h, NUM_ACTIONS)
             )
         else:
+            # FIXME memory problem, try smaller screen size
             convs = [
                 nn.Conv2d(NUM_CHANNELS, channels, 3, padding=1),
                 nn.BatchNorm2d(channels),

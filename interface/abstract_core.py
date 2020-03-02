@@ -181,7 +181,7 @@ class CustomEnvironment():
 class RunSettings:
     def __init__(self, num_episodes, num_epochs, batch_size, train_every,
             save_every, graph_every, averaging_window, test_episodes=20,
-            verbose=True, graph_file=None):
+            verbose=True, graph_file=None, log_file=None):
         """
         :param num_episodes: The total number of episodes to play
         :param num_epochs: The number of update iterations for each experience set
@@ -202,3 +202,4 @@ class RunSettings:
         self.test_episodes = test_episodes
         self.verbose = verbose
         self.graph_file = graph_file
+        self.log_file = log_file

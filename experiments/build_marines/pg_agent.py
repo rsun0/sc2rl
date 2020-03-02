@@ -1,4 +1,3 @@
-import json
 import collections
 
 import torch
@@ -69,12 +68,13 @@ class PolicyGradientAgent(Agent):
             data, batch_size, self.optimizer, self.settings.verbose)
         
         if self.train_count == 0:
-            print('ITR', 'LOSS', sep='\t')
+            print('ITR\tLOSS', file=run_settings.log_file)
         if loss is not None:
-            print('{itr:02d}\t{loss:.4f}'.format(itr=self.train_count, loss=loss))
+            print('{itr:02d}\t{loss:.4f}'.format(itr=self.train_count, loss=loss),
+                file=run_settings.log_file)
         else:
-            print('{itr:02d}\tNone'.format(itr=self.train_count))
-        sys.stdout.flush()
+            print('{itr:02d}\tNone'.format(itr=self.train_count),
+                file=run_settings.log_file)
         self.train_count += 1
 
     def train_step(self, batch_size):

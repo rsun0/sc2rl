@@ -77,8 +77,9 @@ class TestAgent(Agent):
     def train(self, run_settings):
         loss = np.random.rand() * 100 - 50
         if self.train_count == 0:
-            print('ITR', 'LOSS', sep='\t')
-        print('{itr:02d}\t{loss:.4f}'.format(itr=self.train_count, loss=loss))
+            print('ITR\tLOSS', file=run_settings.log_file)
+        print('{itr:02d}\t{loss:.4f}'.format(itr=self.train_count, loss=loss),
+            file=run_settings.log_file)
         self.train_count += 1
 
     def train_step(self, batch_size):
