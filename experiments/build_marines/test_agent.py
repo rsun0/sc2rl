@@ -75,11 +75,18 @@ class TestAgent(Agent):
         return action
 
     def train(self, run_settings):
-        loss = np.random.rand() * 100 - 50
         if self.train_count == 0:
-            print('ITR\tLOSS', file=run_settings.log_file)
-        print('{itr:02d}\t{loss:.4f}'.format(itr=self.train_count, loss=loss),
-            file=run_settings.log_file)
+            loss = None
+        else:
+            loss = np.random.rand() * 100 - 50
+
+        if self.train_count == 0:
+            print('ITR\tLOSS\t\tSCORE', file=run_settings.log_file)
+        if loss is not None:
+            avg_score = np.random.rand() * 180
+            print('{itr:<2d}\t{loss:8.4f}\t{score:5.1f}'
+                .format(itr=self.train_count, loss=loss, score=avg_score),
+                file=run_settings.log_file, flush=True)
         self.train_count += 1
 
     def train_step(self, batch_size):

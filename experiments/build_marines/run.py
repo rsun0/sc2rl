@@ -14,10 +14,10 @@ import argparse
 def run_training():
     testing = True
     if testing:
-        render = True
+        render = False
         verbose = True
         use_test_net = True
-        use_test_agent = False
+        use_test_agent = True
     else:
         render = False
         verbose = False
@@ -32,7 +32,7 @@ def run_training():
     num_channels = 32
     opt_eps = 1e-8
 
-    num_episodes = 10
+    num_episodes = 10000
     num_epochs = 1
     batch_size = 32
     train_every = 1024

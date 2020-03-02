@@ -73,14 +73,11 @@ class PolicyGradientAgent(Agent):
             data, batch_size, self.optimizer, self.settings.verbose)
         
         if self.train_count == 0:
-            print('ITR\tLOSS\tSCORE', file=run_settings.log_file)
+            print('ITR\tLOSS\t\tSCORE', file=run_settings.log_file)
         if loss is not None:
             avg_score = self.memory.get_average_score()
-            print('{itr:02d}\t{loss:.4f}\t{score:03.1f}'
+            print('{itr:<2d}\t{loss:8.4f}\t{score:5.1f}'
                 .format(itr=self.train_count, loss=loss, score=avg_score),
-                file=run_settings.log_file, flush=True)
-        else:
-            print('{itr:02d}\tNone\tNone'.format(itr=self.train_count),
                 file=run_settings.log_file, flush=True)
         self.train_count += 1
 
