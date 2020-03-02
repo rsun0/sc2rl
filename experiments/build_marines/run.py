@@ -28,8 +28,8 @@ def run_training():
     num_episodes = 10
     num_epochs = 1
     batch_size = 32
-    train_every = 400
-    save_every = 99999999
+    train_every = 1024
+    save_every = train_every * 10
     graph_every = 0
     averaging_window = 100
     graph_file = 'bin/graph.png'

@@ -52,16 +52,16 @@ class TestAgent(Agent):
             else:
                 return BuildMarinesAction.NO_OP
         
-        # if time >= self.rax_done_at and state.observation.player.food_used < state.observation.player.food_cap:
-        if time >= self.rax_done_at and state.observation.player.food_army < 3:
+        if time >= self.rax_done_at and state.observation.player.food_used < state.observation.player.food_cap:
+        # if time >= self.rax_done_at and state.observation.player.food_army < 3:
             return BuildMarinesAction.MAKE_MARINE
         
         if self.num_depots < 3 and mins >= 100:
             self.num_depots += 1
             return BuildMarinesAction.BUILD_DEPOT
         
-        if state.observation.player.food_army > 1:
-            return BuildMarinesAction.KILL_MARINE
+        # if state.observation.player.food_army > 8:
+        #     return BuildMarinesAction.KILL_MARINE
         return BuildMarinesAction.NO_OP
 
     def _forward(self, state):

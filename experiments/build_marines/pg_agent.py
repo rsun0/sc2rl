@@ -35,8 +35,6 @@ class PolicyGradientMemory(Memory):
                 values.append(running_value)
                 running_value *= self.discount
             values.reverse()
-            print('Rewards: ', rewards)
-            print('Values: ', values)
 
             trajectory = zip(states, actions, values)
             self.experiences.extend(trajectory)

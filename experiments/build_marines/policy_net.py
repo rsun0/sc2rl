@@ -109,14 +109,14 @@ class PolicyGradientNet(nn.Module, Model):
             actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
             actions_onehot = torch.from_numpy(actions_onehot)
 
-            preds = self.model(states_batch)
+            preds = self(states_batch)
             log_probs = torch.nn.functional.log_softmax(preds, dim=1)
             log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
             loss = -torch.sum(log_probs_observed * rewards_batch)
 
-            self.optimizer.zero_grad()
+            optimizer.zero_grad()
             loss.backward()
-            self.optimizer.step()
+            optimizer.step()
 
             running_loss += loss.item()
             num_experiences = i + batch_size
