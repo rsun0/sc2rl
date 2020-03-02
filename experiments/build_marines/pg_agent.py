@@ -16,8 +16,9 @@ NUM_CHANNELS = 11
 
 
 class PolicyGradientMemory(Memory):
-    def __init__(self, buffer_len, discount):
+    def __init__(self, buffer_len, discount, averaging_window):
         self.experiences = collections.deque(maxlen=buffer_len)
+        self.scores = collections.deque(maxlen=averaging_window)
         self.discount = discount
         self.current_trajectory = []
 
@@ -37,10 +38,14 @@ class PolicyGradientMemory(Memory):
 
             trajectory = zip(states, actions, values)
             self.experiences.extend(trajectory)
+            self.scores.append(sum(rewards))
             self.current_trajectory = []
 
     def get_data(self):
         return list(self.experiences)
+
+    def get_average_score(self):
+        return np.mean(self.scores)
 
 
 class PolicyGradientAgent(Agent):
@@ -68,13 +73,15 @@ class PolicyGradientAgent(Agent):
             data, batch_size, self.optimizer, self.settings.verbose)
         
         if self.train_count == 0:
-            print('ITR\tLOSS', file=run_settings.log_file)
+            print('ITR\tLOSS\tSCORE', file=run_settings.log_file)
         if loss is not None:
-            print('{itr:02d}\t{loss:.4f}'.format(itr=self.train_count, loss=loss),
-                file=run_settings.log_file)
+            avg_score = self.memory.get_average_score()
+            print('{itr:02d}\t{loss:.4f}\t{score:03.1f}'
+                .format(itr=self.train_count, loss=loss, score=avg_score),
+                file=run_settings.log_file, flush=True)
         else:
-            print('{itr:02d}\tNone'.format(itr=self.train_count),
-                file=run_settings.log_file)
+            print('{itr:02d}\tNone\tNone'.format(itr=self.train_count),
+                file=run_settings.log_file, flush=True)
         self.train_count += 1
 
     def train_step(self, batch_size):
