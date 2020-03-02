@@ -37,8 +37,8 @@ def run_training():
     batch_size = 32
     train_every = 1024
     save_every = train_every * 10
-    graph_every = 0
-    averaging_window = 100
+    graph_every = 10
+    averaging_window = 20
     graph_file = 'bin/graph.png'
     save_file = 'bin/model.h5'
     log_filename = 'bin/log.txt'
