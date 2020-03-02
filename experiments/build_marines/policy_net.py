@@ -96,7 +96,7 @@ class PolicyGradientNet(nn.Module, Model):
         
         self.train()
         running_loss = 0
-        pbar = tqdm(range(0, len(data) - batch_size + 1, batch_size))
+        pbar = tqdm(range(0, len(data) - batch_size + 1, batch_size), disable=(not verbose))
         for i in pbar:
             batch = data[i:i+batch_size]
             states, actions, rewards = zip(*batch)
