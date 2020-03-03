@@ -82,7 +82,8 @@ class BuildMarinesEnvironment(CustomEnvironment):
         import sys
         from absl import flags
         FLAGS = flags.FLAGS
-        FLAGS(sys.argv)
+        # NOTE only passes program name
+        FLAGS(sys.argv[:1])
 
         self._env = sc2_env.SC2Env(
             map_name=MAP,

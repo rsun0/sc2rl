@@ -1,3 +1,5 @@
+import argparse
+
 import sys
 sys.path.insert(0, "../../interface/")
 
@@ -11,18 +13,24 @@ from policy_net import PolicyGradientNet
 import torch
 import argparse
 
-def run_training():
-    testing = True
-    if testing:
-        render = False
-        verbose = True
-        use_test_net = True
-        use_test_agent = True
-    else:
-        render = False
-        verbose = False
-        use_test_net = False
-        use_test_agent = False
+
+def parse_hyperparams():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--render', action='store_true', default=False, help='render game')
+    parser.add_argument('--verbose', action='store_true', default=False, help='enable printouts')
+    parser.add_argument('--testnet', action='store_true', default=False, help='use simple net')
+    parser.add_argument('--testagent', action='store_true', default=False, help='use test agent')
+
+    args = parser.parse_args()
+    return args
+
+
+def run_training(args):
+    render = args.render
+    verbose = args.verbose
+    use_test_net = args.testnet
+    use_test_agent = args.testagent
     step_mul = 16
 
     lr = 0.0001
@@ -63,28 +71,28 @@ def run_training():
             log_file=log_file,
             verbose=verbose,
         )
-        agent_settings = AgentSettings(
-            optimizer=torch.optim.Adam,
-            learning_rate=lr,
-            opt_eps=opt_eps,
-            epsilon_max=0,
-            epsilon_min=0,
-            epsilon_duration=0,
-            verbose=verbose,
-        )
-        memory = PolicyGradientMemory(
-            buffer_len=memsize,
-            discount=discount,
-            averaging_window=averaging_window)
-        model = PolicyGradientNet(
-            num_blocks=num_blocks,
-            channels=num_channels,
-            test_mode=use_test_net,
-        )
         
         if use_test_agent:
             agent = TestAgent()
         else:
+            agent_settings = AgentSettings(
+                optimizer=torch.optim.Adam,
+                learning_rate=lr,
+                opt_eps=opt_eps,
+                epsilon_max=0,
+                epsilon_min=0,
+                epsilon_duration=0,
+                verbose=verbose,
+            )
+            memory = PolicyGradientMemory(
+                buffer_len=memsize,
+                discount=discount,
+                averaging_window=averaging_window)
+            model = PolicyGradientNet(
+                num_blocks=num_blocks,
+                channels=num_channels,
+                test_mode=use_test_net,
+            )
             agent = PolicyGradientAgent(
                 save_file=save_file,
                 model=model,
@@ -98,4 +106,6 @@ def run_training():
 
 
 if __name__ == "__main__":
-    run_training()
+    args = parse_hyperparams()
+    print('Args: ', args)
+    run_training(args)
