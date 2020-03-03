@@ -105,11 +105,11 @@ class PolicyGradientNet(nn.Module, Model):
 
             states_batch = np.stack(states)
             actions_batch = np.array(actions)
-            rewards_batch = torch.from_numpy(np.array(rewards))
+            rewards_batch = torch.from_numpy(np.array(rewards)).type(torch.FloatTensor)
 
             actions_onehot = np.zeros((actions_batch.shape[0], NUM_ACTIONS))
             actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
-            actions_onehot = torch.from_numpy(actions_onehot)
+            actions_onehot = torch.from_numpy(actions_onehot).type(torch.FloatTensor)
 
             preds = self(states_batch)
             log_probs = torch.nn.functional.log_softmax(preds, dim=1)
