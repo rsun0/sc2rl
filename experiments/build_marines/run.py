@@ -107,5 +107,6 @@ def run_training(args):
 
 if __name__ == "__main__":
     args = parse_hyperparams()
-    print('Args: ', args)
+    # Removes "Namespace" from printout
+    print('Args: ', str(args)[9:])
     run_training(args)
