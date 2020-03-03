@@ -17,6 +17,12 @@ import argparse
 def parse_hyperparams():
     parser = argparse.ArgumentParser()
 
+    parser.add_argument('--lr', type=float, default=0.0001, help='learning rate')
+    parser.add_argument('--discount', type=float, default=1.0)
+    parser.add_argument('--memsize', type=int, default=320000, help='experience replay memory size')
+    parser.add_argument('--resblocks', type=int, default=4, help='number of resblocks in net')
+    parser.add_argument('--channels', type=int, default=32, help='number of conv channels in net')
+
     parser.add_argument('--render', action='store_true', default=False, help='render game')
     parser.add_argument('--verbose', action='store_true', default=False, help='enable printouts')
     parser.add_argument('--testnet', action='store_true', default=False, help='use simple net')
@@ -33,11 +39,11 @@ def run_training(args):
     use_test_agent = args.testagent
     step_mul = 16
 
-    lr = 0.0001
-    discount = 1.0
-    memsize = 320000
-    num_blocks = 4
-    num_channels = 32
+    lr = args.lr
+    discount = args.discount
+    memsize = args.memsize
+    num_blocks = args.resblocks
+    num_channels = args.channels
     opt_eps = 1e-8
 
     num_episodes = 10000
