@@ -90,9 +90,7 @@ class PolicyGradientNet(nn.Module, Model):
         if torch.cuda.is_available():
             self.cuda()
 
-    def forward(self, state):
-        images, scalars = state
-
+    def forward(self, images, scalars):
         x = self.convs(images)
         x = torch.flatten(x, start_dim=1)
         x = self.image_linears(x)
@@ -111,20 +109,22 @@ class PolicyGradientNet(nn.Module, Model):
         for i in pbar:
             batch = data[i:i+batch_size]
             states, actions, rewards = zip(*batch)
+            images, scalars = zip(*states)
 
-            states_batch = np.stack(states)
+            images_batch = np.stack(images)
+            scalars_batch = np.stack(scalars)
+            images_batch, scalars_batch = self.to_torch(images_batch, scalars_batch)
+
             actions_batch = np.array(actions)
-            rewards_batch = torch.from_numpy(np.array(rewards)).type(torch.FloatTensor)
-
             actions_onehot = np.zeros((actions_batch.shape[0], NUM_ACTIONS))
             actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
             actions_onehot = torch.from_numpy(actions_onehot).type(torch.FloatTensor)
-
+            rewards_batch = torch.from_numpy(np.array(rewards)).type(torch.FloatTensor)
             if torch.cuda.is_available():
                 actions_onehot = actions_onehot.cuda()
                 rewards_batch = rewards_batch.cuda()
 
-            preds = self(states_batch)
+            preds = self(images_batch, scalars_batch)
             log_probs = torch.nn.functional.log_softmax(preds, dim=1)
             log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
             loss = -torch.sum(log_probs_observed * rewards_batch)
@@ -143,8 +143,7 @@ class PolicyGradientNet(nn.Module, Model):
         return avg_loss
 
     @staticmethod
-    def transform_input(state):
-        images, scalars = state
+    def to_torch(images, scalars):
         images = torch.from_numpy(images).type(torch.FloatTensor)
         scalars = torch.from_numpy(scalars).type(torch.FloatTensor)
         if torch.cuda.is_available():

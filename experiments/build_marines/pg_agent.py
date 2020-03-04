@@ -62,8 +62,11 @@ class PolicyGradientAgent(Agent):
         return action
 
     def _forward(self, state):
+        images, scalars = state
+        images, scalars = self.model.to_torch(images[np.newaxis], scalars[np.newaxis])
+
         self.model.eval()
-        preds = self.model(state[np.newaxis])
+        preds = self.model(images, scalars)
         probs = torch.nn.functional.softmax(preds, dim=1).detach().cpu().numpy()[0]
         return probs
 
