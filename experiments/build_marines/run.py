@@ -29,6 +29,14 @@ def parse_hyperparams():
     parser.add_argument('--memsize', type=int, default=320000, help='experience replay memory size')
     parser.add_argument('--resblocks', type=int, default=4, help='number of resblocks in net')
     parser.add_argument('--channels', type=int, default=32, help='number of conv channels in net')
+    
+    parser.add_argument('--episodes', type=int, default=10000, help='number of episodes per epoch')
+    parser.add_argument('--epochs', type=int, default=1, help='number of epochs')
+    parser.add_argument('--batch-size', type=int, default=32)
+    parser.add_argument('--train-every', type=int, default=4096, help='training period in number of steps')
+    parser.add_argument('--save-every', type=int, default=40960, help='save period in number of steps')
+    parser.add_argument('--graph-every', type=int, default=50, help='graphing period in number of episodes')
+    parser.add_argument('--window', type=int, default=100, help='averaging window for graph')
 
     parser.add_argument('--render', action='store_true', default=False, help='render game')
     parser.add_argument('--verbose', action='store_true', default=False, help='enable printouts')
@@ -39,75 +47,55 @@ def parse_hyperparams():
 
 
 def run_training(args):
-    render = args.render
-    verbose = args.verbose
-    use_test_agent = args.testagent
     step_mul = 16
-
-    lr = args.lr
-    discount = args.discount
-    memsize = args.memsize
-    num_blocks = args.resblocks
-    num_channels = args.channels
     opt_eps = 1e-8
 
-    num_episodes = 10000
-    num_epochs = 1
-    batch_size = 32
-    train_every = 1024
-    save_every = train_every * 10
-    graph_every = 10
-    averaging_window = 20
-    graph_file = args.graph_file
-    save_file = args.model_file
-    log_filename = args.log_file
-
-    with open(log_filename, mode='w') as log_file:
+    with open(args.log_file, mode='w') as log_file:
         # Removes "Namespace" from printout
         print('Args: ', str(args)[9:], file=log_file, flush=True)
 
         env = BuildMarinesEnvironment(
-            render=render,
+            render=args.render,
             step_multiplier=step_mul,
-            verbose=verbose,
+            verbose=args.verbose,
             enable_scv_helper=True,
             enable_kill_helper=True,
         )
         run_settings = RunSettings(
-            num_episodes=num_episodes,
-            num_epochs=num_epochs,
-            batch_size=batch_size,
-            train_every=train_every,
-            save_every=save_every,
-            graph_every=graph_every,
-            averaging_window=averaging_window,
-            graph_file=graph_file,
+            num_episodes=args.episodes,
+            num_epochs=args.epochs,
+            batch_size=args.batch_size,
+            train_every=args.train_every,
+            save_every=args.save_every,
+            graph_every=args.graph_every,
+            averaging_window=args.window,
+            graph_file=args.graph_file,
             log_file=log_file,
-            verbose=verbose,
+            verbose=args.verbose,
         )
         
-        if use_test_agent:
+        if args.testagent:
             agent = TestAgent()
         else:
             agent_settings = AgentSettings(
                 optimizer=torch.optim.Adam,
-                learning_rate=lr,
+                learning_rate=args.lr,
                 opt_eps=opt_eps,
                 epsilon_max=0,
                 epsilon_min=0,
                 epsilon_duration=0,
-                verbose=verbose,
+                verbose=args.verbose,
             )
             memory = PolicyGradientMemory(
-                buffer_len=memsize,
-                discount=discount,
-                averaging_window=averaging_window)
+                buffer_len=args.memsize,
+                discount=args.discount,
+                averaging_window=args.window)
             model = PolicyGradientNet(
-                num_blocks=num_blocks,
-                channels=num_channels,
+                num_blocks=args.resblocks,
+                channels=args.channels,
             )
             agent = PolicyGradientAgent(
-                save_file=save_file,
+                save_file=args.save_file,
                 model=model,
                 settings=agent_settings,
                 memory=memory,
