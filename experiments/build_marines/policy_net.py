@@ -7,20 +7,20 @@ from torch import nn
 from tqdm import tqdm
 
 from agent import Model
-from pg_agent import NUM_CHANNELS
+from pg_agent import NUM_IMAGES, NUM_SCALARS
 from custom_env import SCREEN_SIZE
 from action_interface import NUM_ACTIONS
 
 
 class ResBlock(nn.Module):
-    def __init__(self, inplanes, planes):
+    def __init__(self, innodes, nodes):
         super().__init__()
         self.main = nn.Sequential(
-            nn.Conv2d(inplanes, planes, 3, padding=1),
-            nn.BatchNorm2d(planes),
+            nn.Linear(innodes, nodes),
+            nn.BatchNorm1d(nodes),
             nn.ReLU(inplace=True),
-            nn.Conv2d(planes, planes, 3, padding=1),
-            nn.BatchNorm2d(planes),
+            nn.Linear(nodes, nodes),
+            nn.BatchNorm1d(nodes),
         )
 
     def forward(self, x):
@@ -33,54 +33,71 @@ class ResBlock(nn.Module):
 
 class PolicyGradientNet(nn.Module, Model):
     def __init__(self,
-            num_blocks=4,
+            num_blocks=2,
             channels=32):
         super().__init__()
 
-        convs = [
-            nn.Conv2d(NUM_CHANNELS, channels, 3, padding=1),
-            nn.BatchNorm2d(channels),
-            nn.ReLU()
-        ]
-        for i in range(num_blocks):
-            convs.append(ResBlock(channels, channels))
-        convs.extend([
+        self.convs = nn.Sequential(
+            # NUM_IMAGES x 84 x 84
+            nn.Conv2d(NUM_IMAGES, channels, 3, padding=1),
             # channels x 84 x 84
+            nn.BatchNorm2d(channels),
+            nn.ReLU(),
+            nn.Conv2d(channels, channels, 3, padding=1),
+            nn.BatchNorm2d(channels),
+            nn.ReLU(),
             nn.Conv2d(channels, channels, 4, stride=2, padding=1),
             # channels x 42 x 42
             nn.BatchNorm2d(channels),
-            # channels x 21 x 21
             nn.ReLU(),
             nn.MaxPool2d(2),
-            nn.Conv2d(channels, 4, 1),
-            nn.BatchNorm2d(4),
+            # channels x 21 x 21
+            nn.Conv2d(channels, channels, 3, stride=2),
+            # channels x 10 x 10
+            nn.BatchNorm2d(channels),
             nn.ReLU(),
-        ])
-        self.convs = nn.Sequential(*convs)
-        
-        fc_h = 4 * 21 * 21
-        self.fc = nn.Sequential(
-            nn.Linear(fc_h, fc_h),
-            nn.BatchNorm1d(fc_h),
+            nn.MaxPool2d(2),
+            # channels x 5 x 5
+            nn.Conv2d(channels, NUM_IMAGES, 1),
+            # NUM_IMAGES x 5 x 5
+            nn.BatchNorm2d(NUM_IMAGES),
             nn.ReLU(),
-            nn.Linear(fc_h, fc_h),
-            nn.BatchNorm1d(fc_h),
-            nn.ReLU(),
-            nn.Linear(fc_h, NUM_ACTIONS)
         )
+
+        flattened_width = NUM_IMAGES * 5 * 5
+        self.image_linears = nn.Sequential(
+            nn.Linear(flattened_width, 32),
+            nn.BatchNorm1d(32),
+            nn.ReLU(),
+            nn.Linear(32, NUM_IMAGES * 4),
+            nn.BatchNorm1d(NUM_IMAGES * 4),
+            nn.ReLU(),
+        )
+        
+        combined_width = NUM_IMAGES * 4 + NUM_SCALARS
+        linears = [
+            nn.Linear(combined_width, channels),
+            nn.BatchNorm1d(channels),
+            nn.ReLU(),
+        ]
+        for i in range(num_blocks):
+            linears.append(ResBlock(channels, channels))
+        linears.append(
+            nn.Linear(channels, NUM_ACTIONS)
+        )
+        self.linears = nn.Sequential(*linears)
 
         if torch.cuda.is_available():
             self.cuda()
 
     def forward(self, state):
-        if isinstance(state, np.ndarray):
-            state = torch.from_numpy(state).type(torch.FloatTensor)
-        if torch.cuda.is_available():
-            state = state.cuda()
+        images, scalars = state
 
-        x = self.convs(state)
+        x = self.convs(images)
         x = torch.flatten(x, start_dim=1)
-        policy_scores = self.fc(x)
+        x = self.image_linears(x)
+        x = torch.flatten(x, start_dim=1)
+        policy_scores = self.linears(x)
         return policy_scores
 
     def optimize(self, data, batch_size, optimizer, verbose=False):
@@ -124,3 +141,13 @@ class PolicyGradientNet(nn.Module, Model):
         num_batches = np.ceil(len(data) / batch_size)
         avg_loss = running_loss / num_batches
         return avg_loss
+
+    @staticmethod
+    def transform_input(state):
+        images, scalars = state
+        images = torch.from_numpy(images).type(torch.FloatTensor)
+        scalars = torch.from_numpy(scalars).type(torch.FloatTensor)
+        if torch.cuda.is_available():
+            images = images.cuda()
+            scalars = scalars.cuda()
+        return images, scalars

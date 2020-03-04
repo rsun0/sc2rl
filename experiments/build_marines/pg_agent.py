@@ -12,7 +12,8 @@ from action_interface import BuildMarinesAction
 from custom_env import SCREEN_SIZE
 from action_interface import NUM_ACTIONS
 
-NUM_CHANNELS = 11
+NUM_IMAGES = 3
+NUM_SCALARS = 8
 
 
 class PolicyGradientMemory(Memory):
@@ -101,29 +102,23 @@ class PolicyGradientAgent(Agent):
 
     def state_space_converter(self, raw_state):
         obs, cc_queue_len = raw_state
-        state = np.zeros((NUM_CHANNELS, SCREEN_SIZE, SCREEN_SIZE), dtype=int)
-        state_idx = 0
 
-        features = [
-            obs.observation.feature_screen.unit_type,
-            obs.observation.feature_screen.unit_hit_points,
-            obs.observation.feature_screen.unit_hit_points_ratio,
-            obs.observation.player.minerals,
-            obs.observation.player.food_used,
-            obs.observation.player.food_cap,
-            obs.observation.player.food_army,
-            obs.observation.player.food_workers,
-            obs.observation.player.army_count,
-            obs.observation.game_loop.item(),
-            cc_queue_len,
-        ]
+        images = np.empty((NUM_IMAGES, SCREEN_SIZE, SCREEN_SIZE), dtype=int)
+        images[0] = obs.observation.feature_screen.unit_type
+        images[1] = obs.observation.feature_screen.unit_hit_points
+        images[2] = obs.observation.feature_screen.unit_hit_points_ratio
 
-        for f in features:
-            state[state_idx] = f
-            state_idx += 1
+        scalars = np.empty((NUM_SCALARS), dtype=int)
+        scalars[0] = obs.observation.player.minerals
+        scalars[1] = obs.observation.player.food_used
+        scalars[2] = obs.observation.player.food_cap
+        scalars[3] = obs.observation.player.food_army
+        scalars[4] = obs.observation.player.food_workers
+        scalars[5] = obs.observation.player.army_count
+        scalars[6] = obs.observation.game_loop.item()
+        scalars[7] = cc_queue_len
 
-        assert state_idx == state.shape[0], state_idx
-        return state
+        return images, scalars
 
     def action_space_converter(self, action):
         return action
