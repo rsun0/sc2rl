@@ -19,6 +19,10 @@ import argparse
 
 def parse_hyperparams():
     parser = argparse.ArgumentParser()
+    
+    parser.add_argument('--log-file', type=str, default='bin/log.txt', help='log file')
+    parser.add_argument('--graph-file', type=str, default='bin/graph.png', help='graph save location')
+    parser.add_argument('--model-file', type=str, default='bin/model.h5', help='model save file')
 
     parser.add_argument('--lr', type=float, default=0.0001, help='learning rate')
     parser.add_argument('--discount', type=float, default=1.0)
@@ -54,9 +58,9 @@ def run_training(args):
     save_every = train_every * 10
     graph_every = 10
     averaging_window = 20
-    graph_file = 'bin/graph.png'
-    save_file = 'bin/model.h5'
-    log_filename = 'bin/log.txt'
+    graph_file = args.graph_file
+    save_file = args.model_file
+    log_filename = args.log_file
 
     with open(log_filename, mode='w') as log_file:
         # Removes "Namespace" from printout
