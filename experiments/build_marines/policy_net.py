@@ -96,7 +96,7 @@ class PolicyGradientNet(nn.Module, Model):
         x = self.convs(images)
         x = torch.flatten(x, start_dim=1)
         x = self.image_linears(x)
-        x = torch.flatten(x, start_dim=1)
+        x = torch.cat((x, scalars), dim=1)
         policy_scores = self.linears(x)
         return policy_scores
 
