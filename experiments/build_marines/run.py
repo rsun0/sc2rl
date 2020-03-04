@@ -52,7 +52,7 @@ def run_training(args):
 
     with open(args.log_file, mode='w') as log_file:
         # Removes "Namespace" from printout
-        print('Args: ', str(args)[9:], file=log_file, flush=True)
+        print('Args:', str(args)[9:], file=log_file, flush=True)
 
         env = BuildMarinesEnvironment(
             render=args.render,
@@ -95,7 +95,7 @@ def run_training(args):
                 channels=args.channels,
             )
             agent = PolicyGradientAgent(
-                save_file=args.save_file,
+                save_file=args.model_file,
                 model=model,
                 settings=agent_settings,
                 memory=memory,
