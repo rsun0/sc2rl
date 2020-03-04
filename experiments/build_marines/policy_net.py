@@ -31,7 +31,6 @@ class ResBlock(nn.Module):
         return out
 
 
-# TODO do on gpu
 class PolicyGradientNet(nn.Module, Model):
     def __init__(self,
             num_blocks=4,
@@ -73,6 +72,9 @@ class PolicyGradientNet(nn.Module, Model):
     def forward(self, state):
         if isinstance(state, np.ndarray):
             state = torch.from_numpy(state).type(torch.FloatTensor)
+        if torch.cuda.is_available():
+            state = state.cuda()
+
         x = self.convs(state)
         x = torch.flatten(x, start_dim=1)
         policy_scores = self.fc(x)
@@ -97,6 +99,10 @@ class PolicyGradientNet(nn.Module, Model):
             actions_onehot = np.zeros((actions_batch.shape[0], NUM_ACTIONS))
             actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
             actions_onehot = torch.from_numpy(actions_onehot).type(torch.FloatTensor)
+
+            if torch.cuda.is_available():
+                actions_onehot = actions_onehot.cuda()
+                rewards_batch = rewards_batch.cuda()
 
             preds = self(states_batch)
             log_probs = torch.nn.functional.log_softmax(preds, dim=1)
