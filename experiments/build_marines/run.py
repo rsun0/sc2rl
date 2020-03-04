@@ -56,6 +56,9 @@ def run_training(args):
     log_filename = 'bin/log.txt'
 
     with open(log_filename, mode='w') as log_file:
+        # Removes "Namespace" from printout
+        print('Args: ', str(args)[9:], file=log_file, flush=True)
+
         env = BuildMarinesEnvironment(
             render=render,
             step_multiplier=step_mul,
@@ -110,7 +113,4 @@ def run_training(args):
 
 if __name__ == "__main__":
     args = parse_hyperparams()
-    # Removes "Namespace" from printout
-    # TODO print to log file
-    print('Args: ', str(args)[9:])
     run_training(args)

@@ -38,7 +38,6 @@ class PolicyGradientNet(nn.Module, Model):
             channels=32):
         super().__init__()
 
-        # FIXME memory problem, try downsizing
         convs = [
             nn.Conv2d(NUM_CHANNELS, channels, 3, padding=1),
             nn.BatchNorm2d(channels),
@@ -47,13 +46,20 @@ class PolicyGradientNet(nn.Module, Model):
         for i in range(num_blocks):
             convs.append(ResBlock(channels, channels))
         convs.extend([
+            # channels x 84 x 84
+            nn.Conv2d(channels, channels, 4, stride=2, padding=1),
+            # channels x 42 x 42
+            nn.BatchNorm2d(channels),
+            # channels x 21 x 21
+            nn.ReLU(),
+            nn.MaxPool2d(2),
             nn.Conv2d(channels, 4, 1),
             nn.BatchNorm2d(4),
             nn.ReLU(),
         ])
         self.convs = nn.Sequential(*convs)
         
-        fc_h = 4 * SCREEN_SIZE ** 2
+        fc_h = 4 * 21 * 21
         self.fc = nn.Sequential(
             nn.Linear(fc_h, fc_h),
             nn.BatchNorm1d(fc_h),
