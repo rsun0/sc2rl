@@ -69,6 +69,9 @@ class PolicyGradientNet(nn.Module, Model):
             nn.Linear(fc_h, NUM_ACTIONS)
         )
 
+        if torch.cuda.is_available():
+            self.cuda()
+
     def forward(self, state):
         if isinstance(state, np.ndarray):
             state = torch.from_numpy(state).type(torch.FloatTensor)
