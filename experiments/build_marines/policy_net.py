@@ -35,53 +35,34 @@ class ResBlock(nn.Module):
 class PolicyGradientNet(nn.Module, Model):
     def __init__(self,
             num_blocks=4,
-            channels=32,
-            test_mode=False):
+            channels=32):
         super().__init__()
 
-        if test_mode:
-            self.convs = nn.Sequential(
-                nn.Conv2d(NUM_CHANNELS, channels, 3, padding=1),
-                nn.BatchNorm2d(channels),
-                nn.ReLU(),
-                nn.Conv2d(channels, 1, 3, padding=1),
-                nn.BatchNorm2d(1),
-                nn.ReLU(),
-            )
-            
-            fc_h = SCREEN_SIZE ** 2
-            self.fc = nn.Sequential(
-                nn.Linear(fc_h, fc_h),
-                nn.BatchNorm1d(fc_h),
-                nn.ReLU(),
-                nn.Linear(fc_h, NUM_ACTIONS)
-            )
-        else:
-            # FIXME memory problem, try smaller screen size
-            convs = [
-                nn.Conv2d(NUM_CHANNELS, channels, 3, padding=1),
-                nn.BatchNorm2d(channels),
-                nn.ReLU()
-            ]
-            for i in range(num_blocks):
-                convs.append(ResBlock(channels, channels))
-            convs.extend([
-                nn.Conv2d(channels, 4, 1),
-                nn.BatchNorm2d(4),
-                nn.ReLU(),
-            ])
-            self.convs = nn.Sequential(*convs)
-            
-            fc_h = 4 * SCREEN_SIZE ** 2
-            self.fc = nn.Sequential(
-                nn.Linear(fc_h, fc_h),
-                nn.BatchNorm1d(fc_h),
-                nn.ReLU(),
-                nn.Linear(fc_h, fc_h),
-                nn.BatchNorm1d(fc_h),
-                nn.ReLU(),
-                nn.Linear(fc_h, NUM_ACTIONS)
-            )
+        # FIXME memory problem, try smaller screen size
+        convs = [
+            nn.Conv2d(NUM_CHANNELS, channels, 3, padding=1),
+            nn.BatchNorm2d(channels),
+            nn.ReLU()
+        ]
+        for i in range(num_blocks):
+            convs.append(ResBlock(channels, channels))
+        convs.extend([
+            nn.Conv2d(channels, 4, 1),
+            nn.BatchNorm2d(4),
+            nn.ReLU(),
+        ])
+        self.convs = nn.Sequential(*convs)
+        
+        fc_h = 4 * SCREEN_SIZE ** 2
+        self.fc = nn.Sequential(
+            nn.Linear(fc_h, fc_h),
+            nn.BatchNorm1d(fc_h),
+            nn.ReLU(),
+            nn.Linear(fc_h, fc_h),
+            nn.BatchNorm1d(fc_h),
+            nn.ReLU(),
+            nn.Linear(fc_h, NUM_ACTIONS)
+        )
 
     def forward(self, state):
         if isinstance(state, np.ndarray):

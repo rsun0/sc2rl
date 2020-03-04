@@ -25,7 +25,6 @@ def parse_hyperparams():
 
     parser.add_argument('--render', action='store_true', default=False, help='render game')
     parser.add_argument('--verbose', action='store_true', default=False, help='enable printouts')
-    parser.add_argument('--testnet', action='store_true', default=False, help='use simple net')
     parser.add_argument('--testagent', action='store_true', default=False, help='use test agent')
 
     args = parser.parse_args()
@@ -35,7 +34,6 @@ def parse_hyperparams():
 def run_training(args):
     render = args.render
     verbose = args.verbose
-    use_test_net = args.testnet
     use_test_agent = args.testagent
     step_mul = 16
 
@@ -97,7 +95,6 @@ def run_training(args):
             model = PolicyGradientNet(
                 num_blocks=num_blocks,
                 channels=num_channels,
-                test_mode=use_test_net,
             )
             agent = PolicyGradientAgent(
                 save_file=save_file,
