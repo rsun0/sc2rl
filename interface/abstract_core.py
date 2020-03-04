@@ -138,7 +138,7 @@ class Experiment:
         pass
 
     def plot_results(self, averages):
-        plt.figure(1)
+        plt.figure(1, clear=True)
         plt.clf()
         plt.suptitle("Training results")
         plt.title("Ray Sun, David Long, Michael McGuire")
@@ -147,8 +147,6 @@ class Experiment:
         for i in range(len(averages)):
             plt.plot(averages[i])
         plt.legend(['Agent {}'.format(a) for a in range(len(averages))])
-        # Makes graph update nonblocking
-        plt.pause(0.005)
         if self.run_settings.graph_file:
             plt.savefig(self.run_settings.graph_file)
 

@@ -72,6 +72,7 @@ class PolicyGradientAgent(Agent):
         loss = self.model.optimize(
             data, batch_size, self.optimizer, self.settings.verbose)
         
+        # FIXME always prints 0
         if self.train_count == 0:
             print('ITR\tLOSS\t\tSCORE', file=run_settings.log_file)
         if loss is not None:
