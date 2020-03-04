@@ -14,7 +14,7 @@ class BuildMarinesAction(Enum):
     BUILD_BARRACKS = 4
     KILL_MARINE = 5
 
-
+# TODO fix constants for smaller screen size
 class BuildMarinesActuator:
     SCV_COST = 50
     MARINE_COST = 50

@@ -38,7 +38,7 @@ class PolicyGradientNet(nn.Module, Model):
             channels=32):
         super().__init__()
 
-        # FIXME memory problem, try smaller screen size
+        # FIXME memory problem, try downsizing
         convs = [
             nn.Conv2d(NUM_CHANNELS, channels, 3, padding=1),
             nn.BatchNorm2d(channels),
