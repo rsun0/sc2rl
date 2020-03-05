@@ -13,7 +13,7 @@ from action_interface import BuildMarinesAction
 from custom_env import SCREEN_SIZE
 from action_interface import NUM_ACTIONS
 
-NUM_IMAGES = 3
+NUM_IMAGES = 2
 NUM_SCALARS = 8
 MEM_SKIP = 4
 
@@ -124,7 +124,7 @@ class PolicyGradientAgent(Agent):
         images = np.empty((NUM_IMAGES, SCREEN_SIZE, SCREEN_SIZE), dtype=int)
         images[0] = obs.observation.feature_screen.unit_type
         images[1] = obs.observation.feature_screen.unit_hit_points
-        images[2] = obs.observation.feature_screen.unit_hit_points_ratio
+        # images[2] = obs.observation.feature_screen.unit_hit_points_ratio
 
         scalars = np.empty((NUM_SCALARS), dtype=int)
         scalars[0] = obs.observation.player.minerals
