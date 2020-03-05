@@ -61,6 +61,7 @@ class PolicyGradientAgent(Agent):
         self.train_count = 0
 
     def _sample(self, state):
+        # TODO add exploration?
         probs = self._forward(state)
         action = np.random.choice(NUM_ACTIONS, p=probs)
         return action
