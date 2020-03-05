@@ -26,6 +26,8 @@ def parse_hyperparams():
 
     parser.add_argument('--lr', type=float, default=0.0001, help='learning rate')
     parser.add_argument('--discount', type=float, default=1.0)
+    parser.add_argument('--init-temp', type=float, default=1.0)
+    parser.add_argument('--temp-steps', type=int, default=256)
     parser.add_argument('--memsize', type=int, default=32000, help='experience replay memory size')
     parser.add_argument('--resblocks', type=int, default=2, help='number of resblocks in net')
     parser.add_argument('--channels', type=int, default=32, help='number of conv channels in net')
@@ -33,8 +35,8 @@ def parse_hyperparams():
     parser.add_argument('--episodes', type=int, default=10000, help='number of episodes per epoch')
     parser.add_argument('--epochs', type=int, default=1, help='number of epochs')
     parser.add_argument('--batch-size', type=int, default=32)
-    parser.add_argument('--train-every', type=int, default=4096, help='training period in number of steps')
-    parser.add_argument('--save-every', type=int, default=40960, help='save period in number of steps')
+    parser.add_argument('--train-every', type=int, default=16000, help='training period in number of steps')
+    parser.add_argument('--save-every', type=int, default=160000, help='save period in number of steps')
     parser.add_argument('--graph-every', type=int, default=50, help='graphing period in number of episodes')
     parser.add_argument('--window', type=int, default=100, help='averaging window for graph')
 
@@ -95,6 +97,8 @@ def run_training(args):
                 channels=args.channels,
             )
             agent = PolicyGradientAgent(
+                init_temp=args.init_temp,
+                temp_steps=args.temp_steps,
                 save_file=args.model_file,
                 model=model,
                 settings=agent_settings,

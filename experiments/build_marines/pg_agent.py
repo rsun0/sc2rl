@@ -4,6 +4,7 @@ import itertools
 import torch
 import numpy as np
 from tqdm import tqdm
+import scipy.special
 
 import sys
 sys.path.insert(0, "../interface/")
@@ -59,15 +60,23 @@ class PolicyGradientMemory(Memory):
 
 
 class PolicyGradientAgent(Agent):
-    def __init__(self, save_file=None, *args, **kwargs):
+    def __init__(self,
+            init_temp=0.0,
+            temp_steps=1,
+            save_file=None,
+            *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.save_file = save_file
 
+        self.init_temp = init_temp
+        self.temp_steps = temp_steps
+        self.temp = init_temp
         self.train_count = 0
 
     def _sample(self, state):
-        # TODO add exploration?
         probs = self._forward(state)
+        if self.temp > 0:
+            probs = scipy.special.softmax(probs / self.temp)
         action = np.random.choice(NUM_ACTIONS, p=probs)
         return action
 
@@ -87,17 +96,21 @@ class PolicyGradientAgent(Agent):
             data, batch_size, self.optimizer, self.settings.verbose)
         
         if self.train_count == 0:
-            print('ITR\tGAMES\tEXP\t\tLOSS\t\tSCORE', file=run_settings.log_file)
+            print('ITR\tGAMES\tEXP\t\tTEMP\tLOSS\t\tSCORE', file=run_settings.log_file)
         if loss is not None:
             avg_score = self.memory.get_average_score()
-            print('{itr:<3d}\t{games:4d}\t{exp:8d}\t{loss:8.4f}\t{score:5.1f}'
+            print('{itr:<3d}\t{games:5d}\t{exp:8d}\t{tmp:6.4f}\t{loss:8.4f}\t{score:5.1f}'
                 .format(
                     itr=self.train_count,
                     games=self.memory.num_games,
                     exp=self.memory.num_exp,
+                    tmp=self.temp,
                     loss=loss,
                     score=avg_score),
                 file=run_settings.log_file, flush=True)
+
+        if self.temp > 0:
+            self.temp -= (self.init_temp / self.temp_steps)
         self.train_count += 1
 
     def train_step(self, batch_size):
