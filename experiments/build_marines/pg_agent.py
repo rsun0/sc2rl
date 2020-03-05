@@ -22,6 +22,8 @@ class PolicyGradientMemory(Memory):
         self.scores = collections.deque(maxlen=averaging_window)
         self.discount = discount
         self.current_trajectory = []
+        self.num_games = 0
+        self.num_exp = 0
 
     def push(self, state, action, reward, done):
         self.current_trajectory.append((state, action, reward))
@@ -39,7 +41,9 @@ class PolicyGradientMemory(Memory):
 
             trajectory = zip(states, actions, values)
             self.experiences.extend(trajectory)
-            self.scores.append(sum(rewards))
+            self.scores.append(values[0])
+            self.num_exp += len(self.current_trajectory)
+            self.num_games += 1
             self.current_trajectory = []
 
     def get_data(self):
@@ -77,11 +81,16 @@ class PolicyGradientAgent(Agent):
             data, batch_size, self.optimizer, self.settings.verbose)
         
         if self.train_count == 0:
-            print('ITR\tLOSS\t\tSCORE', file=run_settings.log_file)
+            print('ITR\tGAMES\tEXP\t\tLOSS\t\tSCORE', file=run_settings.log_file)
         if loss is not None:
             avg_score = self.memory.get_average_score()
-            print('{itr:<2d}\t{loss:8.4f}\t{score:5.1f}'
-                .format(itr=self.train_count, loss=loss, score=avg_score),
+            print('{itr:<3d}\t{games:4d}\t{exp:8d}\t{loss:8.4f}\t{score:5.1f}'
+                .format(
+                    itr=self.train_count,
+                    games=self.memory.num_games,
+                    exp=self.memory.num_exp,
+                    loss=loss,
+                    score=avg_score),
                 file=run_settings.log_file, flush=True)
         self.train_count += 1
 
