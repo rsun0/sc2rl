@@ -46,8 +46,8 @@ class PolicyGradientMemory(Memory):
             self.num_games += 1
             self.current_trajectory = []
 
-    def get_data(self):
-        return list(self.experiences)
+    def get_shuffled_data(self):
+        return np.random.permutation(list(self.experiences))
 
     def get_average_score(self):
         return np.mean(self.scores)
@@ -75,7 +75,7 @@ class PolicyGradientAgent(Agent):
         return probs
 
     def train(self, run_settings):
-        data = self.memory.get_data()
+        data = self.memory.get_shuffled_data()
         batch_size = run_settings.batch_size
         loss = self.model.optimize(
             data, batch_size, self.optimizer, self.settings.verbose)
