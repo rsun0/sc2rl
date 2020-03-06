@@ -1,11 +1,12 @@
 from enum import Enum
+import sys
 
 import numpy as np
 from pysc2.env import sc2_env
 from pysc2.lib import features, protocol, units
 
 from action_interface import BuildMarinesAction, BuildMarinesActuator
-from abstract_core import CustomEnvironment
+from abstract_core import CustomEnvironment, EpisodeCrashException
     
 SCREEN_SIZE = 84
 MINIMAP_SIZE = 1
@@ -129,16 +130,24 @@ class BuildMarinesEnvironment(CustomEnvironment):
             self._step_env(raw_action)
     
     def _reset_env(self):
-        # Get obs for 1st agent
-        self._curr_frame = self._env.reset()[0]
+        try:
+            # Get obs for 1st agent
+            self._curr_frame = self._env.reset()[0]
+        except protocol.ConnectionError as e:
+            tb = sys.exc_info()[2]
+            raise EpisodeCrashException('pysc2 reset() failed').with_traceback(tb)
         self._update_persistent_state()
         self._accumulated_reward += self._curr_frame.reward
         if self._curr_frame.last():
             self._terminal = True
 
     def _step_env(self, raw_action):
-        # Get obs for 1st agent
-        self._curr_frame = self._env.step([raw_action])[0]
+        try:
+            # Get obs for 1st agent
+            self._curr_frame = self._env.step([raw_action])[0]
+        except protocol.ConnectionError:
+            tb = sys.exc_info()[2]
+            raise EpisodeCrashException('pysc2 step() failed').with_traceback(tb)
         self._update_persistent_state()
         self._accumulated_reward += self._curr_frame.reward
         if self._curr_frame.last():

@@ -58,6 +58,9 @@ class PolicyGradientMemory(Memory):
     def get_average_score(self):
         return np.mean(self.scores)
 
+    def discard(self):
+        self.current_trajectory = []
+
 
 class PolicyGradientAgent(Agent):
     def __init__(self,
@@ -130,6 +133,10 @@ class PolicyGradientAgent(Agent):
 
     def push_memory(self, state, action, reward, done):
         self.memory.push(state, action, reward, done)
+
+    def notify_episode_crashed(self, run_settings):
+        print('Episode crashed', file=run_settings.log_file, flush=True)
+        self.memory.discard()
 
     def state_space_converter(self, raw_state):
         obs, cc_queue_len = raw_state

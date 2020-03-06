@@ -13,6 +13,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import deque
 
+class EpisodeCrashException(Exception):
+    '''
+    Signals that the current episode has crashed
+    Data for this episode should be discarded before resetting
+    '''
+    pass
+
+
 class Experiment:
     def __init__(self, agents, custom_env, run_settings):
         self.agents = agents
@@ -30,7 +38,13 @@ class Experiment:
 
         for e in range(self.run_settings.num_episodes):
             # Initialize episode
-            env_states, rewards, done, metainfo = self.custom_env.reset()
+            try:
+                env_states, rewards, done, metainfo = self.custom_env.reset()
+            except EpisodeCrashException:
+                for a in range(len(self.agents)):
+                    if hasattr(self.agents[a], 'notify_episode_crashed'):
+                        self.agents[a].notify_episode_crashed(self.run_settings)
+                continue
 
             # Initialize scores to starting reward (probably 0)
             scores = rewards
@@ -56,7 +70,13 @@ class Experiment:
                 env_actions = [self.agents[a].action_space_converter(actions[a])
                     for a in range(len(self.agents))]
                 # Take environment step
-                env_states, rewards, done, metainfo = self.custom_env.step(env_actions)
+                try:
+                    env_states, rewards, done, metainfo = self.custom_env.step(env_actions)
+                except EpisodeCrashException:
+                    for a in range(len(self.agents)):
+                        if hasattr(self.agents[a], 'notify_episode_crashed'):
+                            self.agents[a].notify_episode_crashed(self.run_settings)
+                    break
                 step += 1
                 total_steps += 1
 
@@ -98,7 +118,11 @@ class Experiment:
 
         for e in range(self.run_settings.test_episodes):
             # Initialize episode
-            env_states, rewards, done, metainfo = self.custom_env.reset()
+            try:
+                env_states, rewards, done, metainfo = self.custom_env.reset()
+            except EpisodeCrashException:
+                print('Episode crashed, resetting.')
+                continue
 
             # Initialize scores to starting reward (probably 0)
             scores = np.array(rewards)
@@ -116,7 +140,11 @@ class Experiment:
                 if self.run_settings.verbose:
                     self.print_action(env_actions)
                 # Take environment step
-                env_states, rewards, done, metainfo = self.custom_env.step(env_actions)
+                try:
+                    env_states, rewards, done, metainfo = self.custom_env.step(env_actions)
+                except EpisodeCrashException:
+                    print('Episode crashed, resetting.')
+                    break
                 step += 1
                 total_steps += 1
 
