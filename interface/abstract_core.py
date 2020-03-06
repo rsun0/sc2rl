@@ -139,14 +139,12 @@ class Experiment:
 
     def plot_results(self, averages):
         plt.figure(1, clear=True)
-        plt.clf()
-        plt.suptitle("Training results")
-        plt.title("Ray Sun, David Long, Michael McGuire")
+        plt.title("Moving average of score over time")
         plt.xlabel("Episodes")
         plt.ylabel("Average score")
         for i in range(len(averages)):
             plt.plot(averages[i])
-        plt.legend(['Agent {}'.format(a) for a in range(len(averages))])
+        # plt.legend(['Agent {}'.format(a) for a in range(len(averages))])
         if self.run_settings.graph_file:
             plt.savefig(self.run_settings.graph_file)
 
