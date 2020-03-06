@@ -1,5 +1,6 @@
 import collections
 import itertools
+from datetime import datetime
 
 import torch
 import numpy as np
@@ -95,12 +96,16 @@ class PolicyGradientAgent(Agent):
             data, batch_size, self.optimizer, self.settings.verbose)
         
         if self.train_count == 0:
-            print('ITR\tGAMES\tEXP\t\tTEMP\tLOSS\t\tSCORE', file=run_settings.log_file)
+            print('ITR\tTIME\tGAMES\tEXP\t\tTEMP\tLOSS\t\tSCORE', file=run_settings.log_file)
+            time = datetime.now().strftime('%H:%M:%S')
+            print('start\t{time}'.format(time=time), file=run_settings.log_file)
         if loss is not None:
             avg_score = self.memory.get_average_score()
-            print('{itr:<3d}\t{games:5d}\t{exp:8d}\t{tmp:6.4f}\t{loss:8.4f}\t{score:5.1f}'
+            time = datetime.now().strftime('%H:%M:%S')
+            print('{itr:<3d}\t{time}\t{games:5d}\t{exp:8d}\t{tmp:6.4f}\t{loss:8.4f}\t{score:5.1f}'
                 .format(
                     itr=self.train_count,
+                    time=time,
                     games=self.memory.num_games,
                     exp=self.memory.num_exp,
                     tmp=self.temp,
