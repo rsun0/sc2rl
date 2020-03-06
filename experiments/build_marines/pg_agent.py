@@ -16,7 +16,7 @@ from action_interface import NUM_ACTIONS
 
 NUM_IMAGES = 2
 NUM_SCALARS = 8
-MEM_SKIP = 4
+# MEM_SKIP = 4
 
 
 class PolicyGradientMemory(Memory):
@@ -43,12 +43,13 @@ class PolicyGradientMemory(Memory):
             values.reverse()
 
             trajectory = zip(states, actions, values)
-            # Only save 1 out of MEM_SKIP experiences
-            trajectory = itertools.islice(trajectory, None, None, MEM_SKIP)
+            # # Only save 1 out of MEM_SKIP experiences
+            # trajectory = itertools.islice(trajectory, None, None, MEM_SKIP)
             self.experiences.extend(trajectory)
 
             self.scores.append(values[0])
-            self.num_exp += len(self.current_trajectory) // MEM_SKIP
+            # self.num_exp += len(self.current_trajectory) // MEM_SKIP
+            self.num_exp += len(self.current_trajectory)
             self.num_games += 1
             self.current_trajectory = []
 

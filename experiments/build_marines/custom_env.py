@@ -135,7 +135,7 @@ class BuildMarinesEnvironment(CustomEnvironment):
             self._curr_frame = self._env.reset()[0]
         except protocol.ConnectionError as e:
             tb = sys.exc_info()[2]
-            raise EpisodeCrashException('pysc2 reset() failed').with_traceback(tb)
+            raise EpisodeCrashException('SC2Env.reset() failed').with_traceback(tb)
         self._update_persistent_state()
         self._accumulated_reward += self._curr_frame.reward
         if self._curr_frame.last():
@@ -147,7 +147,7 @@ class BuildMarinesEnvironment(CustomEnvironment):
             self._curr_frame = self._env.step([raw_action])[0]
         except protocol.ConnectionError:
             tb = sys.exc_info()[2]
-            raise EpisodeCrashException('pysc2 step() failed').with_traceback(tb)
+            raise EpisodeCrashException('SC2Env.step() failed').with_traceback(tb)
         self._update_persistent_state()
         self._accumulated_reward += self._curr_frame.reward
         if self._curr_frame.last():
