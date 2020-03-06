@@ -21,8 +21,9 @@ class TestAgent(Agent):
         self.num_scvs = 12
         self.rax_done_at = self.NOT_SET
 
-    def push_memory_terminal(self, _):
-        self.reset()
+    def push_memory(self, _state, _action, _reward, done):
+        if done:
+            self.reset()
 
     def _sample(self, state):
         mins = state.observation.player.minerals
