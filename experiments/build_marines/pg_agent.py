@@ -64,6 +64,7 @@ class PolicyGradientAgent(Agent):
             init_temp=0.0,
             temp_steps=1,
             save_file=None,
+            log_file=None,
             *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.save_file = save_file
@@ -72,6 +73,10 @@ class PolicyGradientAgent(Agent):
         self.temp_steps = temp_steps
         self.temp = init_temp
         self.train_count = 0
+        
+        print('ITR\tTIME\t\tGAMES\tEXP\t\tTEMP\tLOSS\t\tSCORE', file=log_file)
+        time = datetime.now().strftime('%H:%M:%S')
+        print('start\t{time}'.format(time=time), file=log_file)
 
     def _sample(self, state):
         probs = self._forward(state)
@@ -95,10 +100,6 @@ class PolicyGradientAgent(Agent):
         loss = self.model.optimize(
             data, batch_size, self.optimizer, self.settings.verbose)
         
-        if self.train_count == 0:
-            print('ITR\tTIME\tGAMES\tEXP\t\tTEMP\tLOSS\t\tSCORE', file=run_settings.log_file)
-            time = datetime.now().strftime('%H:%M:%S')
-            print('start\t{time}'.format(time=time), file=run_settings.log_file)
         if loss is not None:
             avg_score = self.memory.get_average_score()
             time = datetime.now().strftime('%H:%M:%S')

@@ -100,6 +100,7 @@ def run_training(args):
                 init_temp=args.init_temp,
                 temp_steps=args.temp_steps,
                 save_file=args.model_file,
+                log_file=log_file,
                 model=model,
                 settings=agent_settings,
                 memory=memory,
