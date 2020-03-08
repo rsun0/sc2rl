@@ -46,21 +46,21 @@ class PolicyGradientNet(nn.Module, Model):
             nn.ReLU(),
         )
 
-        self.image_linears = nn.Sequential(
-            nn.Linear(84 * 84, NUM_IMAGES * 8),
-            nn.BatchNorm1d(NUM_IMAGES * 8),
-            nn.ReLU(),
-        )
+        # self.image_linears = nn.Sequential(
+        #     nn.Linear(84 * 84, NUM_IMAGES * 8),
+        #     nn.BatchNorm1d(NUM_IMAGES * 8),
+        #     nn.ReLU(),
+        # )
 
-        self.linears = nn.Sequential(
-            nn.Linear(NUM_IMAGES * 8 + NUM_SCALARS, channels),
-            nn.BatchNorm1d(channels),
-            nn.ReLU(),
-            nn.Linear(channels, channels),
-            nn.BatchNorm1d(channels),
-            nn.ReLU(),
-            nn.Linear(channels, NUM_ACTIONS)
-        )
+        # self.linears = nn.Sequential(
+        #     nn.Linear(NUM_IMAGES * 8 + NUM_SCALARS, channels),
+        #     nn.BatchNorm1d(channels),
+        #     nn.ReLU(),
+        #     nn.Linear(channels, channels),
+        #     nn.BatchNorm1d(channels),
+        #     nn.ReLU(),
+        #     nn.Linear(channels, NUM_ACTIONS)
+        # )
 
         # self.convs = nn.Sequential(
         #     # NUM_IMAGES x 84 x 84
@@ -90,27 +90,28 @@ class PolicyGradientNet(nn.Module, Model):
         # )
 
         # flattened_width = NUM_IMAGES * 5 * 5
-        # self.image_linears = nn.Sequential(
-        #     nn.Linear(flattened_width, 32),
-        #     nn.BatchNorm1d(32),
-        #     nn.ReLU(),
-        #     nn.Linear(32, NUM_IMAGES * 4),
-        #     nn.BatchNorm1d(NUM_IMAGES * 4),
-        #     nn.ReLU(),
-        # )
+        flattened_width = 84 * 84
+        self.image_linears = nn.Sequential(
+            nn.Linear(flattened_width, flattened_width // 24),
+            nn.BatchNorm1d(flattened_width // 24),
+            nn.ReLU(),
+            nn.Linear(flattened_width // 24, NUM_IMAGES * 4),
+            nn.BatchNorm1d(NUM_IMAGES * 4),
+            nn.ReLU(),
+        )
         
-        # combined_width = NUM_IMAGES * 4 + NUM_SCALARS
-        # linears = [
-        #     nn.Linear(combined_width, channels),
-        #     nn.BatchNorm1d(channels),
-        #     nn.ReLU(),
-        # ]
-        # for i in range(num_blocks):
-        #     linears.append(ResBlock(channels, channels))
-        # linears.append(
-        #     nn.Linear(channels, NUM_ACTIONS)
-        # )
-        # self.linears = nn.Sequential(*linears)
+        combined_width = NUM_IMAGES * 4 + NUM_SCALARS
+        linears = [
+            nn.Linear(combined_width, channels),
+            nn.BatchNorm1d(channels),
+            nn.ReLU(),
+        ]
+        for i in range(num_blocks):
+            linears.append(ResBlock(channels, channels))
+        linears.append(
+            nn.Linear(channels, NUM_ACTIONS)
+        )
+        self.linears = nn.Sequential(*linears)
 
         if torch.cuda.is_available():
             self.cuda()
