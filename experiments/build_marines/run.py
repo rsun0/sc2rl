@@ -40,9 +40,11 @@ def parse_hyperparams():
     parser.add_argument('--graph-every', type=int, default=50, help='graphing period in number of episodes')
     parser.add_argument('--window', type=int, default=100, help='averaging window for graph')
 
-    parser.add_argument('--render', action='store_true', default=False, help='render game')
-    parser.add_argument('--verbose', action='store_true', default=False, help='enable printouts')
-    parser.add_argument('--testagent', action='store_true', default=False, help='use test agent')
+    parser.add_argument('--render', action='store_true', help='render game')
+    parser.add_argument('--verbose', action='store_true', help='enable printouts')
+    parser.add_argument('--testagent', action='store_true', help='use test agent')
+    parser.add_argument('--no-scvs', action='store_true', help='disable make SCV helper')
+    parser.add_argument('--no-kill', action='store_true', help='disable kill marine helper')
 
     args = parser.parse_args()
     return args
@@ -60,8 +62,8 @@ def run_training(args):
             render=args.render,
             step_multiplier=step_mul,
             verbose=args.verbose,
-            enable_scv_helper=True,
-            enable_kill_helper=True,
+            enable_scv_helper=(not args.no_scvs),
+            enable_kill_helper=(not args.no_kill),
         )
         run_settings = RunSettings(
             num_episodes=args.episodes,
