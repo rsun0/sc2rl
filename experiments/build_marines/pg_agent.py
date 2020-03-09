@@ -1,70 +1,121 @@
-import json
+import collections
+import itertools
+from datetime import datetime
 
 import torch
 import numpy as np
 from tqdm import tqdm
-from pommerman import constants
+import scipy.special
 
 import sys
 sys.path.insert(0, "../interface/")
 
-from agent import Agent
+from agent import Agent, Memory
+from action_interface import BuildMarinesAction
+from custom_env import SCREEN_SIZE
+from action_interface import NUM_ACTIONS
 
-NUM_ACTIONS = len(constants.Action)
+NUM_IMAGES = 2
+NUM_SCALARS = 8
+
+
+class PolicyGradientMemory(Memory):
+    def __init__(self, buffer_len, discount, averaging_window):
+        self.experiences = collections.deque(maxlen=buffer_len)
+        self.scores = collections.deque(maxlen=averaging_window)
+        self.discount = discount
+        self.current_trajectory = []
+        self.num_games = 0
+        self.num_exp = 0
+
+    def push(self, state, action, reward, done):
+        self.current_trajectory.append((state, action, reward))
+        
+        if done:
+            states, actions, rewards = zip(*self.current_trajectory)
+            
+            values = []
+            running_value = 0
+            for i in range(len(rewards) - 1, -1, -1):
+                running_value += rewards[i]
+                values.append(running_value)
+                running_value *= self.discount
+            values.reverse()
+
+            trajectory = zip(states, actions, values)
+            self.experiences.extend(trajectory)
+            self.scores.append(values[0])
+            self.num_exp += len(self.current_trajectory)
+            self.num_games += 1
+            self.current_trajectory = []
+
+    def get_shuffled_data(self):
+        return np.random.permutation(list(self.experiences))
+
+    def get_average_score(self):
+        return np.mean(self.scores)
+
+    def discard(self):
+        self.current_trajectory = []
 
 
 class PolicyGradientAgent(Agent):
-    def __init__(self, save_file=None, *args, **kwargs):
+    def __init__(self,
+            init_temp=0.0,
+            temp_steps=1,
+            save_file=None,
+            *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.save_file = save_file
 
+        self.init_temp = init_temp
+        self.temp_steps = temp_steps
+        self.temp = init_temp
+        self.train_count = 0
+
     def _sample(self, state):
         probs = self._forward(state)
-        action = np.random.choice(6, p=probs)
+        if self.temp > 0:
+            probs = scipy.special.softmax(probs / self.temp)
+        action = np.random.choice(NUM_ACTIONS, p=probs)
         return action
 
     def _forward(self, state):
-        self.model.eval()
         images, scalars = state
-        preds = self.model((images[np.newaxis], scalars[np.newaxis]))
-        probs = torch.nn.functional.softmax(preds, dim=1).detach().numpy()[0]
+        images, scalars = self.model.to_torch(images[np.newaxis], scalars[np.newaxis])
+
+        self.model.eval()
+        preds = self.model(images, scalars)
+        probs = torch.nn.functional.softmax(preds, dim=1).detach().cpu().numpy()[0]
         return probs
 
     def train(self, run_settings):
+        data = self.memory.get_shuffled_data()
         batch_size = run_settings.batch_size
-        self.model.train()
-        data = self.memory.get_data()
-        running_loss = 0
-        pbar = tqdm(range(0, len(data) - batch_size + 1, batch_size))
-        for i in pbar:
-            batch = data[i:i+batch_size]
-            states, actions, rewards = zip(*batch)
-            images, scalars = zip(*states)
+        loss = self.model.optimize(
+            data, batch_size, self.optimizer, self.settings.verbose)
+        
+        if self.train_count == 0:
+            print('ITR\tTIME\tGAMES\tEXP\t\tTEMP\tLOSS\t\tSCORE', file=run_settings.log_file)
+            time = datetime.now().strftime('%H:%M:%S')
+            print('start\t{time}'.format(time=time), file=run_settings.log_file)
+        if loss is not None:
+            avg_score = self.memory.get_average_score()
+            time = datetime.now().strftime('%H:%M:%S')
+            print('{itr:<3d}\t{time}\t{games:5d}\t{exp:8d}\t{tmp:6.4f}\t{loss:8.4f}\t{score:5.1f}'
+                .format(
+                    itr=self.train_count,
+                    time=time,
+                    games=self.memory.num_games,
+                    exp=self.memory.num_exp,
+                    tmp=self.temp,
+                    loss=loss,
+                    score=avg_score),
+                file=run_settings.log_file, flush=True)
 
-            images_batch = np.stack(images)
-            scalars_batch = np.stack(scalars)
-            actions_batch = np.array(actions)
-            rewards_batch = torch.from_numpy(np.array(rewards))
-
-            actions_onehot = np.zeros((actions_batch.shape[0], NUM_ACTIONS))
-            actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
-            actions_onehot = torch.from_numpy(actions_onehot)
-
-            preds = self.model((images_batch, scalars_batch))
-            log_probs = torch.nn.functional.log_softmax(preds, dim=1)
-            log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
-            loss = -torch.sum(log_probs_observed * rewards_batch)
-
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
-
-            running_loss += loss.item()
-            num_experiences = i + batch_size
-            pbar.set_postfix_str("{:.3f}L".format(running_loss / num_experiences))
-        pbar.close()
-        # Throw away used experiences?
-        # self.experiences = []
+        if self.temp > 0:
+            self.temp -= (self.init_temp / self.temp_steps)
+        self.train_count += 1
 
     def train_step(self, batch_size):
         pass
@@ -84,34 +135,27 @@ class PolicyGradientAgent(Agent):
     def push_memory(self, state, action, reward, done):
         self.memory.push(state, action, reward, done)
 
-    def state_space_converter(self, obs):
-        to_use = [0, 1, 2, 3, 4, 6, 7, 8, 10, 11]
- 
-        board = obs['board'] # 0-4, 6-8, 10-11 [10 total]
-        bomb_life = obs['bomb_life'] # 11
-        bomb_moving_direction = obs['bomb_moving_direction'] #12
-        flame_life = obs['flame_life'] #13
+    def notify_episode_crashed(self, run_settings):
+        print('Episode crashed', file=run_settings.log_file, flush=True)
+        self.memory.discard()
 
-        images = np.zeros((13, board.shape[0], board.shape[1]))
-        for i in range(len(to_use)):
-            images[i] = (board == to_use[i]).astype(int)
-        images[10] = bomb_life 
-        images[11] = bomb_moving_direction 
-        images[12] = flame_life 
+    def state_space_converter(self, raw_state):
+        obs, cc_queue_len = raw_state
 
-        scalars = []
-        scalar_items = ['ammo', 'blast_strength', 'can_kick']
-        agents = obs['json_info']['agents'] # array of dictionaries as a string
-       
-        i = agents.find('}')
-        agent1 = json.loads(obs['json_info']['agents'][1:i+1])
-        agent2 = json.loads(obs['json_info']['agents'][i+2:-1]) 
+        images = np.empty((NUM_IMAGES, SCREEN_SIZE, SCREEN_SIZE), dtype=int)
+        images[0] = obs.observation.feature_screen.unit_type
+        images[1] = obs.observation.feature_screen.unit_hit_points
+        # images[2] = obs.observation.feature_screen.unit_hit_points_ratio
 
-        for agent in [agent1, agent2]:
-            for scalar_item in scalar_items:
-                scalars.append(agent[scalar_item])
-
-        scalars = np.array(scalars)
+        scalars = np.empty((NUM_SCALARS), dtype=int)
+        scalars[0] = obs.observation.player.minerals
+        scalars[1] = obs.observation.player.food_used
+        scalars[2] = obs.observation.player.food_cap
+        scalars[3] = obs.observation.player.food_army
+        scalars[4] = obs.observation.player.food_workers
+        scalars[5] = obs.observation.player.army_count
+        scalars[6] = obs.observation.game_loop.item()
+        scalars[7] = cc_queue_len
 
         return images, scalars
 

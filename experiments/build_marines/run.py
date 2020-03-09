@@ -1,52 +1,115 @@
+import matplotlib
+matplotlib.use('Agg')
+
+import argparse
+
 import sys
 sys.path.insert(0, "../../interface/")
 
 from custom_env import BuildMarinesEnvironment
 from abstract_core import Experiment, RunSettings
 from agent import AgentSettings
+from pg_agent import PolicyGradientAgent, PolicyGradientMemory
 from test_agent import TestAgent
+from policy_net import PolicyGradientNet
 
 import torch
 import argparse
 
-def run_training():
-    render = True
-    step_mul = 16
 
-    env = BuildMarinesEnvironment(render=render, step_multiplier=step_mul)
-                                
-    # lr = 5e-3
-    # eps_max = 0.3
-    # eps_min = 0.05
-    # eps_duration=1e5
+def parse_hyperparams():
+    parser = argparse.ArgumentParser()
     
-    # agent_settings = AgentSettings(torch.optim.Adam,
-    #                             lr,
-    #                             eps_max,
-    #                             eps_min,
-    #                             eps_duration)
+    parser.add_argument('--log-file', type=str, default='bin/log.txt', help='log file')
+    parser.add_argument('--graph-file', type=str, default='bin/graph.png', help='graph save location')
+    parser.add_argument('--model-file', type=str, default='bin/model.h5', help='model save file')
+
+    parser.add_argument('--lr', type=float, default=0.0001, help='learning rate')
+    parser.add_argument('--discount', type=float, default=1.0)
+    parser.add_argument('--init-temp', type=float, default=1.0)
+    parser.add_argument('--temp-steps', type=int, default=16)
+    parser.add_argument('--memsize', type=int, default=64000, help='experience replay memory size')
+    parser.add_argument('--resblocks', type=int, default=2, help='number of resblocks in net')
+    parser.add_argument('--channels', type=int, default=32, help='number of conv channels in net')
     
-    num_episodes = 10
-    num_epochs = 1
-    batch_size = 32
-    train_every = 9999
-    save_every = 9999
-    graph_every = 0
-    averaging_window = 100
-    
-    run_settings = RunSettings(num_episodes,
-                                num_epochs,
-                                batch_size,
-                                train_every,
-                                save_every,
-                                graph_every,
-                                averaging_window)
-    
-    agent = TestAgent()
-    experiment = Experiment([agent], env, run_settings)
-    
-    experiment.train()
+    parser.add_argument('--episodes', type=int, default=10000, help='number of episodes per epoch')
+    parser.add_argument('--epochs', type=int, default=1, help='number of epochs')
+    parser.add_argument('--batch-size', type=int, default=32)
+    parser.add_argument('--train-every', type=int, default=16000, help='training period in number of steps')
+    parser.add_argument('--save-every', type=int, default=160000, help='save period in number of steps')
+    parser.add_argument('--graph-every', type=int, default=50, help='graphing period in number of episodes')
+    parser.add_argument('--window', type=int, default=100, help='averaging window for graph')
+
+    parser.add_argument('--render', action='store_true', default=False, help='render game')
+    parser.add_argument('--verbose', action='store_true', default=False, help='enable printouts')
+    parser.add_argument('--testagent', action='store_true', default=False, help='use test agent')
+
+    args = parser.parse_args()
+    return args
+
+
+def run_training(args):
+    step_mul = 16
+    opt_eps = 1e-8
+
+    with open(args.log_file, mode='w') as log_file:
+        # Removes "Namespace" from printout
+        print('Args:', str(args)[9:], file=log_file, flush=True)
+
+        env = BuildMarinesEnvironment(
+            render=args.render,
+            step_multiplier=step_mul,
+            verbose=args.verbose,
+            enable_scv_helper=True,
+            enable_kill_helper=True,
+        )
+        run_settings = RunSettings(
+            num_episodes=args.episodes,
+            num_epochs=args.epochs,
+            batch_size=args.batch_size,
+            train_every=args.train_every,
+            save_every=args.save_every,
+            graph_every=args.graph_every,
+            averaging_window=args.window,
+            graph_file=args.graph_file,
+            log_file=log_file,
+            verbose=args.verbose,
+        )
+        
+        if args.testagent:
+            agent = TestAgent()
+        else:
+            agent_settings = AgentSettings(
+                optimizer=torch.optim.Adam,
+                learning_rate=args.lr,
+                opt_eps=opt_eps,
+                epsilon_max=0,
+                epsilon_min=0,
+                epsilon_duration=0,
+                verbose=args.verbose,
+            )
+            memory = PolicyGradientMemory(
+                buffer_len=args.memsize,
+                discount=args.discount,
+                averaging_window=args.window)
+            model = PolicyGradientNet(
+                num_blocks=args.resblocks,
+                channels=args.channels,
+            )
+            agent = PolicyGradientAgent(
+                init_temp=args.init_temp,
+                temp_steps=args.temp_steps,
+                save_file=args.model_file,
+                model=model,
+                settings=agent_settings,
+                memory=memory,
+            )
+            agent.load()
+
+        experiment = Experiment([agent], env, run_settings)
+        experiment.train()
 
 
 if __name__ == "__main__":
-    run_training()
+    args = parse_hyperparams()
+    run_training(args)

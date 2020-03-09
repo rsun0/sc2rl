@@ -2,6 +2,8 @@ from pysc2.lib import actions, units
 from enum import Enum
 import numpy as np
 
+NUM_ACTIONS = 6
+
 
 class BuildMarinesAction(Enum):
     RALLY_SCVS = -1
@@ -22,8 +24,8 @@ class BuildMarinesActuator:
     BARRACKS_LOCATIONS = ([(20 + 10*i, 60) for i in range(6)] + [(83, 60)]
         + [(52 + 10*i, 40) for i in range(4)])
     MAX_SCVS = 22
-    MAX_DEPOTS = 18
-    MAX_BARRACKS = 11
+    MAX_DEPOTS = 3
+    MAX_BARRACKS = 7
 
     def __init__(self, verbose=True):
         self.verbose = verbose
@@ -223,7 +225,8 @@ class BuildMarinesActuator:
 
         multi = obs.observation.multi_select
         if len(multi) == 0 or any(s.unit_type != units.Terran.Marine for s in multi):
-            if self.progress_stage > 0:
+            available = obs.observation.available_actions
+            if self.progress_stage > 0 or actions.FUNCTIONS.select_army.id not in available:
                 self._print_warning('Not enough Marines to select')
                 return self._conclude_sequence(obs)
             self.progress_stage += 1

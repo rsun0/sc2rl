@@ -13,6 +13,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import deque
 
+class EpisodeCrashException(Exception):
+    '''
+    Signals that the current episode has crashed
+    Data for this episode should be discarded before resetting
+    '''
+    pass
+
+
 class Experiment:
     def __init__(self, agents, custom_env, run_settings):
         self.agents = agents
@@ -30,7 +38,13 @@ class Experiment:
 
         for e in range(self.run_settings.num_episodes):
             # Initialize episode
-            env_states, rewards, done, metainfo = self.custom_env.reset()
+            try:
+                env_states, rewards, done, metainfo = self.custom_env.reset()
+            except EpisodeCrashException:
+                for a in range(len(self.agents)):
+                    if hasattr(self.agents[a], 'notify_episode_crashed'):
+                        self.agents[a].notify_episode_crashed(self.run_settings)
+                continue
 
             # Initialize scores to starting reward (probably 0)
             scores = rewards
@@ -56,7 +70,13 @@ class Experiment:
                 env_actions = [self.agents[a].action_space_converter(actions[a])
                     for a in range(len(self.agents))]
                 # Take environment step
-                env_states, rewards, done, metainfo = self.custom_env.step(env_actions)
+                try:
+                    env_states, rewards, done, metainfo = self.custom_env.step(env_actions)
+                except EpisodeCrashException:
+                    for a in range(len(self.agents)):
+                        if hasattr(self.agents[a], 'notify_episode_crashed'):
+                            self.agents[a].notify_episode_crashed(self.run_settings)
+                    break
                 step += 1
                 total_steps += 1
 
@@ -67,12 +87,6 @@ class Experiment:
                     self.agents[a].push_memory(states[a], actions[a], rewards[a], done)
 
                 if done:
-                    end_states = [self.agents[a].state_space_converter(env_states[a])
-                        for a in range(len(self.agents))]
-                    for a in range(len(self.agents)):
-                        if hasattr(self.agents[a], 'push_memory_terminal'):
-                            self.agents[a].push_memory_terminal(end_states[a])
-
                     averages = []
                     for a in range(len(scores_history)):
                         scores_history[a].append(scores[a])
@@ -98,7 +112,11 @@ class Experiment:
 
         for e in range(self.run_settings.test_episodes):
             # Initialize episode
-            env_states, rewards, done, metainfo = self.custom_env.reset()
+            try:
+                env_states, rewards, done, metainfo = self.custom_env.reset()
+            except EpisodeCrashException:
+                print('Episode crashed, resetting.')
+                continue
 
             # Initialize scores to starting reward (probably 0)
             scores = np.array(rewards)
@@ -116,7 +134,11 @@ class Experiment:
                 if self.run_settings.verbose:
                     self.print_action(env_actions)
                 # Take environment step
-                env_states, rewards, done, metainfo = self.custom_env.step(env_actions)
+                try:
+                    env_states, rewards, done, metainfo = self.custom_env.step(env_actions)
+                except EpisodeCrashException:
+                    print('Episode crashed, resetting.')
+                    break
                 step += 1
                 total_steps += 1
 
@@ -138,17 +160,13 @@ class Experiment:
         pass
 
     def plot_results(self, averages):
-        plt.figure(1)
-        plt.clf()
-        plt.suptitle("Training results")
-        plt.title("Ray Sun, David Long, Michael McGuire")
+        plt.figure(1, clear=True)
+        plt.title("Moving average of score over time")
         plt.xlabel("Episodes")
         plt.ylabel("Average score")
         for i in range(len(averages)):
             plt.plot(averages[i])
-        plt.legend(['Agent {}'.format(a) for a in range(len(averages))])
-        # Makes graph update nonblocking
-        plt.pause(0.005)
+        # plt.legend(['Agent {}'.format(a) for a in range(len(averages))])
         if self.run_settings.graph_file:
             plt.savefig(self.run_settings.graph_file)
 
@@ -181,7 +199,7 @@ class CustomEnvironment():
 class RunSettings:
     def __init__(self, num_episodes, num_epochs, batch_size, train_every,
             save_every, graph_every, averaging_window, test_episodes=20,
-            verbose=True, graph_file=None):
+            verbose=True, graph_file=None, log_file=None):
         """
         :param num_episodes: The total number of episodes to play
         :param num_epochs: The number of update iterations for each experience set
@@ -202,3 +220,4 @@ class RunSettings:
         self.test_episodes = test_episodes
         self.verbose = verbose
         self.graph_file = graph_file
+        self.log_file = log_file
