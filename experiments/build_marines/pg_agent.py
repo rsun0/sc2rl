@@ -129,7 +129,14 @@ class PolicyGradientAgent(Agent):
     def load(self):
         if self.save_file is not None:
             try:
-                self.model.load_state_dict(torch.load(self.save_file))
+                if torch.cuda.is_available():
+                    self.model.load_state_dict(
+                        torch.load(self.save_file, map_location=torch.device('cuda'))
+                    )
+                else:
+                    self.model.load_state_dict(
+                        torch.load(self.save_file, map_location=torch.device('cpu'))
+                    )
             except FileNotFoundError:
                 print('No policy network save file found')
 
