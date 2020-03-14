@@ -24,7 +24,9 @@ def parse_hyperparams():
     parser.add_argument('--graph-file', type=str, default='bin/graph.png', help='graph save location')
     parser.add_argument('--model-file', type=str, default='bin/model.h5', help='model save file')
 
-    parser.add_argument('--lr', type=float, default=0.0001, help='learning rate')
+    parser.add_argument('--lr', type=float, default=0.0001, help='starting learning rate')
+    parser.add_argument('--lr-gamma', type=float, default=0.5, help='learning rate change')
+    parser.add_argument('--lr-step-size', type=int, default=100, help='steps per lr change')
     parser.add_argument('--discount', type=float, default=1.0)
     parser.add_argument('--init-temp', type=float, default=1.0)
     parser.add_argument('--temp-steps', type=int, default=16)
@@ -56,7 +58,7 @@ def run_training(args):
 
     with open(args.log_file, mode='w') as log_file:
         # Removes "Namespace" from printout
-        print('Args:', str(args)[9:], file=log_file, flush=True)
+        print('Args:', str(args)[9:], file=log_file)
 
         env = BuildMarinesEnvironment(
             render=args.render,
@@ -84,6 +86,8 @@ def run_training(args):
             agent_settings = AgentSettings(
                 optimizer=torch.optim.Adam,
                 learning_rate=args.lr,
+                lr_gamma=args.lr_gamma,
+                lr_step_size=args.lr_step_size,
                 opt_eps=opt_eps,
                 epsilon_max=0,
                 epsilon_min=0,

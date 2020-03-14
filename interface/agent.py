@@ -1,3 +1,5 @@
+import torch.optim
+
 class Agent():
     def __init__(self, model, settings, memory, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -12,6 +14,13 @@ class Agent():
             lr=self.settings.learning_rate,
             eps=self.settings.opt_eps,
         )
+        # Instantiate lr scheduler
+        if self.settings.lr_gamma is not None:
+            self.scheduler = torch.optim.lr_scheduler.StepLR(
+                self.optimizer,
+                step_size=self.settings.lr_step_size,
+                gamma=self.settings.lr_gamma,
+            )
 
     def sample(self, state):
         """
@@ -91,7 +100,8 @@ class Model():
 
 class AgentSettings():
     def __init__(self, optimizer, learning_rate, epsilon_max,
-            epsilon_min, epsilon_duration, opt_eps=1e-8, verbose=False):
+            epsilon_min, epsilon_duration, opt_eps=1e-8, verbose=False,
+            lr_gamma=None, lr_step_size=None):
         """
         :param optimizer: A class from torch.optim (instantiated later)
         :param learning_rate: The learning rate for the network
@@ -100,6 +110,8 @@ class AgentSettings():
         :param epsilon_duration: The number of frames to reach the final epsilon
         :param verbose: Enable logging printouts
         :param opt_eps: Numerical stabilizer constant for optimizer
+        :param lr_gamma: gamma argument passed to lr_scheduler
+        :param lr_step_size: step_size argument passed to lr_scheduler
         """
         self.optimizer = optimizer
         self.learning_rate = learning_rate
@@ -108,6 +120,8 @@ class AgentSettings():
         self.epsilon_min = epsilon_min
         self.epsilon_duration = epsilon_duration
         self.verbose = verbose
+        self.lr_gamma = lr_gamma
+        self.lr_step_size = lr_step_size
 
     def get_epsilon(self, frame_num):
         """
