@@ -31,7 +31,7 @@ def parse_hyperparams():
     parser.add_argument('--init-temp', type=float, default=1.0)
     parser.add_argument('--temp-steps', type=int, default=16)
     parser.add_argument('--memsize', type=int, default=64000, help='experience replay memory size')
-    parser.add_argument('--resblocks', type=int, default=4, help='number of resblocks in net')
+    parser.add_argument('--resblocks', type=int, default=1, help='number of resblocks in net')
     parser.add_argument('--channels', type=int, default=32, help='number of conv channels in net')
     
     parser.add_argument('--episodes', type=int, default=25000, help='number of episodes per epoch')
