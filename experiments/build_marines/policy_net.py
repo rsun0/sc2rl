@@ -46,50 +46,6 @@ class PolicyGradientNet(nn.Module, Model):
             nn.ReLU(),
         )
 
-        # self.image_linears = nn.Sequential(
-        #     nn.Linear(84 * 84, NUM_IMAGES * 8),
-        #     nn.BatchNorm1d(NUM_IMAGES * 8),
-        #     nn.ReLU(),
-        # )
-
-        # self.linears = nn.Sequential(
-        #     nn.Linear(NUM_IMAGES * 8 + NUM_SCALARS, channels),
-        #     nn.BatchNorm1d(channels),
-        #     nn.ReLU(),
-        #     nn.Linear(channels, channels),
-        #     nn.BatchNorm1d(channels),
-        #     nn.ReLU(),
-        #     nn.Linear(channels, NUM_ACTIONS)
-        # )
-
-        # self.convs = nn.Sequential(
-        #     # NUM_IMAGES x 84 x 84
-        #     nn.Conv2d(NUM_IMAGES, channels, 3, padding=1),
-        #     # channels x 84 x 84
-        #     nn.BatchNorm2d(channels),
-        #     nn.ReLU(),
-        #     nn.Conv2d(channels, channels, 3, padding=1),
-        #     nn.BatchNorm2d(channels),
-        #     nn.ReLU(),
-        #     nn.Conv2d(channels, channels, 4, stride=2, padding=1),
-        #     # channels x 42 x 42
-        #     nn.BatchNorm2d(channels),
-        #     nn.ReLU(),
-        #     nn.MaxPool2d(2),
-        #     # channels x 21 x 21
-        #     nn.Conv2d(channels, channels, 3, stride=2),
-        #     # channels x 10 x 10
-        #     nn.BatchNorm2d(channels),
-        #     nn.ReLU(),
-        #     nn.MaxPool2d(2),
-        #     # channels x 5 x 5
-        #     nn.Conv2d(channels, NUM_IMAGES, 1),
-        #     # NUM_IMAGES x 5 x 5
-        #     nn.BatchNorm2d(NUM_IMAGES),
-        #     nn.ReLU(),
-        # )
-
-        # flattened_width = NUM_IMAGES * 5 * 5
         flattened_width = 84 * 84
         self.image_linears = nn.Sequential(
             nn.Linear(flattened_width, flattened_width // 24),
