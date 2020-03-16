@@ -29,10 +29,10 @@ class ActorCriticMemory(Memory):
         self.num_exp = 0
 
     def push(self, state, action, reward, done):
-        self.current_trajectory.append((state, action, reward))
+        self.current_trajectory.append((state, action, reward, done))
         
         if done:
-            states, actions, rewards = zip(*self.current_trajectory)
+            states, actions, rewards, terminals = zip(*self.current_trajectory)
             
             values = []
             running_value = 0
@@ -42,17 +42,15 @@ class ActorCriticMemory(Memory):
                 running_value *= self.discount
             values.reverse()
 
-            # FIXME include terminal flag for advantage calculation
-            trajectory = zip(states, actions, values)
+            trajectory = zip(states, actions, values, terminals)
             self.experiences.extend(trajectory)
             self.scores.append(values[0])
             self.num_exp += len(self.current_trajectory)
             self.num_games += 1
             self.current_trajectory = []
 
-    # FIXME do not shuffle, need in order to get critic estimate of next state
-    def get_shuffled_data(self):
-        return np.random.permutation(list(self.experiences))
+    def get_data(self):
+        return list(self.experiences)
 
     def get_average_score(self):
         return np.mean(self.scores)
@@ -76,7 +74,7 @@ class ActorCriticAgent(Agent):
         self.temp = init_temp
         self.train_count = 0
         
-        print('ITR\tTIME\t\tGAMES\tEXP\t\tTEMP\tLOSS\t\tSCORE', file=log_file)
+        print('ITR\tTIME\t\tGAMES\tEXP\t\tTEMP\tC_LOSS\t\tA_LOSS\t\tSCORE', file=log_file)
         time = datetime.now().strftime('%H:%M:%S')
         print('start\t{time}'.format(time=time), file=log_file)
 
@@ -89,30 +87,31 @@ class ActorCriticAgent(Agent):
 
     def _forward(self, state):
         images, scalars = state
-        images, scalars = self.model.to_torch(images[np.newaxis], scalars[np.newaxis])
+        images, scalars = self.model.to_torch((images[np.newaxis], scalars[np.newaxis]))
 
         self.model.eval()
-        preds = self.model(images, scalars)
+        preds, _ = self.model(images, scalars)
         probs = torch.nn.functional.softmax(preds, dim=1).detach().cpu().numpy()[0]
         return probs
 
     def train(self, run_settings):
         data = self.memory.get_shuffled_data()
         batch_size = run_settings.batch_size
-        loss = self.model.optimize(
+        critic_loss, actor_loss = self.model.optimize(
             data, batch_size, self.optimizer, self.settings.verbose)
         
-        if loss is not None:
+        if critic_loss is not None:
             avg_score = self.memory.get_average_score()
             time = datetime.now().strftime('%H:%M:%S')
-            print('{itr:<3d}\t{time}\t{games:5d}\t{exp:8d}\t{tmp:6.4f}\t{loss:8.4f}\t{score:5.1f}'
+            print('{itr:<3d}\t{time}\t{games:5d}\t{exp:8d}\t{tmp:6.4f}\t{closs:8.4f}\t{aloss:8.4f}\t{score:5.1f}'
                 .format(
                     itr=self.train_count,
                     time=time,
                     games=self.memory.num_games,
                     exp=self.memory.num_exp,
                     tmp=self.temp,
-                    loss=loss,
+                    closs=critic_loss,
+                    aloss=actor_loss,
                     score=avg_score),
                 file=run_settings.log_file, flush=True)
 
@@ -155,7 +154,6 @@ class ActorCriticAgent(Agent):
         images = np.empty((NUM_IMAGES, SCREEN_SIZE, SCREEN_SIZE), dtype=int)
         images[0] = obs.observation.feature_screen.unit_type
         images[1] = obs.observation.feature_screen.unit_hit_points
-        # images[2] = obs.observation.feature_screen.unit_hit_points_ratio
 
         scalars = np.empty((NUM_SCALARS), dtype=int)
         scalars[0] = obs.observation.player.minerals

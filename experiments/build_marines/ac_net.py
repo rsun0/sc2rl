@@ -63,7 +63,6 @@ class ActorCriticNet(nn.Module, Model):
             nn.Tanh(),
         )
 
-        self.actor_criterion = nn.CrossEntropyLoss()
         self.critic_criterion = nn.MSELoss()
         
         if torch.cuda.is_available():
@@ -80,57 +79,86 @@ class ActorCriticNet(nn.Module, Model):
         vals = self.critic(x)
         return policy_scores, vals
 
+    def actor_criterion(self, policy_scores, actions_onehot, advantages):
+        log_probs = torch.nn.functional.log_softmax(policy_scores, dim=1)
+        log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
+        loss = -torch.sum(log_probs_observed * advantages)
+        return loss
+
     def optimize(self, data, batch_size, optimizer, verbose=False):
         if len(data) < 2:
             # Need at least 2 data points for batch norm
-            return None
+            return None, None
         
         self.train()
-        running_loss = 0
+
+        critic_loss = 0
         pbar = tqdm(range(0, len(data) - batch_size + 1, batch_size), disable=(not verbose))
         for i in pbar:
             batch = data[i:i+batch_size]
-            states, actions, rewards = zip(*batch)
+            states, actions, values, _ = zip(*batch)
             images, scalars = zip(*states)
 
             images_batch = np.stack(images)
             scalars_batch = np.stack(scalars)
-            images_batch, scalars_batch = self.to_torch(images_batch, scalars_batch)
-
-            actions_batch = np.array(actions)
-            actions_onehot = np.zeros((actions_batch.shape[0], NUM_ACTIONS))
-            actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
-            actions_onehot = torch.from_numpy(actions_onehot).type(torch.FloatTensor)
-            rewards_batch = torch.from_numpy(np.array(rewards)).type(torch.FloatTensor)
-            if torch.cuda.is_available():
-                actions_onehot = actions_onehot.cuda()
-                rewards_batch = rewards_batch.cuda()
-
-            preds = self(images_batch, scalars_batch)
-            log_probs = torch.nn.functional.log_softmax(preds, dim=1)
-            log_probs_observed = torch.sum(log_probs * actions_onehot, dim=1)
-            loss = -torch.sum(log_probs_observed * rewards_batch)
+            values_batch = np.array(values)[:, np.newaxis]
+            images_batch, scalars_batch, values_batch = self.to_torch(
+                (images_batch, scalars_batch, values_batch))
 
             optimizer.zero_grad()
+            _, vals = self(images_batch, scalars_batch)
+            loss = self.critic_criterion(vals, values_batch)
             loss.backward()
             optimizer.step()
 
-            running_loss += loss.item()
+            critic_loss += loss.item()
             num_experiences = i + batch_size
-            pbar.set_postfix_str("{:.3f}L".format(running_loss / num_experiences))
+            pbar.set_postfix_str("{:.3f}L".format(critic_loss / num_experiences))
+        pbar.close()
+        
+        batched_advantages = self.get_batched_advantages()
+        actor_loss = 0
+        # NOTE guarantee next state exists for advantage calculation
+        pbar = tqdm(range(0, len(data) - batch_size, batch_size), disable=(not verbose))
+        for i in pbar:
+            batch = data[i:i+batch_size]
+            states, actions, _, _ = zip(*batch)
+            images, scalars = zip(*states)
+
+            images_batch = np.stack(images)
+            scalars_batch = np.stack(scalars)
+
+            actions_batch = np.array(actions)
+            actions_onehot = np.zeros((actions.shape[0], NUM_ACTIONS))
+            actions_onehot[np.arange(actions.shape[0]), actions] = 1
+            
+            images_batch, scalars_batch, actions_onehot = self.to_torch(
+                (images_batch, scalars_batch, actions_onehot))
+            advantages_batch = batched_advantages[i:i+batch_size]
+
+            optimizer.zero_grad()
+            policy_scores, _ = self(images_batch, scalars_batch)
+            loss = self.actor_criterion(policy_scores, actions_batch, advantages_batch)
+            loss.backward()
+            optimizer.step()
+
+            actor_loss += loss.item()
+            num_experiences = i + batch_size
+            pbar.set_postfix_str("{:.3f}L".format(actor_loss / num_experiences))
         pbar.close()
 
         num_batches = np.ceil(len(data) / batch_size)
-        avg_loss = running_loss / num_batches
-        return avg_loss
+        avg_critic_loss = critic_loss / num_batches
+        avg_actor_loss = actor_loss / num_batches
+        return avg_critic_loss, avg_actor_loss
 
+    def get_batched_advantages(self, data, batch_size):
         # TODO use V(s+1) - V(s) as the advantage estimate
+        return
 
     @staticmethod
-    def to_torch(images, scalars):
-        images = torch.from_numpy(images).type(torch.FloatTensor)
-        scalars = torch.from_numpy(scalars).type(torch.FloatTensor)
-        if torch.cuda.is_available():
-            images = images.cuda()
-            scalars = scalars.cuda()
-        return images, scalars
+    def to_torch(arrays):
+        def transform(x):
+            x = torch.from_numpy(x).type(torch.FloatTensor)
+            return x.cuda() if torch.cuda.is_available() else x
+        return [transform(x) for x in arrays]
