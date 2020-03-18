@@ -74,7 +74,7 @@ class ActorCriticAgent(Agent):
         self.temp = init_temp
         self.train_count = 0
         
-        print('ITR\tTIME\t\tGAMES\tEXP\t\tTEMP\tC_LOSS\t\tA_LOSS\t\tSCORE', file=log_file)
+        print('ITR\tTIME\t\tGAMES\tEXP\t\tTEMP\tLR\t\tC_LOSS\t\tA_LOSS\t\tSCORE', file=log_file)
         time = datetime.now().strftime('%H:%M:%S')
         print('start\t{time}'.format(time=time), file=log_file)
 
@@ -101,15 +101,19 @@ class ActorCriticAgent(Agent):
             data, batch_size, self.optimizer, self.settings.verbose)
         
         if critic_loss is not None:
+            curr_lr = self.optimizer.state_dict()['param_groups'][0]['lr']
+            self.scheduler.step()
+            
             avg_score = self.memory.get_average_score()
             time = datetime.now().strftime('%H:%M:%S')
-            print('{itr:<3d}\t{time}\t{games:5d}\t{exp:8d}\t{tmp:6.4f}\t{closs:8.4f}\t{aloss:8.4f}\t{score:5.1f}'
+            print('{itr:<3d}\t{time}\t{games:5d}\t{exp:8d}\t{tmp:6.4f}\t{lr:8.2e}\t{closs:8.4f}\t{aloss:8.4f}\t{score:5.1f}'
                 .format(
                     itr=self.train_count,
                     time=time,
                     games=self.memory.num_games,
                     exp=self.memory.num_exp,
                     tmp=self.temp,
+                    lr=curr_lr,
                     closs=critic_loss,
                     aloss=actor_loss,
                     score=avg_score),
