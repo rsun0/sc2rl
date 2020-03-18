@@ -91,12 +91,11 @@ class ActorCriticNet(nn.Module, Model):
             return None, None
         
         self.train()
-
         critic_loss = 0
         pbar = tqdm(range(0, len(data) - batch_size + 1, batch_size), disable=(not verbose))
         for i in pbar:
             batch = data[i:i+batch_size]
-            states, actions, values, _ = zip(*batch)
+            states, _, values, _ = zip(*batch)
             images, scalars = zip(*states)
 
             images_batch = np.stack(images)
@@ -116,7 +115,8 @@ class ActorCriticNet(nn.Module, Model):
             pbar.set_postfix_str("{:.3f}L".format(critic_loss / num_experiences))
         pbar.close()
         
-        batched_advantages = self.get_batched_advantages()
+        batched_advantages = self.get_batched_advantages(data, batch_size)
+        self.train()
         actor_loss = 0
         # NOTE guarantee next state exists for advantage calculation
         pbar = tqdm(range(0, len(data) - batch_size, batch_size), disable=(not verbose))
@@ -153,7 +153,29 @@ class ActorCriticNet(nn.Module, Model):
         return avg_critic_loss, avg_actor_loss
 
     def get_batched_advantages(self, data, batch_size):
-        # TODO use V(s+1) - V(s) as the advantage estimate
+        self.eval()
+        values = np.zeros(len(data))
+        for i in range(0, len(data), batch_size):
+            batch = data[i:i+batch_size]
+            states, _, _, _ = zip(*batch)
+            images, scalars = zip(*states)
+            
+            images_batch = np.stack(images)
+            scalars_batch = np.stack(scalars)
+            images_batch, scalars_batch = self.to_torch((images_batch, scalars_batch))
+
+            _, vals = self(images_batch, scalars_batch)
+            vals = vals.detach().cpu().numpy()
+            values[i:i+batch_size] = vals
+        
+        # TODO calculate advantage
+        for i in range(0, len(data) - batch_size, batch_size):
+            batch = data[i:i+batch_size]
+            _, _, _, terminals = zip(*batch)
+            terminals = np.array(terminals)
+
+            values[i:i+batch_size] -= values[i+1:i+batch_size+1]
+        # TODO insert NaN, no advantage for last experience
         return
 
     @staticmethod
