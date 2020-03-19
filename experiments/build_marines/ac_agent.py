@@ -29,10 +29,10 @@ class ActorCriticMemory(Memory):
         self.num_exp = 0
 
     def push(self, state, action, reward, done):
-        self.current_trajectory.append((state, action, reward, done))
+        self.current_trajectory.append((state, action, reward))
         
         if done:
-            states, actions, rewards, terminals = zip(*self.current_trajectory)
+            states, actions, rewards = zip(*self.current_trajectory)
             
             values = []
             running_value = 0
@@ -42,15 +42,15 @@ class ActorCriticMemory(Memory):
                 running_value *= self.discount
             values.reverse()
 
-            trajectory = zip(states, actions, values, terminals)
+            trajectory = zip(states, actions, values)
             self.experiences.extend(trajectory)
             self.scores.append(values[0])
             self.num_exp += len(self.current_trajectory)
             self.num_games += 1
             self.current_trajectory = []
 
-    def get_data(self):
-        return list(self.experiences)
+    def get_shuffled_data(self):
+        return np.random.permutation(list(self.experiences))
 
     def get_average_score(self):
         return np.mean(self.scores)
