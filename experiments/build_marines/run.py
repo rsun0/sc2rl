@@ -16,6 +16,9 @@ from policy_net import PolicyGradientNet
 import torch
 import argparse
 
+# NOTE disabled due to broken CUDA on current production machine
+torch.backends.cudnn.enabled = False
+
 
 def parse_hyperparams():
     parser = argparse.ArgumentParser()
