@@ -2,6 +2,7 @@ __pycache__/
 .vscode/
 env/
 bin/
+experiments/build_marines/results/
 *.pickle
 *.h5
 *.png

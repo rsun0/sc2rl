@@ -16,6 +16,9 @@ from policy_net import PolicyGradientNet
 import torch
 import argparse
 
+# NOTE disabled due to broken CUDA on current production machine
+torch.backends.cudnn.enabled = False
+
 
 def parse_hyperparams():
     parser = argparse.ArgumentParser()
@@ -24,15 +27,17 @@ def parse_hyperparams():
     parser.add_argument('--graph-file', type=str, default='bin/graph.png', help='graph save location')
     parser.add_argument('--model-file', type=str, default='bin/model.h5', help='model save file')
 
-    parser.add_argument('--lr', type=float, default=0.0001, help='learning rate')
+    parser.add_argument('--lr', type=float, default=0.0001, help='starting learning rate')
+    parser.add_argument('--lr-gamma', type=float, default=0.5, help='learning rate change')
+    parser.add_argument('--lr-step-size', type=int, default=100, help='steps per lr change')
     parser.add_argument('--discount', type=float, default=1.0)
     parser.add_argument('--init-temp', type=float, default=1.0)
     parser.add_argument('--temp-steps', type=int, default=16)
     parser.add_argument('--memsize', type=int, default=64000, help='experience replay memory size')
-    parser.add_argument('--resblocks', type=int, default=2, help='number of resblocks in net')
+    parser.add_argument('--resblocks', type=int, default=1, help='number of resblocks in net')
     parser.add_argument('--channels', type=int, default=32, help='number of conv channels in net')
     
-    parser.add_argument('--episodes', type=int, default=10000, help='number of episodes per epoch')
+    parser.add_argument('--episodes', type=int, default=30000, help='number of episodes per epoch')
     parser.add_argument('--epochs', type=int, default=1, help='number of epochs')
     parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--train-every', type=int, default=16000, help='training period in number of steps')
@@ -40,9 +45,11 @@ def parse_hyperparams():
     parser.add_argument('--graph-every', type=int, default=50, help='graphing period in number of episodes')
     parser.add_argument('--window', type=int, default=100, help='averaging window for graph')
 
-    parser.add_argument('--render', action='store_true', default=False, help='render game')
-    parser.add_argument('--verbose', action='store_true', default=False, help='enable printouts')
-    parser.add_argument('--testagent', action='store_true', default=False, help='use test agent')
+    parser.add_argument('--render', action='store_true', help='render game')
+    parser.add_argument('--verbose', action='store_true', help='enable printouts')
+    parser.add_argument('--testagent', action='store_true', help='use test agent')
+    parser.add_argument('--no-scvs', action='store_true', help='disable make SCV helper')
+    parser.add_argument('--no-kill', action='store_true', help='disable kill marine helper')
 
     args = parser.parse_args()
     return args
@@ -54,14 +61,14 @@ def run_training(args):
 
     with open(args.log_file, mode='w') as log_file:
         # Removes "Namespace" from printout
-        print('Args:', str(args)[9:], file=log_file, flush=True)
+        print('Args:', str(args)[9:], file=log_file)
 
         env = BuildMarinesEnvironment(
             render=args.render,
             step_multiplier=step_mul,
             verbose=args.verbose,
-            enable_scv_helper=True,
-            enable_kill_helper=True,
+            enable_scv_helper=(not args.no_scvs),
+            enable_kill_helper=(not args.no_kill),
         )
         run_settings = RunSettings(
             num_episodes=args.episodes,
@@ -82,6 +89,8 @@ def run_training(args):
             agent_settings = AgentSettings(
                 optimizer=torch.optim.Adam,
                 learning_rate=args.lr,
+                lr_gamma=args.lr_gamma,
+                lr_step_size=args.lr_step_size,
                 opt_eps=opt_eps,
                 epsilon_max=0,
                 epsilon_min=0,
@@ -100,6 +109,7 @@ def run_training(args):
                 init_temp=args.init_temp,
                 temp_steps=args.temp_steps,
                 save_file=args.model_file,
+                log_file=log_file,
                 model=model,
                 settings=agent_settings,
                 memory=memory,

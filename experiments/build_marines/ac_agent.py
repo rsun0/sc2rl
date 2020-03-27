@@ -19,7 +19,7 @@ NUM_IMAGES = 2
 NUM_SCALARS = 8
 
 
-class PolicyGradientMemory(Memory):
+class ActorCriticMemory(Memory):
     def __init__(self, buffer_len, discount, averaging_window):
         self.experiences = collections.deque(maxlen=buffer_len)
         self.scores = collections.deque(maxlen=averaging_window)
@@ -59,7 +59,7 @@ class PolicyGradientMemory(Memory):
         self.current_trajectory = []
 
 
-class PolicyGradientAgent(Agent):
+class ActorCriticAgent(Agent):
     def __init__(self,
             init_temp=0.0,
             temp_steps=1,
@@ -74,9 +74,9 @@ class PolicyGradientAgent(Agent):
         self.temp = init_temp
         self.train_count = 0
         
-        print('ITR\tTIME\t\tGAMES\tEXP\t\tTEMP\tLR\t\tLOSS\t\tSCORE', file=log_file)
+        print('ITR\tTIME\t\tGAMES\tEXP\t\tTEMP\tLR\t\tC_LOSS\t\tA_LOSS\t\tSCORE', file=log_file)
         time = datetime.now().strftime('%H:%M:%S')
-        print('start\t{time}'.format(time=time), file=log_file, flush=True)
+        print('start\t{time}'.format(time=time), file=log_file)
 
     def _sample(self, state):
         probs = self._forward(state)
@@ -87,26 +87,26 @@ class PolicyGradientAgent(Agent):
 
     def _forward(self, state):
         images, scalars = state
-        images, scalars = self.model.to_torch(images[np.newaxis], scalars[np.newaxis])
+        images, scalars = self.model.to_torch((images[np.newaxis], scalars[np.newaxis]))
 
         self.model.eval()
-        preds = self.model(images, scalars)
+        preds, _ = self.model(images, scalars)
         probs = torch.nn.functional.softmax(preds, dim=1).detach().cpu().numpy()[0]
         return probs
 
     def train(self, run_settings):
         data = self.memory.get_shuffled_data()
         batch_size = run_settings.batch_size
-        loss = self.model.optimize(
+        critic_loss, actor_loss = self.model.optimize(
             data, batch_size, self.optimizer, self.settings.verbose)
         
-        if loss is not None:
+        if critic_loss is not None:
             curr_lr = self.optimizer.state_dict()['param_groups'][0]['lr']
             self.scheduler.step()
-
+            
             avg_score = self.memory.get_average_score()
             time = datetime.now().strftime('%H:%M:%S')
-            print('{itr:<3d}\t{time}\t{games:5d}\t{exp:8d}\t{tmp:6.4f}\t{lr:8.2e}\t{loss:8.4f}\t{score:5.1f}'
+            print('{itr:<3d}\t{time}\t{games:5d}\t{exp:8d}\t{tmp:6.4f}\t{lr:8.2e}\t{closs:8.4f}\t{aloss:8.4f}\t{score:5.1f}'
                 .format(
                     itr=self.train_count,
                     time=time,
@@ -114,7 +114,8 @@ class PolicyGradientAgent(Agent):
                     exp=self.memory.num_exp,
                     tmp=self.temp,
                     lr=curr_lr,
-                    loss=loss,
+                    closs=critic_loss,
+                    aloss=actor_loss,
                     score=avg_score),
                 file=run_settings.log_file, flush=True)
 
@@ -157,7 +158,6 @@ class PolicyGradientAgent(Agent):
         images = np.empty((NUM_IMAGES, SCREEN_SIZE, SCREEN_SIZE), dtype=int)
         images[0] = obs.observation.feature_screen.unit_type
         images[1] = obs.observation.feature_screen.unit_hit_points
-        # images[2] = obs.observation.feature_screen.unit_hit_points_ratio
 
         scalars = np.empty((NUM_SCALARS), dtype=int)
         scalars[0] = obs.observation.player.minerals

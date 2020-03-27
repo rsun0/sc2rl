@@ -86,17 +86,21 @@ class BuildMarinesEnvironment(CustomEnvironment):
         # NOTE only passes program name
         FLAGS(sys.argv[:1])
 
-        self._env = sc2_env.SC2Env(
-            map_name=MAP,
-            agent_interface_format=features.AgentInterfaceFormat(
-                feature_dimensions=features.Dimensions(
-                    screen=SCREEN_SIZE, minimap=MINIMAP_SIZE),
-                use_feature_units=True
-            ),
-            step_mul=self.step_multiplier,
-            visualize=self.render,
-            game_steps_per_episode=None
-        )
+        try:
+            self._env = sc2_env.SC2Env(
+                map_name=MAP,
+                agent_interface_format=features.AgentInterfaceFormat(
+                    feature_dimensions=features.Dimensions(
+                        screen=SCREEN_SIZE, minimap=MINIMAP_SIZE),
+                    use_feature_units=True
+                ),
+                step_mul=self.step_multiplier,
+                visualize=self.render,
+                game_steps_per_episode=None
+            )
+        except protocol.ConnectionError as e:
+            tb = sys.exc_info()[2]
+            raise EpisodeCrashException('SC2Env constructor failed').with_traceback(tb)
 
     def _update_persistent_state(self):
         single_select = self._curr_frame.observation.single_select[0]
