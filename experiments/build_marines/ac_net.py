@@ -16,8 +16,11 @@ from action_interface import NUM_ACTIONS
 class ActorCriticNet(nn.Module, Model):
     def __init__(self,
             num_blocks=2,
-            channels=32):
+            channels=32,
+            force_cpu=False):
         super().__init__()
+
+        self.force_cpu = force_cpu
 
         self.convs = nn.Sequential(
             nn.Conv2d(NUM_IMAGES, channels, 3, padding=1),
@@ -65,7 +68,7 @@ class ActorCriticNet(nn.Module, Model):
 
         self.critic_criterion = nn.MSELoss()
         
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and not self.force_cpu:
             self.cuda()
 
     def forward(self, images, scalars):
@@ -169,9 +172,10 @@ class ActorCriticNet(nn.Module, Model):
             values[i:i+batch_size] = vals
         return values
 
-    @staticmethod
-    def to_torch(arrays):
+    def to_torch(self, arrays):
         def transform(x):
             x = torch.from_numpy(x).type(torch.FloatTensor)
-            return x.cuda() if torch.cuda.is_available() else x
+            if torch.cuda.is_available() and not self.force_cpu:
+                return x.cuda()
+            return x
         return [transform(x) for x in arrays]
