@@ -34,8 +34,11 @@ class ResBlock(nn.Module):
 class PolicyGradientNet(nn.Module, Model):
     def __init__(self,
             num_blocks=2,
-            channels=32):
+            channels=32,
+            force_cpu=False):
         super().__init__()
+
+        self.force_cpu = force_cpu
 
         self.convs = nn.Sequential(
             nn.Conv2d(NUM_IMAGES, channels, 3, padding=1),
@@ -69,7 +72,7 @@ class PolicyGradientNet(nn.Module, Model):
         )
         self.linears = nn.Sequential(*linears)
 
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and not self.force_cpu:
             self.cuda()
 
     def forward(self, images, scalars):
@@ -102,7 +105,7 @@ class PolicyGradientNet(nn.Module, Model):
             actions_onehot[np.arange(actions_batch.shape[0]), actions_batch] = 1
             actions_onehot = torch.from_numpy(actions_onehot).type(torch.FloatTensor)
             rewards_batch = torch.from_numpy(np.array(rewards)).type(torch.FloatTensor)
-            if torch.cuda.is_available():
+            if torch.cuda.is_available() and not self.force_cpu:
                 actions_onehot = actions_onehot.cuda()
                 rewards_batch = rewards_batch.cuda()
 
@@ -124,11 +127,10 @@ class PolicyGradientNet(nn.Module, Model):
         avg_loss = running_loss / num_batches
         return avg_loss
 
-    @staticmethod
-    def to_torch(images, scalars):
+    def to_torch(self, images, scalars):
         images = torch.from_numpy(images).type(torch.FloatTensor)
         scalars = torch.from_numpy(scalars).type(torch.FloatTensor)
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and not self.force_cpu:
             images = images.cuda()
             scalars = scalars.cuda()
         return images, scalars

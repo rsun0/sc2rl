@@ -50,6 +50,7 @@ def parse_hyperparams():
     parser.add_argument('--testagent', action='store_true', help='use test agent')
     parser.add_argument('--no-scvs', action='store_true', help='disable make SCV helper')
     parser.add_argument('--no-kill', action='store_true', help='disable kill marine helper')
+    parser.add_argument('--cpu', action='store_true', help='disable GPU use')
 
     args = parser.parse_args()
     return args
@@ -104,6 +105,7 @@ def run_training(args):
             model = PolicyGradientNet(
                 num_blocks=args.resblocks,
                 channels=args.channels,
+                force_cpu=args.cpu,
             )
             agent = PolicyGradientAgent(
                 init_temp=args.init_temp,
@@ -113,6 +115,7 @@ def run_training(args):
                 model=model,
                 settings=agent_settings,
                 memory=memory,
+                force_cpu=args.cpu,
             )
             agent.load()
 

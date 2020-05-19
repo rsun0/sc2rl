@@ -65,6 +65,7 @@ class PolicyGradientAgent(Agent):
             temp_steps=1,
             save_file=None,
             log_file=None,
+            force_cpu=False,
             *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.save_file = save_file
@@ -72,6 +73,7 @@ class PolicyGradientAgent(Agent):
         self.init_temp = init_temp
         self.temp_steps = temp_steps
         self.temp = init_temp
+        self.force_cpu = force_cpu
         self.train_count = 0
         
         print('ITR\tTIME\t\tGAMES\tEXP\t\tTEMP\tLR\t\tLOSS\t\tSCORE', file=log_file)
@@ -133,7 +135,7 @@ class PolicyGradientAgent(Agent):
     def load(self):
         if self.save_file is not None:
             try:
-                if torch.cuda.is_available():
+                if torch.cuda.is_available() and not self.force_cpu:
                     self.model.load_state_dict(
                         torch.load(self.save_file, map_location=torch.device('cuda'))
                     )
