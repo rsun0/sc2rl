@@ -53,7 +53,7 @@ torchvision==0.3.0
 tqdm==4.38.0
 typed-ast==1.4.1
 Unidecode==1.1.1
-urllib3==1.25.8
+urllib3==1.26.5
 websocket-client==0.57.0
 websockets==6.0
 Werkzeug==0.16.0
